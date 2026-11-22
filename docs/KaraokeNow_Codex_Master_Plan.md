@@ -1,6 +1,6 @@
 # KaraokeNow — Master Plan for Codex
 
-> Version: 1.0 | Date: 2026-11-22 | Status: Planning baseline, not approved requirements
+> Version: 1.2 | Date: 2026-11-22 | Status: Mixed — product model, Hanoi pilot, MVP scope and selected business rules approved; implementation progress recorded below
 > Product: Hybrid B2B SaaS + B2C Marketplace for karaoke room booking and management in Vietnam.
 > Intended readers: Codex, Product Owner, BA, SA, Backend/Frontend developers, QA, DevOps, Marketing.
 
@@ -20,7 +20,7 @@ KaraokeNow is a **Hybrid SaaS + Marketplace** platform:
 
 **North-star metric:** completed bookings per month through the system, with no overlapping confirmed bookings and healthy merchant retention.
 
-Launch market hypothesis: Hanoi. MVP target: 12–16 weeks. Pilot: 5–10 merchants. Year-one stretch target: 100 paying merchants. All targets require validation.
+**Approved:** Hanoi is the pilot geography; the Hybrid SaaS + Marketplace model and MVP scope/pilot gates are recorded as PD-020–PD-022 in the Decision Log. MVP target of 12–16 weeks, pilot size of 5–10 merchants, and year-one stretch target of 100 paying merchants remain **planning assumptions, not approved targets**.
 
 ### Strategic sequencing
 
@@ -58,7 +58,7 @@ Merchant value: consolidate walk-in, phone, Zalo, Messenger and marketplace book
 | Setup/integration | Project-based |
 | Sponsored listings | Future only; transparently labeled |
 
-Do not charge marketplace commission on merchant-owned bookings initially. Define immutable attribution at booking confirmation, refund adjustments, payout/reconciliation and disputes before enabling fees.
+Do not charge marketplace commission on merchant-owned bookings. The PO selected commission only for completed marketplace-attributed bookings, with a percentage configured per merchant and calculated on room revenue retained after discounts/refunds, excluding tax (PD-009/PD-013). During the pilot, record calculated amounts for reporting only; do not collect or settle commission and handle exceptions manually (PD-016).
 
 ### Competitive moat
 
@@ -80,55 +80,55 @@ Enforce authorization in APIs and database queries, not just UI.
 
 ### Modules and release priority
 
-| ID | Module | Priority | Release |
-|---|---|---|---|
-| MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP |
-| MOD-02 | Branch and room management | P0 | MVP |
-| MOD-03 | Pricing and availability | P0 | MVP |
-| MOD-04 | Booking engine | P0 | MVP |
-| MOD-05 | Deposit and payment | P0 | MVP |
-| MOD-06 | Reception dashboard | P0 | MVP |
-| MOD-07 | Customer web booking | P0 | MVP |
-| MOD-08 | Zalo Mini App | P1 | Pilot |
-| MOD-09 | Messenger chatbot/deep-link integration | P1 | Pilot |
-| MOD-10 | CRM and loyalty | P1 | V1 |
-| MOD-11 | Marketplace discovery | P1 | V1 |
-| MOD-12 | Promotions and campaigns | P1 | V1 |
-| MOD-13 | SaaS subscription and billing | P1 | V1 |
-| MOD-14 | Analytics and reporting | P1 | V1 |
-| MOD-15 | AI recommendations | P2 | V2 |
-| MOD-16 | POS/inventory integration | P2 | V2 |
+| ID | Module | Priority | Release | Trạng thái hiện tại |
+|---|---|---|---|---|
+| MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — auth, tenant membership, roles, branch grants; reset-code delivery còn phụ thuộc ZBS |
+| MOD-02 | Branch and room management | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — CRUD, trạng thái, tiện nghi, metadata media; chưa có upload file thật |
+| MOD-03 | Pricing and availability | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — quote API, quản lý cấu hình giá, room blocks, audited buffer policy và availability search đã có; snapshot giá chưa lưu cùng booking |
+| MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, expiry và overlap constraint đã có; customer identity, snapshot giá và booking state machine còn thiếu |
+| MOD-05 | Deposit and payment | P0 | MVP | **PHẠM VI PILOT ĐÃ CHỐT** — chỉ ghi nhận thanh toán thủ công; online payment ngoài pilot |
+| MOD-06 | Reception dashboard | P0 | MVP | **MỘT PHẦN** — FE có tìm phòng, báo giá, staff hold và danh sách hold theo chi nhánh; chưa có lịch booking xác nhận, check-in/out hay UAT |
+| MOD-07 | Customer web booking | P0 | MVP | **PROTOTYPE** — FE responsive với dữ liệu minh họa; public catalog, guest booking API và xử lý booking thật chưa có |
+| MOD-08 | Zalo Mini App | P1 | Pilot | **CHƯA TÍCH HỢP** — quyền/SDK cần xác nhận; pilot channel approach phải được duyệt |
+| MOD-09 | Messenger chatbot/deep-link integration | P1 | Pilot | **CHƯA TÍCH HỢP** — chờ xác minh quyền Meta và lựa chọn luồng |
+| MOD-10 | CRM and loyalty | P1 | V1 | BACKLOG |
+| MOD-11 | Marketplace discovery | P1 | V1 | BACKLOG |
+| MOD-12 | Promotions and campaigns | P1 | V1 | BACKLOG |
+| MOD-13 | SaaS subscription and billing | P1 | V1 | BACKLOG |
+| MOD-14 | Analytics and reporting | P1 | V1 | BACKLOG — observability kỹ thuật không đồng nghĩa báo cáo kinh doanh |
+| MOD-15 | AI recommendations | P2 | V2 | BACKLOG |
+| MOD-16 | POS/inventory integration | P2 | V2 | BACKLOG |
 
 ### Business requirements
 
 - **BR-01 Rooms:** multiple branches per merchant; room capacity, amenities, media, operational status.
 - **BR-02 Availability:** exclude overlapping confirmed bookings, valid holds, maintenance blocks; support variable durations.
-- **BR-03 Pricing:** weekday/time-slot/holiday/room-type/duration rules with explicit precedence; snapshot final quote and cancellation policy.
+- **BR-03 Pricing:** weekday/time-slot/holiday/room-type/duration rules with merchant-assigned explicit priority; reject tied/ambiguous matches, round final VND total to 1 VND, and snapshot quote and cancellation terms (PD-011 approved 2026-11-22).
 - **BR-04 Omnichannel booking:** all sources use the same transactional booking engine.
-- **BR-05 Deposits:** configurable fixed or percentage deposits; payment success required for confirmation unless merchant permits no-deposit bookings.
-- **BR-06 Cancellation/refund:** versioned policies, authorization, customer disclosure, audit trail.
+- **BR-05 Deposits:** merchants may configure no-deposit, fixed or percentage deposit rules; default is no deposit. Owner/Branch Manager may configure no-deposit for online or other channels/cases; a valid hold and booking-rule checks remain required (PD-005 approved 2026-11-22).
+- **BR-06 Cancellation/refund:** merchant supplies free-form terms per booking; show and snapshot exact terms. Authorized staff reviews and records outcomes; the system does not automatically decide refunds/no-shows (PD-006/PD-015 approved 2026-11-22).
 - **BR-07 Attribution:** track booking origin, campaign and marketplace eligibility for commission.
 - **BR-08 Privacy:** minimize data, separate service terms from marketing opt-in, implement retention and data-subject workflows.
 
 ### Functional requirements and acceptance criteria
 
-| ID | Requirement | Acceptance criterion |
-|---|---|---|
-| FR-001 | Create branch | Owner can create valid branch with timezone/status |
-| FR-002 | Create room | Unique room code within branch |
-| FR-003 | Pricing rules | Deterministic priority and correct quoted price |
-| FR-004 | Search availability | Excludes blocked/occupied time intervals |
-| FR-005 | Hold room | TTL-based hold, never conflicting active holds |
-| FR-006 | Confirm booking | Requires valid hold and payment/no-deposit conditions |
-| FR-007 | Webhook processing | Duplicate webhook never double-charges/confirms |
-| FR-008 | Cancel booking | Enforces rights and refund policy |
-| FR-009 | Check-in | Only eligible booking can check in |
-| FR-010 | Check-out | Records actual usage end time |
-| FR-011 | Tenant isolation | Unauthorized cross-tenant access denied |
-| FR-012 | Audit | Sensitive state and pricing changes tracked |
-| FR-013 | Marketplace listings | Only approved venues visible |
-| FR-014 | Attribution | Confirmation locks attribution fields |
-| FR-015 | Notifications | Provider failure cannot roll back committed booking |
+| ID | Requirement | Acceptance criterion | Trạng thái |
+|---|---|---|---|
+| FR-001 | Create branch | Owner can create valid branch with timezone/status | **ĐÃ LÀM** — API và PostgreSQL E2E |
+| FR-002 | Create room | Unique room code within branch | **ĐÃ LÀM CƠ BẢN** — API/CRUD; duplicate room-code assertion còn thiếu trong E2E |
+| FR-003 | Pricing rules | Deterministic priority and correct quoted price | **MỘT PHẦN** — quote API returns a versioned calculation snapshot; durable booking snapshot integration remains for booking workflow |
+| FR-004 | Search availability | Excludes blocked/occupied time intervals | **ĐÃ CÓ NỀN TẢNG** — search API loại phòng inactive, maintenance và occupancy chồng lấp, áp dụng buffer dọn phòng sau booking; UAT chưa chạy; hold nguyên tử là yêu cầu riêng |
+| FR-005 | Hold room | TTL-based hold, never conflicting active holds | **ĐÃ CÓ NỀN TẢNG** — staff hold/create/read, TTL, expiry và test 100 yêu cầu; customer identity và snapshot giá còn thiếu |
+| FR-006 | Confirm booking | Requires valid hold and payment/no-deposit conditions | **CHƯA LÀM** — booking lifecycle chưa có; pilot manual payment đã chốt |
+| FR-007 | Webhook processing | Duplicate webhook never double-charges/confirms | **NGOÀI PILOT / CHƯA LÀM** — provider/MoR chờ quyết định sau pilot |
+| FR-008 | Cancel booking | Enforces rights and refund policy | **CHƯA LÀM** — điều khoản free-form và staff review đã chốt; workflow chưa có |
+| FR-009 | Check-in | Only eligible booking can check in | **CHƯA LÀM** |
+| FR-010 | Check-out | Records actual usage end time | **CHƯA LÀM** |
+| FR-011 | Tenant isolation | Unauthorized cross-tenant access denied | **ĐÃ LÀM CHO API HIỆN CÓ** — booking scope chưa thể kiểm thử do booking API chưa có |
+| FR-012 | Audit | Sensitive state and pricing changes tracked | **ĐÃ LÀM CHO MUTATION HIỆN CÓ** — booking/pricing quote audit chưa có |
+| FR-013 | Marketplace listings | Only approved venues visible | **CHƯA LÀM** |
+| FR-014 | Attribution | Confirmation locks attribution fields | **CHƯA LÀM** — nguyên tắc commission đã chốt, attribution implementation chưa có |
+| FR-015 | Notifications | Provider failure cannot roll back committed booking | **NỀN TẢNG ĐÃ LÀM** — outbox/adapter; chưa có booking event producer hay provider live |
 
 ### Nonfunctional targets (verify in performance tests)
 
@@ -149,14 +149,14 @@ Alternative terminal paths: `HELD -> EXPIRED`; `PENDING_PAYMENT/CONFIRMED -> CAN
 
 ### Core user journeys
 
-1. Customer: browse venue -> choose room/date/time/duration -> see exact quote and policy -> hold -> deposit -> confirmation -> reminder -> check-in -> completion -> feedback.
+1. Customer: browse venue -> choose room/date/time/duration -> see exact quote and policy -> hold -> pay a configured deposit when required -> confirmation -> reminder -> check-in -> completion -> feedback.
 2. Reception: select branch -> calendar -> manually create/modify booking -> verify room occupancy -> check-in/out -> payment status.
 3. Merchant onboarding: sign up -> verify merchant -> configure branch/rooms/prices -> preview public listing -> approve and publish.
 4. Customer cancellation: verify ownership -> evaluate policy snapshot -> cancel/release room -> initiate refund if eligible -> notify.
 
 ### Open business decisions
 
-Booking duration increments, buffer between sessions, overtime, grace period, walk-ins, no-show handling, partial refunds, tax invoicing, cash deposits, payment merchant-of-record, commission calculation, customer account identity matching, age restrictions and business license verification all require BA/PO decisions.
+**Còn mở:** overtime, grace period, hóa đơn thuế, payment/MoR sau pilot, payout/đối soát/tranh chấp trước khi thu commission, giới hạn độ tuổi và xác minh giấy phép. **Đã chốt:** duration mặc định 30 phút (min 1h/max 8h, Merchant cấu hình); buffer mặc định 15 phút và có thể chỉnh; hold mặc định 15 phút theo kênh; no-deposit/fixed/percentage deposit và quyền bật no-deposit theo kênh; walk-in/cash ghi nhận riêng; khách guest booking cần số điện thoại, email tùy chọn; ưu tiên giá do Merchant đặt và từ chối tie; điều khoản hủy free-form được snapshot, nhân viên duyệt outcome, không tự động quyết định refund/no-show; commission chỉ áp dụng booking Marketplace hoàn tất trên doanh thu phòng giữ lại sau discount/refund, chưa thu/settle trong pilot. Chi tiết và ngày duyệt nằm trong `docs/00-product/decision-log.md`.
 
 ## 4. Product backlog and delivery plan
 
@@ -201,13 +201,13 @@ Booking duration increments, buffer between sessions, overtime, grace period, wa
 
 ```mermaid
 flowchart TB
-  subgraph Channels
-    Z[Zalo Mini App]
-    M[Messenger Bot / Web Link]
+  subgraph FE[Frontend applications — build and deploy separately]
+    Z[Zalo Mini App / WebView]
+    M[Messenger entry / result message]
     W[Customer Web / Marketplace]
-    A[Merchant Admin / Reception]
+    A[Merchant Admin / Reception Web]
   end
-  Channels --> E[WAF / TLS / API Gateway / Auth / Rate Limits]
+  FE --> E[HTTPS API boundary / WAF / Rate Limits]
   E --> C
   subgraph C[Node.js / NestJS Modular Monolith]
     I[Identity / Tenant / RBAC]
@@ -487,7 +487,7 @@ Test categories: unit, integration, API contract, E2E, concurrency, security, pe
 | TC-009 | Maintenance-blocked room | Not bookable |
 | TC-010 | Worker crashes after DB commit | Outbox resumes after restart |
 
-Go-live gates: no unresolved critical booking/payment/security defects; concurrency invariant passes; payment reconciliation works; recovery runbook tested; at least five merchants validate workflows; external integration permissions verified.
+Go-live gates theo PD-022: dữ liệu/quyền Merchant được ký nhận; booking/availability correctness và concurrency pass; customer/reception flows qua UAT; hỗ trợ, giám sát và phục hồi sẵn sàng; Merchant pilot chấp nhận quy trình. Payment thủ công cần quy trình đối soát; online payment ngoài pilot. Quy mô năm Merchant là mục tiêu dự thảo chưa chốt. Quyền kênh ngoài phải được xác minh trước khi bật kênh, nhưng không chặn pilot web.
 
 ## 10. Risk register
 
@@ -528,35 +528,44 @@ Go-live gates: no unresolved critical booking/payment/security defects; concurre
 | Marketing | GTM, ICP, campaigns, attribution, CAC/LTV |
 | Sales/Ops | Onboarding SOP, pricing, support playbook |
 
-## 13. Approval checklist (not yet approved)
+## 13. Quyết định và phê duyệt
 
-- [ ] Approve Hybrid SaaS + Marketplace model.
-- [ ] Approve Hanoi pilot geography.
-- [ ] Freeze MVP around room management, booking and deposit.
-- [ ] Approve Node.js 24 LTS + TypeScript + NestJS + PostgreSQL + Redis stack.
-- [ ] Approve approximate VND 2.13 billion year-one planning budget.
-- [ ] Approve 12–16 week MVP target and pilot gates.
-- [ ] Decide merchant-of-record, payment provider, refunds, deposits and commissions.
-- [ ] Validate Zalo Mini App and Meta Messenger permissions/current API policies.
-- [ ] Confirm legal requirements for karaoke partners, consumer protection and personal data.
+Các checkbox bên dưới phản ánh đúng trạng thái trong Decision Log tại ngày cập nhật; “đã chốt” là quyết định nghiệp vụ, không đồng nghĩa tính năng tương ứng đã được code hoặc tích hợp.
+
+- [x] **Đã chốt (PD-020):** mô hình Hybrid SaaS + Marketplace.
+- [x] **Đã chốt (PD-021):** địa bàn pilot Hà Nội.
+- [x] **Đã chốt (PD-022):** phạm vi MVP và cổng pilot. MVP gồm tenant/RBAC, thiết lập chi nhánh/phòng, giá/availability, booking và vận hành lễ tân, web đặt phòng khách hàng, ghi nhận thanh toán thủ công. Pilot không có thanh toán online. Chỉ go-live sau khi ký nhận dữ liệu/quyền Merchant, qua kiểm thử availability/booking/concurrency, UAT khách hàng và lễ tân, sẵn sàng hỗ trợ/giám sát và Merchant pilot chấp nhận quy trình. Zalo/Messenger WebView là hạng mục có điều kiện, cần xác minh quyền nền tảng và không chặn pilot web.
+- [x] **Quyết định kiến trúc frontend (ADR-012):** frontend là ứng dụng riêng, có source/build/release riêng và gọi backend qua HTTPS API/OpenAPI. Backend NestJS không render hoặc bundle UI. Repository hiện có `fe/` và `be/` tách biệt; cách tổ chức lâu dài thành repository riêng hay workspace chưa chốt.
+- [ ] Ngân sách năm đầu khoảng 2,13 tỷ VND.
+- [ ] Mục tiêu MVP 12–16 tuần và quy mô pilot 5–10 Merchant (vẫn là giả định kế hoạch, chưa được chốt).
+- [x] **Đã chốt theo hướng kỹ thuật nền tảng:** Node.js 24 LTS + TypeScript + NestJS + PostgreSQL; trạng thái triển khai được ghi trong bảng 13.1. Phê duyệt kiến trúc tổng thể vẫn cần PO xác nhận.
+- [x] **Đã chốt:** duration, buffer, hold TTL, deposit/no-deposit, xử lý walk-in/cash, guest booking, ưu tiên giá, điều khoản hủy và commission eligibility/base — xem PD-001 đến PD-015 trong Decision Log.
+- [x] **Đã chốt cho pilot:** không thanh toán online; ghi nhận tiền thủ công (PD-007).
+- [ ] Chọn payment provider/MoR sau pilot; hoàn tất payout, reconciliation và dispute trước khi thu commission.
+- [ ] Xác minh quyền Zalo Mini App và Meta Messenger theo tài khoản/nền tảng thực tế.
+- [ ] Xác nhận yêu cầu pháp lý về đối tác karaoke, bảo vệ người tiêu dùng và dữ liệu cá nhân với chuyên gia phù hợp.
 
 ### 13.1 Evidence-backed implementation progress
 
-This section records repository evidence as of 2026-11-22. It does not approve any unchecked product decision above and does not represent unimplemented external integrations as complete.
+Backend source, migrations, package and tests reside in `be/`; shared documentation remains in `docs/`. Price catalog management (`PRC-005`) provides Owner create, list, read and update APIs for tenant price plans, special dates and rules with status and transactional audit. BKG-003 is in progress: staff hold API uses scoped idempotency, buffered PostgreSQL occupancy, configurable TTL and an expiry worker. Branch-scoped hold listing (`BKG-006`) is available for frontend integration; it is not a confirmed-booking calendar. Customer identity, durable price snapshot and deployed worker verification remain. Verify passed and PostgreSQL Docker E2E passed 20/20 with Node 26, including 100 concurrent hold attempts.
+
+This section records repository evidence as of 2026-11-22. The checklist above distinguishes product decisions approved by the PO from technical/product approvals still open; neither is proof that an implementation exists.
 
 | Capability | Status | Repository evidence and remaining boundary |
 |---|---|---|
 | Node.js/NestJS/PostgreSQL foundation | Done | Modular application, migrations, Docker development environment, CI workflow and versioned OpenAPI contract |
-| Authentication, membership and RBAC | Baseline done | Password login/change, JWT, rotating refresh sessions, revocation, lockout, tenant membership, branch grants and authorization tests; reset delivery and MFA remain incomplete |
-| Branch and room operations | Baseline done | Tenant-scoped CRUD/status/soft delete and transactional audit tests; amenities/media remain pending |
-| Maintenance availability | Foundation done | Audited maintenance blocks share the room-occupancy invariant |
-| Booking overlap protection | Schema proof done | `tstzrange` plus GiST exclusion prevents overlapping active occupancy; hold lifecycle, availability query and booking state machine remain blocked/pending |
+| Authentication, membership and RBAC | Baseline done | Password login/change, JWT, rotating refresh sessions, revocation, lockout, tenant membership, branch grants and authorization tests; reset-code/fail-closed ZBS fallback are approved. One Merchant/Tenant maps to one OA while an OA can serve multiple merchants; OA/App/account/template setup will happen in parallel and remains incomplete. Email is deferred; MFA is deferred until after pilot (`PD-018`) |
+| Branch and room operations | Baseline done | Tenant-scoped CRUD/status/soft delete and transactional audit; amenities and metadata-only media have tenant/room-scoped CRUD, validation and audit E2E coverage. Binary upload/fetch remains outside scope pending a storage decision |
+| Maintenance availability | Baseline done | Audited maintenance blocks share the room-occupancy invariant; audited merchant buffer settings default to enabled/15 minutes; availability search excludes inactive/occupied/maintenance rooms and applies the approved post-booking cleanup buffer (PD-024). It remains a read-only query, not an atomic hold |
+| Pricing | API done, booking integration pending | Tenant-scoped plans, special-date ranges, selectors, explicit-priority selection/tie rejection, per-rule hourly/per-booking amount calculation, audited duration settings and `POST /merchant/rooms/{roomId}/quote` are implemented. Snapshot is returned but not persisted with a booking |
+| Booking overlap protection | Schema and search proof done | `tstzrange` plus GiST exclusion prevents overlapping active occupancy; availability query is implemented. Hold lifecycle and booking state machine remain pending; booking occupancy must extend through the cleanup buffer end |
 | Transactional outbox | Foundation done | Migration, transactional enqueue, `SKIP LOCKED` claim, retry/backoff, dead state and stale-claim recovery; E2E covers rollback and crash-recovery behavior |
 | Notification boundary | Foundation done | Notification port and recording test adapter exist; runtime adapter fails explicitly because no live email/SMS/Zalo provider is approved or configured |
-| Operations probes and metrics | Partial | Liveness, PostgreSQL readiness (including 503 failure behavior), correlation headers and process-local Prometheus request metrics are implemented and E2E tested; OpenTelemetry instrumentation and distributed context propagation remain |
-| Pricing, payment, customer/reception frontends | Not implemented | Dependent product/provider decisions and downstream tasks remain open in `docs/03-delivery/task-board.md` |
+| Operations and telemetry | Baseline done | Liveness/readiness, process-local Prometheus request metrics, W3C traceparent extraction, HTTP spans, trace-aware logs and optional OTLP exporter are implemented; E2E verifies trace round-trip. Sending spans to a configured collector has not been verified here |
+| Requirement traceability | Matrix done | `docs/04-quality/requirement-traceability.md` maps FR-001–FR-015 to current APIs, automated evidence and proposed UAT cases; missing modules and unexecuted UAT remain explicit |
+| Payment, customer/reception frontends | Not implemented | Pilot defers online payment and records manual payments only (PD-007); provider/MoR selection remains post-pilot. Customer booking identity is guest-first, phone required with staff call verification, email optional (PD-010) |
 
-Verification executed on 2026-11-22: the outbox migration applied successfully to the existing local PostgreSQL database; `npm run verify` passed build, 4/4 unit suites (8/8 tests) and OpenAPI drift validation; the PostgreSQL E2E suite passed 8/8 tests including outbox rollback, retry and stale-claim recovery.
+Verification executed on 2026-11-22: `npm run verify` passed build, 6/6 unit suites (15/15 tests), OpenAPI drift validation with 42 paths and generated API Markdown validation. `npm run test:e2e` passed 20/20 PostgreSQL Docker E2E tests, including hold creation/read/list, pagination, concurrency, replay, access control, pricing catalog management, buffer policy and availability search. Quote snapshots are responses only until booking persists them; search does not create a hold.
 
 ## 14. Codex execution prompts
 

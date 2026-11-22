@@ -4,8 +4,8 @@ Audit date: 2026-11-22.
 
 ## Executed checks
 
-- `npm audit --omit=dev --json`: 0 production vulnerabilities across 144 production dependencies.
-- `npm audit --json`: 27 moderate findings, 0 high and 0 critical.
+- `npm audit --omit=dev --audit-level=moderate`: 0 production vulnerabilities, including after adding OpenTelemetry runtime packages.
+- npm install audit summary: 27 moderate findings; no high or critical findings reported.
 
 ## Triage
 

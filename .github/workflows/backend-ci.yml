@@ -18,12 +18,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: be/package-lock.json
       - run: npm ci
+        working-directory: be
       - run: npm audit --omit=dev
+        working-directory: be
       - run: npm run build
+        working-directory: be
       - run: npm test -- --runInBand
+        working-directory: be
       - run: npm run test:e2e
+        working-directory: be
       - run: npm run openapi:check
+        working-directory: be
         env:
           DATABASE_URL: postgresql://contract:contract@localhost:5432/contract
           JWT_SECRET: ci-only-contract-secret-at-least-32-characters
+      - run: npm run api:docs:check
+        working-directory: be

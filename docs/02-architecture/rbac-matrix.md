@@ -15,4 +15,4 @@ This is the conservative authorization baseline implemented for the current venu
 
 JWT proves the user identity. `X-Tenant-ID` selects the working tenant, but access is granted only when the authenticated user has an active membership for that tenant. Branch-scoped roles additionally require an explicit branch grant.
 
-Password reset, MFA, email verification, token revocation and external identity providers are not implemented and remain security backlog items.
+Password reset, email verification and external identity providers are not implemented. MFA is explicitly deferred until after the pilot (PD-018); password rate-limit and lockout controls remain in place.

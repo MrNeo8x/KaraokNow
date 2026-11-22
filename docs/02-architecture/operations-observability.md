@@ -1,6 +1,6 @@
 # Operations and Observability Baseline
 
-Status: partial implementation, 2026-11-22.
+Status: baseline implemented, 2026-11-22.
 
 ## Health probes
 
@@ -12,10 +12,12 @@ Status: partial implementation, 2026-11-22.
 
 `GET /v1/metrics` exposes Prometheus text format with process-local request totals and cumulative request duration by bounded method/status labels. The scrape itself is excluded from request metrics. These counters reset when the process restarts and are not aggregated across replicas; configure scraping and aggregation before using them for service-level objectives.
 
-## Tracing status
+## Tracing
 
-Structured request logs already carry the correlation ID. OpenTelemetry SDK/exporter instrumentation and distributed trace context propagation have not yet been added, so a correlation ID is not represented as an OpenTelemetry trace.
+`be/src/instrumentation.ts` starts the OpenTelemetry Node SDK before NestJS modules load. HTTP, Express and PostgreSQL instrumentation are registered. The request middleware also extracts W3C `traceparent`, creates an HTTP server span, returns `X-Trace-ID` and adds `traceId`/`spanId` to the allowlisted request log.
+
+Set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` to the full traces URL, or `OTEL_EXPORTER_OTLP_ENDPOINT` to the collector base URL, to export spans over OTLP HTTP/protobuf. `OTEL_SERVICE_NAME` defaults to `karaokenow-backend`. With no endpoint, a no-op span processor preserves trace context and logs identifiers but drops spans; no collector is configured in this repository. The SDK shuts down through the Nest application lifecycle.
 
 ## Verification
 
-The PostgreSQL E2E suite covers live response, healthy readiness, simulated database failure (503), metrics exposition and correlation headers. `npm run verify` checks build, unit tests and OpenAPI drift.
+The PostgreSQL E2E suite covers live response, healthy readiness, simulated database failure (503), metrics exposition, correlation headers and W3C `traceparent` round-trip. `npm run verify` checks build, unit tests and OpenAPI drift. OTLP transport against a running collector remains an environment-level verification.

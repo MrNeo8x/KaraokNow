@@ -8,13 +8,14 @@ Audit date: 2026-11-22.
 |---|---|---|
 | Backend runtime | NestJS bootstrap and modular module wiring | Implemented foundation |
 | Database | PostgreSQL Compose service, first migration and Testcontainers verification | Implemented foundation; migration test passing |
-| Authentication/RBAC | Password login/change, forced temporary change, short JWT, rotating refresh sessions, revocation, lockout, membership and branch grants | Implemented baseline; reset delivery and MFA pending |
-| Branch management | Audited create/read/update/status API and tenant/branch authorization | Implemented baseline; amenities/media pending |
-| Room management | Audited create/read/update/status API and tenant/branch authorization | Implemented baseline; amenities/media pending |
-| OpenAPI | Swagger UI plus versioned 16-path JSON contract and CI drift check | Implemented baseline |
-| Automated tests | Four Jest unit suites plus PostgreSQL HTTP/E2E coverage for identity, venue, occupancy and outbox recovery | Passing locally; full booking/concurrency coverage still absent |
-| Availability | Audited maintenance-block CRUD/release over shared occupancy | Implemented foundation; availability search pending |
-| Booking/holds | `tstzrange` occupancy and GiST no-overlap invariant | Schema proof implemented; hold workflow pending decisions |
+| Authentication/RBAC | Password login/change, forced temporary change, short JWT, rotating refresh sessions, revocation, lockout, membership and branch grants | Implemented baseline; reset delivery awaits ZBS setup; MFA deferred until after pilot |
+| Branch management | Audited create/read/update/status API and tenant/branch authorization | Implemented baseline |
+| Room management | Audited create/read/update/status API and tenant/branch authorization; free-form amenities and metadata-only media CRUD are tenant/room scoped and audited | Implemented baseline; binary upload/fetch awaits storage decision |
+| OpenAPI | Swagger UI, versioned 41-path JSON contract and generated frontend Markdown reference, with CI drift checks | Implemented baseline; many response schemas still missing |
+| Automated tests | Six Jest unit suites plus 20 PostgreSQL HTTP/E2E tests covering identity, venue, pricing, availability, hold creation, expiry and outbox recovery | Passing locally; 100 concurrent hold attempts tested; production benchmarks absent |
+| Pricing | Tenant-scoped plans, special dates, rules, explicit priority, hourly/per-booking units, audited management, duration settings and quote API | Owner catalog APIs and quote implemented; booking snapshot persistence remains unimplemented |
+| Availability | Audited maintenance-block CRUD/release, audited merchant buffer-policy API and tenant/branch-scoped availability search | Search excludes inactive branches/rooms and overlapping active occupancy; applies approved post-booking cleanup buffer. Search is not an atomic hold |
+| Booking/holds | `tstzrange` occupancy and GiST no-overlap invariant; tenant/channel hold TTL, staff hold API, idempotency and expiry worker | Staff baseline implemented; guest identity, price snapshot and deployed worker verification pending |
 | Payment/refund | No source files or provider adapter | Not implemented |
 | Reception/customer web | No frontend workspace | Not implemented |
 | Audit | Transactional audit schema and Owner read API | Implemented baseline |
@@ -22,29 +23,29 @@ Audit date: 2026-11-22.
 | Notification | Adapter port, explicitly unconfigured runtime adapter and recording test adapter | Implemented boundary; no live provider connected |
 | Health/readiness | Liveness endpoint and PostgreSQL `SELECT 1` readiness probe with 503 on failure | Implemented baseline |
 | HTTP metrics | Prometheus exposition for process-local request counts and duration by method/status | Implemented baseline; counters reset on restart and are not aggregated |
+| OpenTelemetry | SDK started before Nest imports; HTTP spans, PostgreSQL instrumentation, W3C context, trace-aware logs and optional OTLP exporter | Implemented baseline; collector export not environment-tested |
 | Webhook inbox | No schema or worker | Not implemented |
 | CI/CD | GitHub Actions build, unit and E2E workflow | Implemented baseline; not yet observed on remote runner |
-| HTTP observability | Correlation ID, standard errors, allowlisted structured request logs, health probes and basic metrics | Partial; OpenTelemetry instrumentation/context propagation pending |
+| HTTP observability | Correlation ID, standard errors, allowlisted structured request logs, health probes, basic metrics and trace context | Implemented baseline; OTLP collector delivery remains unverified |
+| Requirement traceability | FR-001 through FR-015 mapped to current APIs, automated evidence and proposed UAT cases | Matrix implemented; UAT execution remains pending |
 
 “Partially implemented” means the code exists but the relevant Definition of Done is not yet satisfied. No external integration is represented as working.
 
 ## P0 gaps
 
-1. Authentication lifecycle hardening: reset delivery/confirmation and MFA decision.
-2. Room amenities/media and exported OpenAPI contract.
-3. Approved pricing precedence and deterministic quote snapshots.
-4. PostgreSQL occupancy model, maintenance blocks, hold expiry and concurrency proof.
-5. Booking state transition policy and idempotent commands.
-6. Payment abstraction, sandbox provider selection, webhook inbox and reconciliation.
-7. Reception and customer web applications.
-8. Production notification provider selection/adapter, outbox monitoring and operational recovery.
-9. Broader contract, security and performance coverage.
+1. Complete ZBS password-reset delivery after OA/App/account/template setup; MFA is deferred until after pilot.
+2. Complete staff hold integration with customer identity and durable price snapshot; verify expiry worker operation in a deployed environment.
+3. Booking state transition policy and idempotent commands.
+4. Payment abstraction, sandbox provider selection, webhook inbox and reconciliation.
+5. Reception and customer web applications.
+6. Production notification provider selection/adapter, outbox monitoring and operational recovery.
+7. Broader contract, security and performance coverage.
 
 ## Immediate risks
 
-- Local JWT authentication lacks reset, refresh/revocation, MFA and brute-force protection.
+- ZBS reset delivery requires account/template setup; MFA is deferred until after pilot by PO decision.
 - Production dependency audit reports zero advisories; 27 moderate findings remain isolated to dev/test tooling and are documented.
 - Venue migration and SQL mapping are integration-tested; later domains still need equivalent coverage.
-- Product rules listed in the decision log can block pricing and booking design.
+- Quote API implements approved PD-011/PD-019/PD-023; its response snapshot is not yet persisted by booking. Staff hold and availability search apply the approved PD-024 cleanup interval; confirmation and deployed expiry worker verification remain pending.
 - CI workflow exists locally but has not yet been evidenced on a remote GitHub runner.
 

@@ -1,0 +1,11 @@
+# Booking holds: staff API baseline
+
+`POST /v1/merchant/booking/holds` requires a tenant membership, an authorized branch and Owner, Branch Manager or Receptionist role. `Idempotency-Key` is scoped to tenant and user; a repeated equivalent request returns the original hold, including `EXPIRED` after expiry. Reusing the key with different inputs returns 409. A new attempt requires a new key.
+
+`GET /v1/merchant/booking/holds/{id}` returns the hold to the same permitted roles within their assigned branch and tenant. It locks the hold and expires it before returning if its TTL has elapsed, releasing the occupancy in the same transaction.
+
+`GET /v1/merchant/branches/{branchId}/booking/holds?from=...&to=...&limit=50&offset=0` lists holds whose requested booking interval overlaps `[from,to)`, excluding the cleanup buffer from the filter. Timestamps require an explicit timezone; `limit` is 1–100 and `offset` 0–10000. The response is `{items,limit,offset,hasMore}`, ordered by booking start then ID. Overdue holds are shown as `EXPIRED` based on database time without changing stored state or releasing the room; the worker or individual GET performs expiry. Offset pagination may shift when records are inserted between requests. This endpoint lists holds and does not include confirmed bookings.
+
+The transaction validates active room/branch and merchant duration policy, snapshots the configured channel TTL and cleanup buffer, writes occupancy as `[start, booking end + buffer)` and records audit. PostgreSQL's exclusion constraint rejects overlapping active occupancies, including maintenance. The API does not yet accept customer identity or persist a price snapshot, and cannot confirm a booking.
+
+Run `npm run holds:expire` from `be/` as a supervised separate process. The worker uses PostgreSQL row locks and `SKIP LOCKED`, atomically changes expired holds to EXPIRED, releases occupancy and records audit. Until the worker runs, an expired hold can continue to block search/new holds; a replay also expires its own hold when due. The worker loop itself and production supervision have not been exercised as a deployed service. A future confirmation transition must lock the same hold row and check `expires_at` against database time before changing state.

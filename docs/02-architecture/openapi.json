@@ -697,6 +697,358 @@
         ]
       }
     },
+    "/v1/merchant/rooms/{id}/amenities": {
+      "get": {
+        "operationId": "VenueController_listRoomAmenities",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      },
+      "post": {
+        "operationId": "VenueController_createRoomAmenity",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomAmenityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
+    "/v1/merchant/rooms/{id}/amenities/{amenityId}": {
+      "patch": {
+        "operationId": "VenueController_updateRoomAmenity",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amenityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoomAmenityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      },
+      "delete": {
+        "operationId": "VenueController_deleteRoomAmenity",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "amenityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
+    "/v1/merchant/rooms/{id}/media": {
+      "get": {
+        "operationId": "VenueController_listRoomMedia",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      },
+      "post": {
+        "operationId": "VenueController_createRoomMedia",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
+    "/v1/merchant/rooms/{id}/media/{mediaId}": {
+      "patch": {
+        "operationId": "VenueController_updateRoomMedia",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoomMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      },
+      "delete": {
+        "operationId": "VenueController_deleteRoomMedia",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mediaId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
     "/v1/merchant/audit-logs": {
       "get": {
         "operationId": "AuditController_list",
@@ -738,6 +1090,63 @@
         ],
         "tags": [
           "audit"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/availability": {
+      "get": {
+        "operationId": "RoomBlockController_search",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startAt",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601 timestamp with explicit offset",
+            "schema": {
+              "example": "2030-05-10T11:00:00+07:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "durationMinutes",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1440,
+              "example": 60,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "availability"
         ]
       }
     },
@@ -928,6 +1337,954 @@
         ],
         "tags": [
           "availability"
+        ]
+      }
+    },
+    "/v1/merchant/availability/buffer-policy": {
+      "get": {
+        "operationId": "AvailabilityPolicyController_getPolicy",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "availability"
+        ]
+      },
+      "patch": {
+        "operationId": "AvailabilityPolicyController_updatePolicy",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAvailabilityPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "availability"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/plans/{id}/rules": {
+      "get": {
+        "operationId": "PricingController_listRules",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/rules/{id}": {
+      "get": {
+        "operationId": "PricingController_getRule",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "PricingController_updateRule",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePriceRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/rules": {
+      "post": {
+        "operationId": "PricingController_createRule",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePriceRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/special-dates": {
+      "get": {
+        "operationId": "PricingController_listSpecialDates",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "post": {
+        "operationId": "PricingController_createSpecialDate",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSpecialDateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/special-dates/{id}": {
+      "get": {
+        "operationId": "PricingController_getSpecialDate",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "PricingController_updateSpecialDate",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSpecialDateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/plans": {
+      "get": {
+        "operationId": "PricingController_listPlans",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "post": {
+        "operationId": "PricingController_createPlan",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePricePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/plans/{id}": {
+      "get": {
+        "operationId": "PricingController_getPlan",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "PricingController_updatePlan",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePricePlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/pricing/duration-policy": {
+      "get": {
+        "operationId": "PricingController_getDurationPolicy",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      },
+      "patch": {
+        "operationId": "PricingController_updateDurationPolicy",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingDurationPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/rooms/{roomId}/quote": {
+      "post": {
+        "operationId": "PricingController_quote",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roomId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "pricing"
+        ]
+      }
+    },
+    "/v1/merchant/booking/hold-ttl/{channel}": {
+      "get": {
+        "operationId": "HoldTtlController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking settings"
+        ]
+      },
+      "patch": {
+        "operationId": "HoldTtlController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHoldTtlDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking settings"
+        ]
+      }
+    },
+    "/v1/merchant/booking/holds/{id}": {
+      "get": {
+        "operationId": "HoldController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current hold status; an overdue hold is expired before returning",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking holds"
+        ]
+      }
+    },
+    "/v1/merchant/booking/holds/{id}/details": {
+      "post": {
+        "operationId": "HoldController_attachDetails",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachHoldDetailsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Customer contact and server-calculated price snapshot recorded or replayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Expired hold, conflicting existing details or concurrent change"
+          },
+          "422": {
+            "description": "No price rule matches or current duration policy rejects the hold"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking holds"
+        ]
+      }
+    },
+    "/v1/merchant/booking/holds": {
+      "post": {
+        "operationId": "HoldController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Visible ASCII, 1–100 characters; scoped to tenant and user",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHoldDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created hold or current state of an idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Occupancy conflict or idempotency key reused with different input"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking holds"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/booking/holds": {
+      "get": {
+        "operationId": "BranchHoldController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Start of search interval, inclusive, with explicit timezone",
+            "schema": {
+              "example": "2036-01-01T00:00:00+07:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "End of search interval, exclusive, with explicit timezone",
+            "schema": {
+              "example": "2036-01-02T00:00:00+07:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Holds whose booking intervals overlap [from,to); overdue holds are reported as EXPIRED without releasing occupancy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "booking holds"
         ]
       }
     }
@@ -1161,6 +2518,76 @@
           "status"
         ]
       },
+      "CreateRoomAmenityDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Free-form amenity label; no catalog is imposed"
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "UpdateRoomAmenityDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "CreateRoomMediaDto": {
+        "type": "object",
+        "properties": {
+          "assetRef": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Opaque asset reference, not a URL; this API does not upload or fetch the asset"
+          },
+          "altText": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional accessible text metadata"
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000,
+            "default": 0
+          }
+        },
+        "required": [
+          "assetRef"
+        ]
+      },
+      "UpdateRoomMediaDto": {
+        "type": "object",
+        "properties": {
+          "assetRef": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Opaque asset reference, not a URL; this API does not upload or fetch the asset"
+          },
+          "altText": {
+            "type": "object",
+            "maxLength": 200,
+            "nullable": true,
+            "description": "Pass null to clear this metadata"
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      },
       "CreateRoomBlockDto": {
         "type": "object",
         "properties": {
@@ -1197,6 +2624,505 @@
             "type": "string"
           }
         }
+      },
+      "UpdateAvailabilityPolicyDto": {
+        "type": "object",
+        "properties": {
+          "bufferEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "bufferMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1440,
+            "default": 15
+          }
+        },
+        "required": [
+          "bufferEnabled",
+          "bufferMinutes"
+        ]
+      },
+      "CreatePriceRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "amountUnit": {
+            "type": "string",
+            "enum": [
+              "PER_HOUR",
+              "PER_BOOKING"
+            ]
+          },
+          "amountVnd": {
+            "type": "string",
+            "example": "150000",
+            "description": "Non-negative integer VND as a decimal string"
+          },
+          "weekdays": {
+            "example": [
+              0,
+              6
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "roomId": {
+            "type": "object",
+            "nullable": true
+          },
+          "specialDateId": {
+            "type": "object",
+            "nullable": true
+          },
+          "startTime": {
+            "type": "object",
+            "nullable": true,
+            "example": "18:00:00"
+          },
+          "endTime": {
+            "type": "object",
+            "nullable": true,
+            "example": "02:00:00"
+          },
+          "minDurationMinutes": {
+            "type": "object",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "maxDurationMinutes": {
+            "type": "object",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "code": {
+            "type": "string"
+          },
+          "pricePlanId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "priority",
+          "amountUnit",
+          "amountVnd",
+          "code",
+          "pricePlanId"
+        ]
+      },
+      "UpdatePriceRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "amountUnit": {
+            "type": "string",
+            "enum": [
+              "PER_HOUR",
+              "PER_BOOKING"
+            ]
+          },
+          "amountVnd": {
+            "type": "string",
+            "example": "150000",
+            "description": "Non-negative integer VND as a decimal string"
+          },
+          "weekdays": {
+            "example": [
+              0,
+              6
+            ],
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "roomId": {
+            "type": "object",
+            "nullable": true
+          },
+          "specialDateId": {
+            "type": "object",
+            "nullable": true
+          },
+          "startTime": {
+            "type": "object",
+            "nullable": true,
+            "example": "18:00:00"
+          },
+          "endTime": {
+            "type": "object",
+            "nullable": true,
+            "example": "02:00:00"
+          },
+          "minDurationMinutes": {
+            "type": "object",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "maxDurationMinutes": {
+            "type": "object",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "priority",
+          "amountUnit",
+          "amountVnd",
+          "status"
+        ]
+      },
+      "CreateSpecialDateDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2030-01-01"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2030-01-02"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "startDate",
+          "endDate"
+        ]
+      },
+      "UpdateSpecialDateDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "example": "2030-01-01"
+          },
+          "endDate": {
+            "type": "string",
+            "example": "2030-01-02"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "startDate",
+          "endDate",
+          "status"
+        ]
+      },
+      "CreatePricePlanDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "object",
+            "nullable": true,
+            "example": "2030-01-01"
+          },
+          "effectiveTo": {
+            "type": "object",
+            "nullable": true,
+            "example": "2030-12-31"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "UpdatePricePlanDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "effectiveFrom": {
+            "type": "object",
+            "nullable": true,
+            "example": "2030-01-01"
+          },
+          "effectiveTo": {
+            "type": "object",
+            "nullable": true,
+            "example": "2030-12-31"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ]
+      },
+      "UpdateBookingDurationPolicyDto": {
+        "type": "object",
+        "properties": {
+          "durationStepMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 30
+          },
+          "minDurationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 60
+          },
+          "maxDurationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 480
+          }
+        },
+        "required": [
+          "durationStepMinutes",
+          "minDurationMinutes",
+          "maxDurationMinutes"
+        ]
+      },
+      "QuoteRequestDto": {
+        "type": "object",
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "example": "2030-04-10T22:30:00+07:00",
+            "description": "ISO-8601 timestamp with explicit offset"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 120
+          }
+        },
+        "required": [
+          "startAt",
+          "durationMinutes"
+        ]
+      },
+      "UpdateHoldTtlDto": {
+        "type": "object",
+        "properties": {
+          "ttlMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "example": 15
+          }
+        },
+        "required": [
+          "ttlMinutes"
+        ]
+      },
+      "HoldResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "bufferMinutes": {
+            "type": "number"
+          },
+          "reservedEndAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "HELD",
+              "EXPIRED"
+            ]
+          },
+          "customerPhone": {
+            "type": "object",
+            "nullable": true,
+            "description": "Only present in individual hold responses"
+          },
+          "customerEmail": {
+            "type": "object",
+            "nullable": true,
+            "description": "Only present in individual hold responses"
+          },
+          "priceSnapshot": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Immutable server-calculated quote snapshot, only present in individual hold responses"
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "roomId",
+          "channel",
+          "startAt",
+          "durationMinutes",
+          "bufferMinutes",
+          "reservedEndAt",
+          "expiresAt",
+          "status"
+        ]
+      },
+      "AttachHoldDetailsDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "0912345678",
+            "description": "Phone number for manual verification; digits with optional leading +",
+            "maxLength": 16
+          },
+          "email": {
+            "type": "string",
+            "example": "guest@example.com",
+            "maxLength": 254
+          },
+          "expectedTotalAmountVnd": {
+            "type": "string",
+            "example": "150000",
+            "description": "Total VND shown by the quote API, as a decimal string"
+          }
+        },
+        "required": [
+          "phone",
+          "expectedTotalAmountVnd"
+        ]
+      },
+      "CreateHoldDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "example": "2035-01-01T18:00:00+07:00"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "channel": {
+            "type": "string",
+            "example": "WALK_IN"
+          }
+        },
+        "required": [
+          "roomId",
+          "startAt",
+          "durationMinutes",
+          "channel"
+        ]
+      },
+      "HoldListResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldResponseDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
       }
     }
   }

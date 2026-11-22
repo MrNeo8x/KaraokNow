@@ -3,6 +3,8 @@
 target/
 node_modules/
 dist/
+.next/
+*.tsbuildinfo
 coverage/
 .m2/
 .env
