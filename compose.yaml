@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: karaokenow
+      POSTGRES_USER: karaokenow
+      POSTGRES_PASSWORD: karaokenow_local_only
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U karaokenow -d karaokenow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - karaokenow-postgres:/var/lib/postgresql/data
+
+volumes:
+  karaokenow-postgres:
+

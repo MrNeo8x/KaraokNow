@@ -1,0 +1,29 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run build
+      - run: npm test -- --runInBand
+      - run: npm run test:e2e
+      - run: npm run openapi:check
+        env:
+          DATABASE_URL: postgresql://contract:contract@localhost:5432/contract
+          JWT_SECRET: ci-only-contract-secret-at-least-32-characters
