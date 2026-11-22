@@ -14,3 +14,11 @@ export class ChangePasswordDto {
   @ApiProperty() @IsString() @MinLength(8) currentPassword!: string;
   @ApiProperty({ minLength: 12 }) @IsString() @MinLength(12) newPassword!: string;
 }
+
+export class TokenPairResponseDto {
+  @ApiProperty() accessToken!: string;
+  @ApiProperty({ description: 'Access token lifetime in seconds' }) expiresIn!: number;
+  @ApiProperty() refreshToken!: string;
+  @ApiProperty({ description: 'Refresh token lifetime in seconds' }) refreshExpiresIn!: number;
+  @ApiProperty() mustChangePassword!: boolean;
+}

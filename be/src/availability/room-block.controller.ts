@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from '../platform/auth/auth.types';
 import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
@@ -9,12 +9,14 @@ import { CreateRoomBlockDto, UpdateRoomBlockDto } from './room-block.dto';
 import { AvailabilitySearchDto } from './availability-search.dto';
 import { AvailabilitySearchService } from './availability-search.service';
 import { RoomBlockService } from './room-block.service';
+import { AvailabilityResponseDto } from './availability-response.dto';
 
 @ApiTags('availability') @ApiBearerAuth() @ApiHeader({ name: 'X-Tenant-ID', required: true })
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant')
 export class RoomBlockController {
   constructor(private readonly blocks: RoomBlockService, private readonly searchService: AvailabilitySearchService) {}
   @Get('branches/:branchId/availability') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: AvailabilityResponseDto })
   search(@Req() req: AuthenticatedRequest, @Param('branchId', ParseUUIDPipe) branchId: string,
          @Query() query: AvailabilitySearchDto) {
     return this.searchService.search(req.actor, branchId, query);

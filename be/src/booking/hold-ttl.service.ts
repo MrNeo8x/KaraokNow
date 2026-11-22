@@ -3,12 +3,18 @@ import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
+import { PolicyListQueryDto } from './policy-list.dto';
 
 @Injectable()
 export class HoldTtlService {
   constructor(@Inject(PG_POOL) private readonly db: Pool) {}
   private validateChannel(channel: string) {
     if (!/^[A-Z][A-Z0-9_]{0,49}$/.test(channel)) throw new BadRequestException('Channel must use uppercase letters, digits and underscores');
+  }
+  async list(actor: Actor, query: PolicyListQueryDto) {
+    const limit = query.limit ?? 50, offset = query.offset ?? 0;
+    const rows = (await this.db.query(`SELECT channel,ttl_minutes AS "ttlMinutes",version::text FROM tenant_hold_ttl_policies WHERE tenant_id=$1 ORDER BY channel LIMIT $2 OFFSET $3`, [actor.tenantId, limit + 1, offset])).rows;
+    return { items: rows.slice(0, limit), limit, offset, hasMore: rows.length > limit };
   }
   async get(actor: Actor, channel: string) {
     this.validateChannel(channel);

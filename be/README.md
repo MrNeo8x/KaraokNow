@@ -21,6 +21,10 @@ PostgreSQL runs in Docker and is published on host port `5433` by default, avoid
 
 OpenAPI UI: `http://localhost:3000/docs`. Login returns a bearer JWT. Merchant calls require both the JWT and an `X-Tenant-ID`; the server verifies that the authenticated user has an active membership for that tenant. Never reuse the README JWT secret outside local development.
 
+Run `npm run holds:expire` in a separate supervised process while using holds. It retries temporary database errors with bounded backoff and handles SIGINT/SIGTERM. Owner can query `GET /v1/merchant/booking/hold-expiry/backlog` to observe their tenant's overdue holds. This backlog is not a worker heartbeat; production supervision and alert thresholds require environment-specific setup.
+
+Run `npm run outbox:work` as a separate supervised process when dispatching events. Owner can query `GET /v1/merchant/notifications/outbox/backlog` for tenant-scoped queue counts. Before applying migration `20261123050000_outbox_claim_token`, stop old outbox workers and restart them with the updated code; see `../docs/02-architecture/transactional-outbox.md`. No live notification provider is configured.
+
 Access tokens last 15 minutes and are tied to a server-side session. Refresh tokens rotate on every use; reuse revokes the token family. Staff created with temporary passwords must call `POST /v1/auth/password/change` before accessing merchant APIs.
 
 Run unit tests:

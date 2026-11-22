@@ -11,15 +11,15 @@ Audit date: 2026-11-22.
 | Authentication/RBAC | Password login/change, forced temporary change, short JWT, rotating refresh sessions, revocation, lockout, membership and branch grants | Implemented baseline; reset delivery awaits ZBS setup; MFA deferred until after pilot |
 | Branch management | Audited create/read/update/status API and tenant/branch authorization | Implemented baseline |
 | Room management | Audited create/read/update/status API and tenant/branch authorization; free-form amenities and metadata-only media CRUD are tenant/room scoped and audited | Implemented baseline; binary upload/fetch awaits storage decision |
-| OpenAPI | Swagger UI, versioned 41-path JSON contract and generated frontend Markdown reference, with CI drift checks | Implemented baseline; many response schemas still missing |
-| Automated tests | Six Jest unit suites plus 20 PostgreSQL HTTP/E2E tests covering identity, venue, pricing, availability, hold creation, expiry and outbox recovery | Passing locally; 100 concurrent hold attempts tested; production benchmarks absent |
-| Pricing | Tenant-scoped plans, special dates, rules, explicit priority, hourly/per-booking units, audited management, duration settings and quote API | Owner catalog APIs and quote implemented; booking snapshot persistence remains unimplemented |
+| OpenAPI | Swagger UI, versioned 53-path JSON contract and generated frontend Markdown reference, with CI drift checks | Booking, quote, availability and hold snapshot schemas documented; other response schemas still missing |
+| Automated tests | Eight Jest unit suites plus 31 PostgreSQL HTTP/E2E tests covering identity, venue, pricing, holds, no-deposit confirmation and worker recovery | Passing locally; 100 concurrent hold attempts tested; FE–BE browser verification and production benchmarks absent |
+| Pricing | Tenant-scoped plans, special dates, rules, explicit priority, hourly/per-booking units, audited management, duration settings and quote API | Owner catalog APIs and quote implemented; no-deposit staff confirmation persists price snapshot |
 | Availability | Audited maintenance-block CRUD/release, audited merchant buffer-policy API and tenant/branch-scoped availability search | Search excludes inactive branches/rooms and overlapping active occupancy; applies approved post-booking cleanup buffer. Search is not an atomic hold |
-| Booking/holds | `tstzrange` occupancy and GiST no-overlap invariant; tenant/channel hold TTL, staff hold API, idempotency and expiry worker | Staff baseline implemented; guest identity, price snapshot and deployed worker verification pending |
+| Booking/holds | `tstzrange` occupancy and GiST no-overlap invariant; staff hold, contact/price snapshot, verification and atomic channel-authorized no-deposit confirmation | No-deposit staff baseline implemented; deposit calculation, case rules, deposit-required confirmation, later transitions and production supervision/alerts pending |
 | Payment/refund | No source files or provider adapter | Not implemented |
 | Reception/customer web | No frontend workspace | Not implemented |
 | Audit | Transactional audit schema and Owner read API | Implemented baseline |
-| Outbox | Transactional schema, `SKIP LOCKED` dispatcher, retry/dead-letter states and stale-claim recovery | Implemented foundation; production process supervision/metrics pending |
+| Outbox | Transactional schema, `SKIP LOCKED` dispatcher, claim-token fencing, retry/dead-letter states, worker retry and tenant-scoped backlog | Local concurrent reclaim and worker shutdown E2E pass; provider idempotency and production supervision/alerts pending |
 | Notification | Adapter port, explicitly unconfigured runtime adapter and recording test adapter | Implemented boundary; no live provider connected |
 | Health/readiness | Liveness endpoint and PostgreSQL `SELECT 1` readiness probe with 503 on failure | Implemented baseline |
 | HTTP metrics | Prometheus exposition for process-local request counts and duration by method/status | Implemented baseline; counters reset on restart and are not aggregated |
@@ -34,7 +34,7 @@ Audit date: 2026-11-22.
 ## P0 gaps
 
 1. Complete ZBS password-reset delivery after OA/App/account/template setup; MFA is deferred until after pilot.
-2. Complete staff hold integration with customer identity and durable price snapshot; verify expiry worker operation in a deployed environment.
+2. Complete deposit-required booking and later transitions, and verify expiry worker supervision and alerts in a deployed environment.
 3. Booking state transition policy and idempotent commands.
 4. Payment abstraction, sandbox provider selection, webhook inbox and reconciliation.
 5. Reception and customer web applications.
@@ -46,6 +46,6 @@ Audit date: 2026-11-22.
 - ZBS reset delivery requires account/template setup; MFA is deferred until after pilot by PO decision.
 - Production dependency audit reports zero advisories; 27 moderate findings remain isolated to dev/test tooling and are documented.
 - Venue migration and SQL mapping are integration-tested; later domains still need equivalent coverage.
-- Quote API implements approved PD-011/PD-019/PD-023; its response snapshot is not yet persisted by booking. Staff hold and availability search apply the approved PD-024 cleanup interval; confirmation and deployed expiry worker verification remain pending.
+- Quote API implements approved PD-011/PD-019/PD-023; staff no-deposit confirmation persists the hold snapshot. Deposit-required confirmation and deployed expiry worker verification remain pending.
 - CI workflow exists locally but has not yet been evidenced on a remote GitHub runner.
 

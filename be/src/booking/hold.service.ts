@@ -6,11 +6,40 @@ import { PG_POOL } from '../platform/database/database.module';
 import { AttachHoldDetailsDto, CreateHoldDto, ListHoldsDto } from './hold.dto';
 import { PricingService } from '../pricing/pricing.service';
 
-const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot"`;
+const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy"`;
 
 @Injectable()
 export class HoldService {
   constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly pricing: PricingService) {}
+  async expiryBacklog(actor: Actor): Promise<{ overdueCount: string; oldestOverdueSeconds: number | null }> {
+    const result = await this.db.query<{ overdueCount: string; oldestOverdueSeconds: number | null }>(
+      `SELECT count(*)::text AS "overdueCount",extract(epoch FROM (statement_timestamp()-min(expires_at)))::double precision AS "oldestOverdueSeconds"
+       FROM booking_holds WHERE tenant_id=$1 AND status='HELD' AND expires_at<=statement_timestamp()`, [actor.tenantId]);
+    return result.rows[0];
+  }
+  async recordPhoneVerification(actor: Actor, id: string) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      const hold = (await client.query(`SELECT branch_id AS "branchId",customer_phone AS "customerPhone",phone_verified_at AS "phoneVerifiedAt",status,expires_at>clock_timestamp() AS valid
+        FROM booking_holds WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, [actor.tenantId, id])).rows[0];
+      if (!hold) throw new NotFoundException('Hold not found');
+      this.assertBranch(actor, hold.branchId);
+      if (hold.status !== 'HELD' || !hold.valid) throw new ConflictException('Hold has expired');
+      if (!hold.customerPhone) throw new ConflictException('Customer phone must be recorded first');
+      if (!hold.phoneVerifiedAt) {
+        const updated = await client.query(`UPDATE booking_holds SET phone_verified_at=clock_timestamp(),phone_verified_by=$3,updated_at=clock_timestamp()
+          WHERE tenant_id=$1 AND id=$2 AND status='HELD' AND expires_at>clock_timestamp()`, [actor.tenantId, id, actor.userId]);
+        if (!updated.rowCount) throw new ConflictException('Hold has expired');
+        await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,after_data)
+          VALUES($1,$2,$3,'HOLD_PHONE_VERIFIED','BOOKING_HOLD',$4,$5)`,
+        [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify({ method: 'STAFF_PHONE_CALL' })]);
+      }
+      const result = await this.find(client, actor.tenantId!, id);
+      await client.query('COMMIT'); return result;
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+  }
   async attachDetails(actor: Actor, id: string, dto: AttachHoldDetailsDto) {
     const client = await this.db.connect();
     try {

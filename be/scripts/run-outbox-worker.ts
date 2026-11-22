@@ -5,10 +5,10 @@ import { OutboxWorker } from '../src/outbox/outbox.worker';
 async function run(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const worker = app.get(OutboxWorker);
-  const shutdown = async () => { worker.stop(); await app.close(); };
-  process.once('SIGINT', () => void shutdown());
-  process.once('SIGTERM', () => void shutdown());
-  await worker.runLoop();
+  process.once('SIGINT', () => worker.stop());
+  process.once('SIGTERM', () => worker.stop());
+  try { await worker.runLoop(); }
+  finally { await app.close(); }
 }
 
-void run();
+void run().catch(() => { process.stderr.write('Outbox worker failed to start or shut down\n'); process.exitCode = 1; });

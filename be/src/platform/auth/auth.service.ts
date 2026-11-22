@@ -64,6 +64,9 @@ export class AuthService {
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
+      const family = (await client.query<{ family_id: string }>('SELECT family_id FROM auth_sessions WHERE refresh_token_hash=$1', [tokenHash])).rows[0];
+      if (!family) throw new UnauthorizedException('Invalid refresh token');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`auth-family:${family.family_id}`]);
       const session = (await client.query<SessionRow>(
         `SELECT s.id,s.user_id,s.family_id,s.expires_at,s.revoked_at,s.replaced_by,u.must_change_password
          FROM auth_sessions s JOIN users u ON u.id=s.user_id
@@ -94,8 +97,17 @@ export class AuthService {
   }
 
   async logout(rawToken: string): Promise<void> {
-    await this.db.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE refresh_token_hash=$1',
-      [this.tokenHash(rawToken)]);
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      const family = (await client.query<{ family_id: string }>('SELECT family_id FROM auth_sessions WHERE refresh_token_hash=$1', [this.tokenHash(rawToken)])).rows[0];
+      if (family) {
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`auth-family:${family.family_id}`]);
+        await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE family_id=$1', [family.family_id]);
+      }
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   }
 
   async listSessions(userId: string): Promise<unknown[]> {

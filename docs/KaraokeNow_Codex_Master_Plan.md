@@ -84,8 +84,8 @@ Enforce authorization in APIs and database queries, not just UI.
 |---|---|---|---|---|
 | MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — auth, tenant membership, roles, branch grants; reset-code delivery còn phụ thuộc ZBS |
 | MOD-02 | Branch and room management | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — CRUD, trạng thái, tiện nghi, metadata media; chưa có upload file thật |
-| MOD-03 | Pricing and availability | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — quote API, quản lý cấu hình giá, room blocks, audited buffer policy và availability search đã có; snapshot giá chưa lưu cùng booking |
-| MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, expiry và overlap constraint đã có; customer identity, snapshot giá và booking state machine còn thiếu |
+| MOD-03 | Pricing and availability | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — quote API, quản lý giá, room blocks, buffer policy và search đã có; xác nhận staff không cọc lưu snapshot giá vào booking |
+| MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, xác nhận không cọc theo kênh, lưu snapshot và đọc booking đã có; tính tiền cọc, điều kiện theo trường hợp và các chuyển trạng thái tiếp theo còn thiếu |
 | MOD-05 | Deposit and payment | P0 | MVP | **PHẠM VI PILOT ĐÃ CHỐT** — chỉ ghi nhận thanh toán thủ công; online payment ngoài pilot |
 | MOD-06 | Reception dashboard | P0 | MVP | **MỘT PHẦN** — FE có tìm phòng, báo giá, staff hold và danh sách hold theo chi nhánh; chưa có lịch booking xác nhận, check-in/out hay UAT |
 | MOD-07 | Customer web booking | P0 | MVP | **PROTOTYPE** — FE responsive với dữ liệu minh họa; public catalog, guest booking API và xử lý booking thật chưa có |
@@ -118,8 +118,8 @@ Enforce authorization in APIs and database queries, not just UI.
 | FR-002 | Create room | Unique room code within branch | **ĐÃ LÀM CƠ BẢN** — API/CRUD; duplicate room-code assertion còn thiếu trong E2E |
 | FR-003 | Pricing rules | Deterministic priority and correct quoted price | **MỘT PHẦN** — quote API returns a versioned calculation snapshot; durable booking snapshot integration remains for booking workflow |
 | FR-004 | Search availability | Excludes blocked/occupied time intervals | **ĐÃ CÓ NỀN TẢNG** — search API loại phòng inactive, maintenance và occupancy chồng lấp, áp dụng buffer dọn phòng sau booking; UAT chưa chạy; hold nguyên tử là yêu cầu riêng |
-| FR-005 | Hold room | TTL-based hold, never conflicting active holds | **ĐÃ CÓ NỀN TẢNG** — staff hold/create/read, TTL, expiry và test 100 yêu cầu; customer identity và snapshot giá còn thiếu |
-| FR-006 | Confirm booking | Requires valid hold and payment/no-deposit conditions | **CHƯA LÀM** — booking lifecycle chưa có; pilot manual payment đã chốt |
+| FR-005 | Hold room | TTL-based hold, never conflicting active holds | **ĐÃ CÓ NỀN TẢNG** — staff hold/create/read, TTL, expiry, thông tin khách, snapshot giá và ghi nhận xác minh điện thoại; test 100 yêu cầu. Xác nhận booking còn thiếu |
+| FR-006 | Confirm booking | Requires valid hold and payment/no-deposit conditions | **MỘT PHẦN** — xác nhận staff không cọc theo kênh đã có; xác nhận có cọc, điều kiện theo trường hợp và booking lifecycle chưa có |
 | FR-007 | Webhook processing | Duplicate webhook never double-charges/confirms | **NGOÀI PILOT / CHƯA LÀM** — provider/MoR chờ quyết định sau pilot |
 | FR-008 | Cancel booking | Enforces rights and refund policy | **CHƯA LÀM** — điều khoản free-form và staff review đã chốt; workflow chưa có |
 | FR-009 | Check-in | Only eligible booking can check in | **CHƯA LÀM** |
@@ -547,7 +547,7 @@ Các checkbox bên dưới phản ánh đúng trạng thái trong Decision Log t
 
 ### 13.1 Evidence-backed implementation progress
 
-Backend source, migrations, package and tests reside in `be/`; shared documentation remains in `docs/`. Price catalog management (`PRC-005`) provides Owner create, list, read and update APIs for tenant price plans, special dates and rules with status and transactional audit. BKG-003 is in progress: staff hold API uses scoped idempotency, buffered PostgreSQL occupancy, configurable TTL and an expiry worker. Branch-scoped hold listing (`BKG-006`) is available for frontend integration; it is not a confirmed-booking calendar. Customer identity, durable price snapshot and deployed worker verification remain. Verify passed and PostgreSQL Docker E2E passed 20/20 with Node 26, including 100 concurrent hold attempts.
+Backend source, migrations, package and tests reside in `be/`; shared documentation remains in `docs/`. Pricing catalog, staff hold, contact and price snapshot, manual phone verification, buffered occupancy, TTL and expiry worker are implemented. BKG-005 includes atomic staff no-deposit confirmation and booking-by-ID read; case-level eligibility, deposit calculation, deposit-required confirmation and later transitions remain. Outbox uses claim-token fencing, redacted errors and retrying worker shutdown, with owner backlog visibility. Branch hold listing is not a confirmed-booking calendar. Production worker supervision/alerts remain. Verify passed and PostgreSQL Docker E2E passed 31/31 with Node 26, including 100 concurrent holds and concurrent confirmation.
 
 This section records repository evidence as of 2026-11-22. The checklist above distinguishes product decisions approved by the PO from technical/product approvals still open; neither is proof that an implementation exists.
 
@@ -565,7 +565,7 @@ This section records repository evidence as of 2026-11-22. The checklist above d
 | Requirement traceability | Matrix done | `docs/04-quality/requirement-traceability.md` maps FR-001–FR-015 to current APIs, automated evidence and proposed UAT cases; missing modules and unexecuted UAT remain explicit |
 | Payment, customer/reception frontends | Not implemented | Pilot defers online payment and records manual payments only (PD-007); provider/MoR selection remains post-pilot. Customer booking identity is guest-first, phone required with staff call verification, email optional (PD-010) |
 
-Verification executed on 2026-11-22: `npm run verify` passed build, 6/6 unit suites (15/15 tests), OpenAPI drift validation with 42 paths and generated API Markdown validation. `npm run test:e2e` passed 20/20 PostgreSQL Docker E2E tests, including hold creation/read/list, pagination, concurrency, replay, access control, pricing catalog management, buffer policy and availability search. Quote snapshots are responses only until booking persists them; search does not create a hold.
+Verification executed on 2026-11-22: `npm run verify` passed build, 8/8 unit suites (19/19 tests), OpenAPI drift validation with 53 paths and generated API Markdown validation. `npm run test:e2e` passed 31/31 PostgreSQL Docker E2E tests, including no-deposit confirmation replay and expiry lock scenario, refresh/logout race, outbox worker and hold concurrency. FE–BE browser verification remains pending.
 
 ## 14. Codex execution prompts
 

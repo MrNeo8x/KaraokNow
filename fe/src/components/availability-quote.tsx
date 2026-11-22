@@ -1,13 +1,13 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { request } from '@/lib/api';
+import { clearHoldAttempt, holdStorageKey, readHoldAttempt, writeHoldAttempt, type HoldAttempt } from '@/lib/hold-attempt';
 
 type Room = { id: string; name: string; code: string; capacity: number };
 type Availability = { rooms: Room[]; startAt: string; requestedEndAt: string; reservedEndAt: string; appliedBufferMinutes: number };
 type Quote = { priceSnapshot: { totalAmountVnd: string; currency: string; timezone: string; calculation: { priceRuleCode: string; amountUnit: string } } };
 type Hold = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; bufferMinutes: number; status: 'HELD' | 'EXPIRED' };
-type HoldAttempt = { key: string; room: Room; input: { roomId: string; startAt: string; durationMinutes: number; channel: string } };
 type Props = { token: string; tenant: string; branchId: string; timezone: string };
 
 export default function AvailabilityQuote({ token, tenant, branchId, timezone }: Props) {
@@ -24,6 +24,19 @@ export default function AvailabilityQuote({ token, tenant, branchId, timezone }:
   const [holdError, setHoldError] = useState('');
   const [holdBusy, setHoldBusy] = useState(false);
   const holdBusyRef = useRef(false);
+  const storageKeyRef = useRef<string | null>(null);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [recovered, setRecovered] = useState(false);
+
+  useEffect(() => {
+    try {
+      const key = holdStorageKey(token, tenant, branchId);
+      const saved = readHoldAttempt(window.sessionStorage, key);
+      storageKeyRef.current = key;
+      if (saved) { setAttempt(saved); setRecovered(true); }
+      setRecoveryReady(true);
+    } catch (err) { setHoldError((err as Error).message || 'Không thể truy cập bộ nhớ phiên để khôi phục hold.'); }
+  }, [token, tenant, branchId]);
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,10 +75,19 @@ export default function AvailabilityQuote({ token, tenant, branchId, timezone }:
   }
 
   function startHold(room: Room) {
-    if (!query || holdBusyRef.current || attempt) return;
+    if (!query || holdBusyRef.current || attempt || !recoveryReady || !storageKeyRef.current) return;
     if (!globalThis.crypto?.randomUUID) { setHoldError('Trình duyệt cần HTTPS hoặc localhost để tạo mã yêu cầu an toàn.'); return; }
     const current = { key: globalThis.crypto.randomUUID(), room, input: { roomId: room.id, startAt: query.startAt, durationMinutes: query.durationMinutes, channel: 'WALK_IN' } };
-    setAttempt(current); void sendHold(current);
+    try { writeHoldAttempt(window.sessionStorage, storageKeyRef.current, current); }
+    catch { setHoldError('Không thể lưu mã thử lại trong phiên trình duyệt; chưa gửi yêu cầu giữ phòng.'); return; }
+    setAttempt(current); setRecovered(false); void sendHold(current);
+  }
+
+  function clearAttempt() {
+    if (!storageKeyRef.current) return;
+    try { clearHoldAttempt(window.sessionStorage, storageKeyRef.current); }
+    catch { setHoldError('Không thể xóa dữ liệu khôi phục; yêu cầu vẫn được giữ để tránh mất dấu.'); return; }
+    setAttempt(null); setHold(null); setHoldError(''); setRecovered(false); setResult(null); setQuery(null);
   }
 
   async function refreshHold() {
@@ -87,9 +109,10 @@ export default function AvailabilityQuote({ token, tenant, branchId, timezone }:
     </form>
     {error && <div className="error" role="alert">{error}</div>}
     {result && <div aria-live="polite"><p>Thời gian đã tra: {new Date(result.startAt).toLocaleString('vi-VN', { timeZone: timezone })} – {new Date(result.requestedEndAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone}). Buffer sau lượt: {result.appliedBufferMinutes} phút.</p>
-      {result.rooms.length === 0 ? <p>Không có phòng phù hợp trong khoảng thời gian này.</p> : <ul className="availability-list">{result.rooms.map(room => <li key={room.id}><span><strong>{room.name}</strong> · {room.code} · tối đa {room.capacity} khách</span><div className="amenity-buttons"><button type="button" disabled={busy || holdBusy} onClick={() => void getQuote(room)}>Xem báo giá</button><button type="button" disabled={busy || holdBusy || !!attempt} onClick={() => startHold(room)}>Giữ phòng walk-in</button></div></li>)}</ul>}
+      {result.rooms.length === 0 ? <p>Không có phòng phù hợp trong khoảng thời gian này.</p> : <ul className="availability-list">{result.rooms.map(room => <li key={room.id}><span><strong>{room.name}</strong> · {room.code} · tối đa {room.capacity} khách</span><div className="amenity-buttons"><button type="button" disabled={busy || holdBusy} onClick={() => void getQuote(room)}>Xem báo giá</button><button type="button" disabled={busy || holdBusy || !!attempt || !recoveryReady} onClick={() => startHold(room)}>Giữ phòng walk-in</button></div></li>)}</ul>}
     </div>}
     {quote && <div className="notice" role="status"><strong>{quote.roomName}: {new Intl.NumberFormat('vi-VN').format(BigInt(quote.data.priceSnapshot.totalAmountVnd))} ₫</strong><br />Quy tắc {quote.data.priceSnapshot.calculation.priceRuleCode} · {quote.data.priceSnapshot.calculation.amountUnit === 'PER_HOUR' ? 'theo giờ' : 'theo lượt'}. Báo giá chỉ mang tính tra cứu, chưa tạo booking.</div>}
-    {attempt && <div className="hold-result" aria-live="polite"><h3>Giữ phòng walk-in · {attempt.room.name}</h3><p>Giữ phòng tạm thời chưa phải xác nhận booking; chưa lưu khách hàng hoặc báo giá.</p>{holdError && <div className="error" role="alert">{holdError}</div>}{hold ? <><p><strong>Trạng thái: {hold.status === 'HELD' ? 'Đang giữ' : 'Đã hết hạn'}</strong><br />Mã giữ: {hold.id}<br />Hạn giữ: {new Date(hold.expiresAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone})<br />Giữ chỗ đến: {new Date(hold.reservedEndAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone}), gồm {hold.bufferMinutes} phút dọn phòng.</p><div className="amenity-buttons"><button type="button" className="primary" disabled={holdBusy} onClick={() => void refreshHold()}>Kiểm tra trạng thái</button><button type="button" disabled={holdBusy} onClick={() => { setAttempt(null); setHold(null); setHoldError(''); setResult(null); setQuery(null); }}>Tra cứu lượt khác</button></div></> : <><p>Yêu cầu chưa có kết quả xác định. Thử lại sẽ dùng cùng mã yêu cầu để tránh tạo trùng.</p><button type="button" className="primary" disabled={holdBusy} onClick={() => void sendHold(attempt)}>{holdBusy ? 'Đang gửi…' : 'Thử lại cùng yêu cầu'}</button><button type="button" disabled={holdBusy} onClick={() => { if (window.confirm('Yêu cầu có thể đã được xử lý. Rời bước này có thể làm mất mã thử lại; hãy kiểm tra lịch trước khi tạo yêu cầu mới. Tiếp tục?')) { setAttempt(null); setHoldError(''); setResult(null); setQuery(null); } }}>Bỏ theo dõi yêu cầu</button></>}</div>}
+    {!attempt && holdError && <div className="error" role="alert">{holdError}</div>}
+    {attempt && <div className="hold-result" aria-live="polite"><h3>Giữ phòng walk-in · {attempt.room.name}</h3><p>Bắt đầu: {attempt.input.startAt} · {attempt.input.durationMinutes} phút. Giữ phòng tạm thời chưa phải xác nhận booking; chưa lưu khách hàng hoặc báo giá.</p>{recovered && <p>Đã khôi phục yêu cầu từ phiên trình duyệt này. Nhấn thử lại để lấy trạng thái từ hệ thống; không tự động gửi.</p>}{holdError && <div className="error" role="alert">{holdError}</div>}{hold ? <><p><strong>Trạng thái: {hold.status === 'HELD' ? 'Đang giữ' : 'Đã hết hạn'}</strong><br />Mã giữ: {hold.id}<br />Hạn giữ: {new Date(hold.expiresAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone})<br />Giữ chỗ đến: {new Date(hold.reservedEndAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone}), gồm {hold.bufferMinutes} phút dọn phòng.</p><div className="amenity-buttons"><button type="button" className="primary" disabled={holdBusy} onClick={() => void refreshHold()}>Kiểm tra trạng thái</button><button type="button" disabled={holdBusy} onClick={clearAttempt}>Tra cứu lượt khác</button></div></> : <><p>Yêu cầu chưa có kết quả xác định. Thử lại sẽ dùng cùng mã yêu cầu để tránh tạo trùng.</p><button type="button" className="primary" disabled={holdBusy} onClick={() => void sendHold(attempt)}>{holdBusy ? 'Đang gửi…' : 'Thử lại cùng yêu cầu'}</button><button type="button" disabled={holdBusy} onClick={() => { if (window.confirm('Yêu cầu có thể đã được xử lý. Bỏ theo dõi sẽ xóa mã thử lại; hãy kiểm tra danh sách hold trước khi tạo yêu cầu mới. Tiếp tục?')) clearAttempt(); }}>Bỏ theo dõi yêu cầu</button></>}</div>}
   </section>;
 }

@@ -10,7 +10,7 @@ Body dùng `application/json` khi được khai báo. Các trường có dấu `
 
 Lỗi HTTP có dạng `{ "timestamp": "...", "path": "...", "correlationId": "...", "error": { "code": "...", "message": "...", "details": [] } }`; `details` chỉ có khi có nhiều lỗi. Không hiển thị thông tin lỗi 500 nội bộ.
 
-**Giới hạn contract:** nhiều endpoint chưa khai báo schema response trong OpenAPI; các mã trả về và schema bên dưới chỉ phản ánh phần đã khai báo, không chứng minh response rỗng. Kiểm tra backend hoặc chạy thử trước khi phụ thuộc vào trường response chưa được mô tả. Hold hiện chỉ dành cho nhân viên, chưa xác nhận booking, chưa lưu khách hàng hoặc snapshot giá; worker hết hạn phải chạy riêng.
+**Giới hạn contract:** nhiều endpoint chưa khai báo schema response trong OpenAPI; các mã trả về và schema bên dưới chỉ phản ánh phần đã khai báo, không chứng minh response rỗng. Hold và xác nhận booking hiện chỉ dành cho nhân viên; xác nhận chỉ hỗ trợ trường hợp không cọc đủ điều kiện. Worker hết hạn phải chạy riêng.
 
 ## Luồng hold cho nhân viên
 
@@ -46,7 +46,29 @@ Ví dụ response HTTP 201 (các giá trị chỉ để minh họa):
 
 `reservedEndAt` bao gồm buffer dọn phòng; `expiresAt` là hạn giữ phòng, không phải giờ kết thúc sử dụng phòng. HTTP 409 có thể là xung đột lịch hoặc key; đọc `error.message`. Worker `npm run holds:expire` cần chạy riêng; khi worker dừng, hold quá hạn vẫn có thể chiếm phòng đến khi được xử lý.
 
+Sau khi hiển thị quote và tạo hold, gọi `POST /v1/merchant/booking/holds/{id}/details` với `{ "phone": "0912345678", "email": "guest@example.com", "expectedTotalAmountVnd": "150000" }`; email tùy chọn, tổng tiền là chuỗi `priceSnapshot.totalAmountVnd` từ quote đã hiển thị. Backend tính lại giá và trả 409 nếu tổng tiền khác hoặc hold hết hạn; khi giá đổi cần báo giá lại. Thông tin và snapshot được ghi một lần, gửi lại cùng dữ liệu trả kết quả đã lưu.
+
+Sau khi nhân viên thực sự gọi và xác minh số điện thoại, gọi `POST /v1/merchant/booking/holds/{id}/phone-verification` (không cần body). Response trả `phoneVerifiedAt` và `phoneVerifiedBy`; gọi lại khi hold còn hiệu lực trả cùng kết quả. Chưa có số điện thoại hoặc hold quá hạn trả 409. Đây là ghi nhận của nhân viên, không phải xác minh tự động và không xác nhận booking.
+
+Xác nhận không cọc cho nhân viên: `POST /v1/merchant/booking/holds/{id}/confirm` với `{ "cancellationTerms": "Điều khoản hủy đã hiển thị cho khách" }`. Cần hold còn hiệu lực, đã lưu liên hệ và snapshot giá, đã ghi nhận xác minh điện thoại, chế độ cọc của kênh là NONE và cấu hình cho phép xác nhận không cọc là `allowed: true`. Response 200 chứa booking `CONFIRMED`, ID, snapshot giá, điều khoản và snapshot chính sách. Gửi lại cùng hold và cùng điều khoản trả cùng booking; điều khoản khác trả 409. Lưu booking ID và đọc lại tại `GET /v1/merchant/booking/bookings/{id}`. API chưa hỗ trợ trường hợp có cọc, check-in/out, thanh toán hoặc đặt phòng công khai.
+
 Danh sách lễ tân: `GET /v1/merchant/branches/{branchId}/booking/holds?from=2036-01-01T00%3A00%3A00%2B07%3A00&to=2036-01-02T00%3A00%3A00%2B07%3A00&limit=50&offset=0`. `from`/`to` bắt buộc có múi giờ; lọc theo khoảng sử dụng phòng `[startAt, startAt + durationMinutes)` giao với `[from,to)`, không tính buffer. Response gồm `items`, `limit`, `offset`, `hasMore`. Danh sách chỉ bao gồm hold, không có booking đã xác nhận. Hold quá hạn được hiển thị `EXPIRED` theo giờ database; thao tác này không giải phóng occupancy. Phân trang offset có thể thay đổi khi có dữ liệu mới.
+
+Lịch booking: `GET /v1/merchant/branches/{branchId}/booking/bookings?from=...&to=...&limit=50&offset=0` trả booking theo khoảng sử dụng giao với `[from,to)`, không bao gồm buffer; response `{items,limit,offset,hasMore}`. Danh sách hold riêng có thể chứa hold đã `CONFIRMED`; FE nên loại bản ghi này khi ghép hai danh sách để tránh hiển thị hai lần.
+
+Ghi nhận tiền mặt: `POST /v1/merchant/booking/bookings/{id}/manual-payments` với `Idempotency-Key` và body `{ "method": "CASH", "amountVnd": "30000" }`, `note` tùy chọn. Gửi lại cùng key cùng body trả cùng giao dịch; thay đổi body trả 409. Owner, Branch Manager, Cashier thuộc chi nhánh có thể đọc danh sách và ghi; API ghi nhận, không tự xác nhận đã thu đủ, không đối soát hoặc hoàn tiền. `GET` cùng đường dẫn có `limit`/`offset` để đọc danh sách.
+
+Catalog khách: Owner dùng `GET/PATCH /v1/merchant/catalog/publication` để yêu cầu công bố toàn bộ chi nhánh/phòng hoạt động của merchant; `platformApproved` là trạng thái duyệt độc lập, Owner không thể sửa. Chỉ merchant vừa yêu cầu công bố vừa được platform duyệt mới xuất hiện tại `GET /v1/public/branches` và `GET /v1/public/branches/{id}/rooms`. API duyệt platform, public quote, availability và guest booking chưa có; chưa dùng catalog làm luồng đặt phòng thật.
+
+Cấu hình xác nhận không cọc theo kênh: Owner/Branch Manager dùng `GET` và `PATCH /v1/merchant/booking/no-deposit-confirmation/{channel}`. PATCH nhận `{ "allowed": true }` hoặc `false`. Khi chưa cấu hình, GET trả `{ "channel": "WEB", "configured": false, "allowed": null }`; frontend hiển thị chưa cấu hình thay vì suy đoán bật/tắt. Cấu hình này chưa xác nhận booking và chưa thay thế cấu hình loại tiền cọc hoặc quy tắc theo trường hợp.
+
+Cấu hình phương thức cọc theo kênh: Owner/Branch Manager dùng `GET` và `PATCH /v1/merchant/booking/deposit-policy/{channel}`. PATCH nhận `{ "mode": "NONE" }`, `{ "mode": "FIXED", "fixedAmountVnd": "150000" }` hoặc `{ "mode": "PERCENT", "percent": "25.5" }`. Tiền là số nguyên VND dạng chuỗi; tỷ lệ là chuỗi từ trên 0 đến 100, tối đa bốn chữ số thập phân. Kênh chưa cấu hình trả `configured: false`, `mode: "NONE"` theo mặc định. API chỉ lưu cấu hình, chưa tính số tiền cọc, chưa nhận thanh toán và chưa xác nhận booking; cấu hình theo trường hợp chưa có.
+
+Danh sách cấu hình: `GET /v1/merchant/booking/deposit-policy`, `GET /v1/merchant/booking/no-deposit-confirmation` và `GET /v1/merchant/booking/hold-ttl` chỉ trả kênh đã lưu cấu hình. Cả ba nhận `limit` (1–100, mặc định 50) và `offset` (0–10000, mặc định 0), trả `{items,limit,offset,hasMore}`, sắp xếp theo tên kênh. Muốn xem mặc định của kênh chưa lưu, gọi GET `/{channel}` tương ứng. Offset có thể dịch chuyển khi dữ liệu thay đổi giữa các lần gọi.
+
+Theo dõi worker: Owner có thể gọi `GET /v1/merchant/booking/hold-expiry/backlog` để xem `overdueCount` (chuỗi số nguyên) và `oldestOverdueSeconds` (số hoặc `null`) của tenant. Chỉ số này không xác nhận worker đang chạy; API không tự hết hạn hoặc giải phóng hold.
+
+Theo dõi thông báo: Owner gọi `GET /v1/merchant/notifications/outbox/backlog` để xem số `pendingCount`, `processingCount`, `deadCount` dưới dạng chuỗi và `oldestReadySeconds` là số hoặc `null`. Số liệu chỉ thuộc tenant, không chứa nội dung/người nhận; đây không phải heartbeat và không chứng minh gửi thông báo thành công.
 
 ## Endpoint
 
@@ -99,7 +121,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/TokenPairResponseDto"} |
 
 ### POST /v1/auth/refresh
 
@@ -119,11 +141,14 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/TokenPairResponseDto"} |
+| 401 | Invalid, expired or reused token; reuse revokes the family | Chưa khai báo schema |
 
 ### POST /v1/auth/logout
 
 Nhóm: authentication
+
+Revokes the refresh-token family, including any token rotated concurrently. Unknown tokens still return 204.
 
 Body bắt buộc:
 
@@ -139,7 +164,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 204 | Chưa mô tả | Chưa khai báo schema |
+| 204 | Logout processed | Chưa khai báo schema |
 
 ### POST /v1/auth/password/change
 
@@ -702,7 +727,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/AvailabilityResponseDto"} |
 
 ### POST /v1/merchant/room-blocks
 
@@ -849,6 +874,22 @@ Response được khai báo:
 | HTTP | Mô tả | Schema |
 |---|---|---|
 | 200 | Chưa mô tả | Chưa khai báo schema |
+
+### GET /v1/merchant/notifications/outbox/backlog
+
+Nhóm: notification operations
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Tenant-scoped outbox counts; no payloads or recipients | {"$ref":"#/components/schemas/OutboxBacklogDto"} |
 
 ### GET /v1/merchant/pricing/plans/{id}/rules
 
@@ -1123,7 +1164,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BookingDurationPolicyResponseDto"} |
 
 ### PATCH /v1/merchant/pricing/duration-policy
 
@@ -1149,7 +1190,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BookingDurationPolicyResponseDto"} |
 
 ### POST /v1/merchant/rooms/{roomId}/quote
 
@@ -1176,7 +1217,25 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/QuoteResponseDto"} |
+
+### GET /v1/merchant/booking/hold-ttl
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Explicitly configured channels only | {"$ref":"#/components/schemas/HoldTtlListDto"} |
 
 ### GET /v1/merchant/booking/hold-ttl/{channel}
 
@@ -1193,7 +1252,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/HoldTtlResponseDto"} |
 
 ### PATCH /v1/merchant/booking/hold-ttl/{channel}
 
@@ -1220,7 +1279,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/HoldTtlResponseDto"} |
 
 ### GET /v1/merchant/booking/holds/{id}
 
@@ -1267,6 +1326,24 @@ Response được khai báo:
 | 200 | Customer contact and server-calculated price snapshot recorded or replayed | {"$ref":"#/components/schemas/HoldResponseDto"} |
 | 409 | Expired hold, conflicting existing details or concurrent change | Chưa khai báo schema |
 | 422 | No price rule matches or current duration policy rejects the hold | Chưa khai báo schema |
+
+### POST /v1/merchant/booking/holds/{id}/phone-verification
+
+Nhóm: booking holds
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Staff-recorded successful verification call, or previously recorded result | {"$ref":"#/components/schemas/HoldResponseDto"} |
+| 409 | Hold has expired or customer phone is not recorded | Chưa khai báo schema |
 
 ### POST /v1/merchant/booking/holds
 
@@ -1318,6 +1395,334 @@ Response được khai báo:
 |---|---|---|
 | 200 | Holds whose booking intervals overlap [from,to); overdue holds are reported as EXPIRED without releasing occupancy | {"$ref":"#/components/schemas/HoldListResponseDto"} |
 
+### GET /v1/merchant/booking/no-deposit-confirmation
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Explicitly configured channels only | {"$ref":"#/components/schemas/NoDepositPolicyListDto"} |
+
+### GET /v1/merchant/booking/no-deposit-confirmation/{channel}
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `channel` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/NoDepositPolicyResponseDto"} |
+
+### PATCH /v1/merchant/booking/no-deposit-confirmation/{channel}
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `channel` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateNoDepositPolicyDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/NoDepositPolicyResponseDto"} |
+
+### GET /v1/merchant/booking/deposit-policy
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Explicitly configured channels only | {"$ref":"#/components/schemas/DepositPolicyListDto"} |
+
+### GET /v1/merchant/booking/deposit-policy/{channel}
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `channel` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositPolicyResponseDto"} |
+
+### PATCH /v1/merchant/booking/deposit-policy/{channel}
+
+Nhóm: booking settings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `channel` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateDepositPolicyDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositPolicyResponseDto"} |
+
+### GET /v1/merchant/booking/hold-expiry/backlog
+
+Nhóm: booking operations
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Tenant-scoped overdue holds; this endpoint does not expire them | {"$ref":"#/components/schemas/HoldExpiryBacklogDto"} |
+
+### POST /v1/merchant/booking/holds/{id}/confirm
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/ConfirmHoldDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Confirmed no-deposit booking or replay with the same terms | {"$ref":"#/components/schemas/BookingResponseDto"} |
+| 409 | Expired or incomplete hold, ineligible deposit policy, or conflicting replay | Chưa khai báo schema |
+
+### GET /v1/merchant/booking/bookings/{id}
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BookingResponseDto"} |
+
+### GET /v1/merchant/branches/{branchId}/booking/bookings
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `branchId` | Có | string |
+| query | `from` | Có | string — Start of search interval, inclusive, with explicit timezone |
+| query | `to` | Có | string — End of search interval, exclusive, with explicit timezone |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Bookings whose scheduled intervals overlap [from,to), excluding the cleanup buffer | {"$ref":"#/components/schemas/BookingListResponseDto"} |
+
+### GET /v1/merchant/booking/bookings/{id}/manual-payments
+
+Nhóm: manual payments
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/ManualPaymentListDto"} |
+
+### POST /v1/merchant/booking/bookings/{id}/manual-payments
+
+Nhóm: manual payments
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+| header | `idempotency-key` | Có | string |
+| header | `Idempotency-Key` | Có | string — Visible ASCII 1–100 characters; scoped to tenant and user |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/RecordManualPaymentDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Recorded payment or matching replay | {"$ref":"#/components/schemas/ManualPaymentResponseDto"} |
+| 409 | Idempotency key reused with different payment details | Chưa khai báo schema |
+
+### GET /v1/merchant/catalog/publication
+
+Nhóm: merchant catalog
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicationResponseDto"} |
+
+### PATCH /v1/merchant/catalog/publication
+
+Nhóm: merchant catalog
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdatePublicationDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicationResponseDto"} |
+
+### GET /v1/public/branches
+
+Nhóm: public catalog
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicBranchListDto"} |
+
+### GET /v1/public/branches/{id}/rooms
+
+Nhóm: public catalog
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicRoomListDto"} |
+
 ## Các schema request và response
 
 Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là các trường bắt buộc.
@@ -1338,6 +1743,40 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "email",
     "password"
+  ]
+}
+```
+
+### TokenPairResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "accessToken": {
+      "type": "string"
+    },
+    "expiresIn": {
+      "type": "number",
+      "description": "Access token lifetime in seconds"
+    },
+    "refreshToken": {
+      "type": "string"
+    },
+    "refreshExpiresIn": {
+      "type": "number",
+      "description": "Refresh token lifetime in seconds"
+    },
+    "mustChangePassword": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "accessToken",
+    "expiresIn",
+    "refreshToken",
+    "refreshExpiresIn",
+    "mustChangePassword"
   ]
 }
 ```
@@ -1674,6 +2113,90 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### AvailableRoomResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "capacity": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "name",
+    "capacity"
+  ]
+}
+```
+
+### AvailabilityResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "startAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "requestedEndAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "durationMinutes": {
+      "type": "number"
+    },
+    "bufferEnabled": {
+      "type": "boolean"
+    },
+    "bufferMinutes": {
+      "type": "number"
+    },
+    "appliedBufferMinutes": {
+      "type": "number"
+    },
+    "reservedEndAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/AvailableRoomResponseDto"
+      }
+    }
+  },
+  "required": [
+    "branchId",
+    "startAt",
+    "requestedEndAt",
+    "durationMinutes",
+    "bufferEnabled",
+    "bufferMinutes",
+    "appliedBufferMinutes",
+    "reservedEndAt",
+    "rooms"
+  ]
+}
+```
+
 ### CreateRoomBlockDto
 
 ```json
@@ -1741,6 +2264,39 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "bufferEnabled",
     "bufferMinutes"
+  ]
+}
+```
+
+### OutboxBacklogDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pendingCount": {
+      "type": "string",
+      "description": "PENDING events, including delayed retries; decimal string"
+    },
+    "processingCount": {
+      "type": "string",
+      "description": "Currently PROCESSING events; decimal string"
+    },
+    "deadCount": {
+      "type": "string",
+      "description": "DEAD events; decimal string"
+    },
+    "oldestReadySeconds": {
+      "type": "number",
+      "nullable": true,
+      "description": "Seconds since the oldest ready PENDING event was created, or null"
+    }
+  },
+  "required": [
+    "pendingCount",
+    "processingCount",
+    "deadCount",
+    "oldestReadySeconds"
   ]
 }
 ```
@@ -2042,6 +2598,34 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### BookingDurationPolicyResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "durationStepMinutes": {
+      "type": "number"
+    },
+    "minDurationMinutes": {
+      "type": "number"
+    },
+    "maxDurationMinutes": {
+      "type": "number"
+    },
+    "version": {
+      "type": "string",
+      "description": "Present when a policy has been persisted"
+    }
+  },
+  "required": [
+    "durationStepMinutes",
+    "minDurationMinutes",
+    "maxDurationMinutes"
+  ]
+}
+```
+
 ### UpdateBookingDurationPolicyDto
 
 ```json
@@ -2096,6 +2680,276 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "startAt",
     "durationMinutes"
+  ]
+}
+```
+
+### QuoteLocalStartDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "example": "2030-04-10"
+    },
+    "time": {
+      "type": "string",
+      "example": "22:30:00"
+    },
+    "weekday": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 6,
+      "description": "Sunday=0 through Saturday=6"
+    }
+  },
+  "required": [
+    "date",
+    "time",
+    "weekday"
+  ]
+}
+```
+
+### QuoteSpecialDateDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "endDate": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "code",
+    "startDate",
+    "endDate"
+  ]
+}
+```
+
+### QuoteCalculationDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "pricePlanId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "pricePlanCode": {
+      "type": "string"
+    },
+    "pricePlanVersion": {
+      "type": "string"
+    },
+    "priceRuleId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "priceRuleCode": {
+      "type": "string"
+    },
+    "priceRuleVersion": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "number"
+    },
+    "amountUnit": {
+      "type": "string",
+      "enum": [
+        "PER_HOUR",
+        "PER_BOOKING"
+      ]
+    },
+    "configuredAmountVnd": {
+      "type": "string",
+      "description": "Configured integer VND, encoded as a decimal string"
+    },
+    "matchedOnLocalStart": {
+      "$ref": "#/components/schemas/QuoteLocalStartDto"
+    },
+    "specialDate": {
+      "nullable": true,
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/QuoteSpecialDateDto"
+        }
+      ]
+    },
+    "rounding": {
+      "type": "string",
+      "example": "nearest 1 VND, half up"
+    }
+  },
+  "required": [
+    "pricePlanId",
+    "pricePlanCode",
+    "pricePlanVersion",
+    "priceRuleId",
+    "priceRuleCode",
+    "priceRuleVersion",
+    "priority",
+    "amountUnit",
+    "configuredAmountVnd",
+    "matchedOnLocalStart",
+    "specialDate",
+    "rounding"
+  ]
+}
+```
+
+### PriceSnapshotDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "example": 1
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timezone": {
+      "type": "string",
+      "example": "Asia/Ho_Chi_Minh"
+    },
+    "startAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "durationMinutes": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "enum": [
+        "VND"
+      ]
+    },
+    "totalAmountVnd": {
+      "type": "string",
+      "description": "Final amount as an integer VND decimal string"
+    },
+    "calculation": {
+      "$ref": "#/components/schemas/QuoteCalculationDto"
+    },
+    "bookingDurationPolicy": {
+      "$ref": "#/components/schemas/BookingDurationPolicyResponseDto"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "tenantId",
+    "branchId",
+    "roomId",
+    "timezone",
+    "startAt",
+    "endAt",
+    "durationMinutes",
+    "currency",
+    "totalAmountVnd",
+    "calculation",
+    "bookingDurationPolicy"
+  ]
+}
+```
+
+### QuoteResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "priceSnapshot": {
+      "$ref": "#/components/schemas/PriceSnapshotDto"
+    }
+  },
+  "required": [
+    "priceSnapshot"
+  ]
+}
+```
+
+### HoldTtlResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "channel": {
+      "type": "string"
+    },
+    "ttlMinutes": {
+      "type": "number"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "channel",
+    "ttlMinutes"
+  ]
+}
+```
+
+### HoldTtlListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/HoldTtlResponseDto"
+      }
+    }
+  },
+  "required": [
+    "limit",
+    "offset",
+    "hasMore",
+    "items"
   ]
 }
 ```
@@ -2162,7 +3016,8 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "type": "string",
       "enum": [
         "HELD",
-        "EXPIRED"
+        "EXPIRED",
+        "CONFIRMED"
       ]
     },
     "customerPhone": {
@@ -2176,10 +3031,26 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "description": "Only present in individual hold responses"
     },
     "priceSnapshot": {
+      "nullable": true,
+      "description": "Immutable server-calculated quote snapshot, only present in individual hold responses",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/PriceSnapshotDto"
+        }
+      ]
+    },
+    "phoneVerifiedAt": {
       "type": "object",
       "nullable": true,
-      "additionalProperties": true,
-      "description": "Immutable server-calculated quote snapshot, only present in individual hold responses"
+      "format": "date-time",
+      "description": "Time staff recorded a successful verification call; individual responses only"
+    },
+    "phoneVerifiedBy": {
+      "type": "object",
+      "nullable": true,
+      "format": "uuid",
+      "description": "Staff user who recorded the verification call; individual responses only"
     }
   },
   "required": [
@@ -2286,6 +3157,679 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "limit",
     "offset",
     "hasMore"
+  ]
+}
+```
+
+### NoDepositPolicyResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "channel": {
+      "type": "string"
+    },
+    "configured": {
+      "type": "boolean"
+    },
+    "allowed": {
+      "type": "boolean",
+      "nullable": true,
+      "description": "null when no merchant configuration exists"
+    },
+    "version": {
+      "type": "string",
+      "description": "Configuration version; absent when unconfigured"
+    }
+  },
+  "required": [
+    "channel",
+    "configured",
+    "allowed"
+  ]
+}
+```
+
+### NoDepositPolicyListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/NoDepositPolicyResponseDto"
+      }
+    }
+  },
+  "required": [
+    "limit",
+    "offset",
+    "hasMore",
+    "items"
+  ]
+}
+```
+
+### UpdateNoDepositPolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "allowed": {
+      "type": "boolean",
+      "description": "Whether no-deposit confirmation is enabled for this merchant and channel"
+    }
+  },
+  "required": [
+    "allowed"
+  ]
+}
+```
+
+### DepositPolicyResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "channel": {
+      "type": "string"
+    },
+    "configured": {
+      "type": "boolean"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "FIXED",
+        "PERCENT"
+      ]
+    },
+    "fixedAmountVnd": {
+      "type": "string",
+      "nullable": true
+    },
+    "percent": {
+      "type": "string",
+      "nullable": true
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "channel",
+    "configured",
+    "mode",
+    "fixedAmountVnd",
+    "percent"
+  ]
+}
+```
+
+### DepositPolicyListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/DepositPolicyResponseDto"
+      }
+    }
+  },
+  "required": [
+    "limit",
+    "offset",
+    "hasMore",
+    "items"
+  ]
+}
+```
+
+### UpdateDepositPolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "FIXED",
+        "PERCENT"
+      ]
+    },
+    "fixedAmountVnd": {
+      "type": "object",
+      "nullable": true,
+      "example": "150000",
+      "description": "VND integer string; required only for FIXED"
+    },
+    "percent": {
+      "type": "object",
+      "nullable": true,
+      "example": "25.0000",
+      "description": "Percentage as decimal string with up to four fractional digits; required only for PERCENT"
+    }
+  },
+  "required": [
+    "mode"
+  ]
+}
+```
+
+### HoldExpiryBacklogDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "overdueCount": {
+      "type": "string",
+      "description": "Number of overdue holds still awaiting expiration, as a decimal string"
+    },
+    "oldestOverdueSeconds": {
+      "type": "number",
+      "nullable": true,
+      "description": "Age in seconds of the oldest overdue hold; null if none"
+    }
+  },
+  "required": [
+    "overdueCount",
+    "oldestOverdueSeconds"
+  ]
+}
+```
+
+### ConfirmHoldDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "cancellationTerms": {
+      "type": "string",
+      "maxLength": 5000,
+      "description": "Exact cancellation terms shown and agreed for this booking"
+    }
+  },
+  "required": [
+    "cancellationTerms"
+  ]
+}
+```
+
+### ConfirmationPolicySnapshotDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "depositMode": {
+      "type": "string",
+      "enum": [
+        "NONE"
+      ]
+    },
+    "depositPolicyVersion": {
+      "type": "string",
+      "nullable": true
+    },
+    "noDepositAllowed": {
+      "type": "boolean",
+      "enum": [
+        true
+      ]
+    },
+    "noDepositPolicyVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "depositMode",
+    "depositPolicyVersion",
+    "noDepositAllowed",
+    "noDepositPolicyVersion"
+  ]
+}
+```
+
+### BookingResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "holdId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "startAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "durationMinutes": {
+      "type": "number"
+    },
+    "bufferMinutes": {
+      "type": "number"
+    },
+    "reservedEndAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "customerPhone": {
+      "type": "string"
+    },
+    "customerEmail": {
+      "type": "string",
+      "nullable": true
+    },
+    "phoneVerifiedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "phoneVerifiedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "priceSnapshot": {
+      "$ref": "#/components/schemas/PriceSnapshotDto"
+    },
+    "cancellationTerms": {
+      "type": "string"
+    },
+    "confirmationPolicySnapshot": {
+      "$ref": "#/components/schemas/ConfirmationPolicySnapshotDto"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "CONFIRMED"
+      ]
+    },
+    "confirmedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "confirmedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "holdId",
+    "branchId",
+    "roomId",
+    "channel",
+    "startAt",
+    "durationMinutes",
+    "bufferMinutes",
+    "reservedEndAt",
+    "customerPhone",
+    "customerEmail",
+    "phoneVerifiedAt",
+    "phoneVerifiedBy",
+    "priceSnapshot",
+    "cancellationTerms",
+    "confirmationPolicySnapshot",
+    "status",
+    "confirmedBy",
+    "confirmedAt"
+  ]
+}
+```
+
+### BookingListResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/BookingResponseDto"
+      }
+    },
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "items",
+    "limit",
+    "offset",
+    "hasMore"
+  ]
+}
+```
+
+### ManualPaymentResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "bookingId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "CASH"
+      ]
+    },
+    "amountVnd": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string",
+      "nullable": true
+    },
+    "recordedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "bookingId",
+    "branchId",
+    "method",
+    "amountVnd",
+    "note",
+    "recordedBy",
+    "recordedAt"
+  ]
+}
+```
+
+### ManualPaymentListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ManualPaymentResponseDto"
+      }
+    },
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "items",
+    "limit",
+    "offset",
+    "hasMore"
+  ]
+}
+```
+
+### RecordManualPaymentDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "method": {
+      "type": "string",
+      "enum": [
+        "CASH"
+      ]
+    },
+    "amountVnd": {
+      "type": "string",
+      "description": "Positive integer VND as a decimal string",
+      "example": "150000"
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "method",
+    "amountVnd"
+  ]
+}
+```
+
+### PublicationResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "published": {
+      "type": "boolean"
+    },
+    "platformApproved": {
+      "type": "boolean",
+      "description": "Separate platform approval; cannot be changed through the merchant API"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "published",
+    "platformApproved"
+  ]
+}
+```
+
+### UpdatePublicationDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "published": {
+      "type": "boolean",
+      "description": "Request publication of all active branches and rooms; separate platform approval is required before they appear publicly"
+    }
+  },
+  "required": [
+    "published"
+  ]
+}
+```
+
+### PublicBranchDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "merchantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "merchantName": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "merchantId",
+    "merchantName",
+    "name",
+    "timezone"
+  ]
+}
+```
+
+### PublicBranchListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PublicBranchDto"
+      }
+    }
+  },
+  "required": [
+    "limit",
+    "offset",
+    "hasMore",
+    "items"
+  ]
+}
+```
+
+### PublicRoomDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "capacity": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "branchId",
+    "name",
+    "capacity"
+  ]
+}
+```
+
+### PublicRoomListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PublicRoomDto"
+      }
+    }
+  },
+  "required": [
+    "limit",
+    "offset",
+    "hasMore",
+    "items"
   ]
 }
 ```

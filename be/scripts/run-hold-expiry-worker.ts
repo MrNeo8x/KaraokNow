@@ -1,18 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { HoldService } from '../src/booking/hold.service';
+import { runHoldExpiryLoop } from '../src/booking/hold-expiry-loop';
 
 async function run(): Promise<void> {
   const app = await NestFactory.createApplicationContext(AppModule);
   const holds = app.get(HoldService);
-  let stopping = false;
-  process.once('SIGINT', () => { stopping = true; });
-  process.once('SIGTERM', () => { stopping = true; });
+  const controller = new AbortController();
+  process.once('SIGINT', () => controller.abort());
+  process.once('SIGTERM', () => controller.abort());
   try {
-    while (!stopping) {
-      const count = await holds.expireBatch();
-      if (count < 100) await new Promise(resolve => setTimeout(resolve, 1000));
-    }
+    await runHoldExpiryLoop(holds, controller.signal, event => process.stdout.write(`${JSON.stringify({ timestamp: new Date().toISOString(), ...event })}\n`));
   } finally { await app.close(); }
 }
-void run();
+void run().catch(() => { process.stderr.write('Hold expiry worker failed to start or shut down\n'); process.exitCode = 1; });

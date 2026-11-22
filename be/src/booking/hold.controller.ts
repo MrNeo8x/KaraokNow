@@ -7,6 +7,7 @@ import { RolesGuard } from '../platform/auth/roles.guard';
 import { TenantGuard } from '../platform/tenant/tenant.guard';
 import { AttachHoldDetailsDto, CreateHoldDto, ListHoldsDto } from './hold.dto';
 import { HoldService } from './hold.service';
+import { PriceSnapshotDto } from '../pricing/quote-response.dto';
 
 export class HoldResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -18,10 +19,12 @@ export class HoldResponseDto {
   @ApiProperty() bufferMinutes!: number;
   @ApiProperty({ format: 'date-time' }) reservedEndAt!: string;
   @ApiProperty({ format: 'date-time' }) expiresAt!: string;
-  @ApiProperty({ enum: ['HELD', 'EXPIRED'] }) status!: string;
+  @ApiProperty({ enum: ['HELD', 'EXPIRED', 'CONFIRMED'] }) status!: string;
   @ApiPropertyOptional({ nullable: true, description: 'Only present in individual hold responses' }) customerPhone?: string | null;
   @ApiPropertyOptional({ nullable: true, description: 'Only present in individual hold responses' }) customerEmail?: string | null;
-  @ApiPropertyOptional({ nullable: true, type: 'object', additionalProperties: true, description: 'Immutable server-calculated quote snapshot, only present in individual hold responses' }) priceSnapshot?: object | null;
+  @ApiPropertyOptional({ nullable: true, type: PriceSnapshotDto, description: 'Immutable server-calculated quote snapshot, only present in individual hold responses' }) priceSnapshot?: PriceSnapshotDto | null;
+  @ApiPropertyOptional({ nullable: true, format: 'date-time', description: 'Time staff recorded a successful verification call; individual responses only' }) phoneVerifiedAt?: string | null;
+  @ApiPropertyOptional({ nullable: true, format: 'uuid', description: 'Staff user who recorded the verification call; individual responses only' }) phoneVerifiedBy?: string | null;
 }
 
 class HoldListResponseDto {
@@ -44,6 +47,12 @@ export class HoldController {
   @ApiResponse({ status: 422, description: 'No price rule matches or current duration policy rejects the hold' })
   attachDetails(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: AttachHoldDetailsDto) {
     return this.holds.attachDetails(req.actor, id, dto);
+  }
+  @Post(':id/phone-verification') @HttpCode(200) @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
+  @ApiResponse({ status: 200, type: HoldResponseDto, description: 'Staff-recorded successful verification call, or previously recorded result' })
+  @ApiResponse({ status: 409, description: 'Hold has expired or customer phone is not recorded' })
+  verifyPhone(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    return this.holds.recordPhoneVerification(req.actor, id);
   }
   @Post() @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
   @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'Visible ASCII, 1–100 characters; scoped to tenant and user' })

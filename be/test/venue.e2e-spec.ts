@@ -2,7 +2,8 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { hash } from 'bcryptjs';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { resolve } from 'node:path';
 import type { Pool } from 'pg';
 import request = require('supertest');
@@ -125,6 +126,30 @@ describe('Authentication, membership, RBAC and venue API', () => {
       .set('Authorization', `Bearer ${logoutLogin.accessToken}`).expect(401);
   });
 
+  it('revokes the rotated token family when logout races with refresh', async () => {
+    const login = () => request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'owner@example.com', password: OWNER_PASSWORD }).expect(200);
+    const sequential = (await login()).body;
+    const rotated = (await request(app.getHttpServer()).post('/v1/auth/refresh').send({ refreshToken: sequential.refreshToken }).expect(200)).body;
+    await request(app.getHttpServer()).post('/v1/auth/logout').send({ refreshToken: sequential.refreshToken }).expect(204);
+    await request(app.getHttpServer()).get('/v1/auth/sessions').set('Authorization', `Bearer ${rotated.accessToken}`).expect(401);
+    await request(app.getHttpServer()).post('/v1/auth/refresh').send({ refreshToken: rotated.refreshToken }).expect(401);
+    for (let i = 0; i < 5; i++) {
+      const pair = (await login()).body;
+      const [refresh, logout] = await Promise.all([
+        request(app.getHttpServer()).post('/v1/auth/refresh').send({ refreshToken: pair.refreshToken }),
+        request(app.getHttpServer()).post('/v1/auth/logout').send({ refreshToken: pair.refreshToken })
+      ]);
+      expect(logout.status).toBe(204);
+      expect([200, 401]).toContain(refresh.status);
+      if (refresh.status === 200) {
+        await request(app.getHttpServer()).get('/v1/auth/sessions').set('Authorization', `Bearer ${refresh.body.accessToken}`).expect(401);
+        await request(app.getHttpServer()).post('/v1/auth/refresh').send({ refreshToken: refresh.body.refreshToken }).expect(401);
+      }
+      await request(app.getHttpServer()).get('/v1/auth/sessions').set('Authorization', `Bearer ${pair.accessToken}`).expect(401);
+    }
+    await request(app.getHttpServer()).post('/v1/auth/logout').send({ refreshToken: 'unknown-token-with-sufficient-length-12345' }).expect(204);
+  });
+
   it('locks repeated failed logins in PostgreSQL and records security events', async () => {
     for (let attempt = 1; attempt <= 4; attempt++) {
       await request(app.getHttpServer()).post('/v1/auth/login')
@@ -177,6 +202,78 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await pool.query(`UPDATE outbox_events SET status='PROCESSING',locked_at=now()-interval '10 minutes' WHERE id=$1`, [staleId]);
     expect(await worker.runOnce(1)).toBe(1);
     expect((await pool.query('SELECT status FROM outbox_events WHERE id=$1', [staleId])).rows[0].status).toBe('PUBLISHED');
+  });
+
+  it('does not persist untrusted provider error names or messages', async () => {
+    const eventId = await outboxEvent('66666666-6666-4666-8666-666666666666');
+    const failing = new OutboxWorker(pool, { deliver: async () => { const error = new Error('message-secret'); error.name = 'provider-secret'; throw error; } });
+    expect(await failing.runOnce()).toBe(1);
+    const event = (await pool.query('SELECT status,last_error FROM outbox_events WHERE id=$1', [eventId])).rows[0];
+    expect(event).toEqual({ status: 'PENDING', last_error: 'DeliveryError' });
+    await pool.query(`UPDATE outbox_events SET status='DEAD' WHERE id=$1`, [eventId]);
+  });
+
+  it('prevents a stale outbox claimant from overwriting the new claim result', async () => {
+    const eventId = await outboxEvent('77777777-7777-4777-8777-777777777777');
+    let release!: () => void;
+    let started!: () => void;
+    const claimed = new Promise<void>(resolveStart => { started = resolveStart; });
+    const pending = new Promise<void>(resolveDelivery => { release = resolveDelivery; });
+    const slow = new OutboxWorker(pool, { deliver: async () => { started(); await pending; } });
+    const slowRun = slow.runOnce();
+    try {
+      await claimed;
+      await pool.query(`UPDATE outbox_events SET locked_at=clock_timestamp()-interval '10 minutes' WHERE id=$1`, [eventId]);
+      const failing = new OutboxWorker(pool, { deliver: async () => { throw new Error('synthetic provider failure'); } });
+      expect(await failing.runOnce(1)).toBe(1);
+      const before = (await pool.query(`SELECT status,attempts FROM outbox_events WHERE id=$1`, [eventId])).rows[0];
+      expect(before).toEqual({ status: 'PENDING', attempts: 2 });
+      release(); await slowRun;
+      expect((await pool.query(`SELECT status,attempts FROM outbox_events WHERE id=$1`, [eventId])).rows[0]).toEqual(before);
+    } finally { release(); await slowRun; }
+    await pool.query(`UPDATE outbox_events SET status='DEAD' WHERE id=$1`, [eventId]);
+  });
+
+  it('runs the outbox worker process without reporting unconfigured delivery as success', async () => {
+    const id = await outboxEvent('88888888-8888-4888-8888-888888888888');
+    const child = spawn(process.execPath, ['-r', 'ts-node/register', 'scripts/run-outbox-worker.ts'], { cwd: resolve('.'), env: process.env, stdio: 'ignore' });
+    const exited = once(child, 'exit');
+    try {
+      let row: { status: string; attempts: number } = { status: 'PENDING', attempts: 0 };
+      const deadline = Date.now() + 15000;
+      while (row.attempts === 0 && Date.now() < deadline && child.exitCode === null) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 100));
+        row = (await pool.query('SELECT status,attempts FROM outbox_events WHERE id=$1', [id])).rows[0];
+      }
+      expect(row.attempts).toBeGreaterThanOrEqual(1);
+      expect(['PENDING', 'PROCESSING', 'DEAD']).toContain(row.status);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      const result = await Promise.race([exited, new Promise<never>((_, reject) => setTimeout(() => { child.kill('SIGKILL'); reject(new Error('Outbox worker did not shut down')); }, 5000).unref())]);
+      expect(result).toEqual([0, null]);
+      const final = (await pool.query('SELECT status FROM outbox_events WHERE id=$1', [id])).rows[0];
+      expect(['PENDING', 'DEAD']).toContain(final.status);
+      await pool.query('DELETE FROM outbox_events WHERE id=$1', [id]);
+    }
+  }, 25000);
+
+  it('reports tenant-scoped outbox backlog without exposing payloads', async () => {
+    const path = '/v1/merchant/notifications/outbox/backlog';
+    await request(app.getHttpServer()).get(path).set('X-Tenant-ID', TENANT_A).expect(401);
+    const baseline = (await authorized('get', path).expect(200)).body;
+    const ids = (await pool.query(`INSERT INTO outbox_events(id,tenant_id,event_type,aggregate_type,aggregate_id,payload,status,available_at,locked_at)
+      VALUES (gen_random_uuid(),$1,'TEST','TEST',gen_random_uuid(),'{"secret":"hidden"}','PENDING',clock_timestamp()-interval '1 minute',NULL),
+      (gen_random_uuid(),$1,'TEST','TEST',gen_random_uuid(),'{}','PROCESSING',clock_timestamp(),clock_timestamp()),
+      (gen_random_uuid(),$1,'TEST','TEST',gen_random_uuid(),'{}','DEAD',clock_timestamp(),NULL),
+      (gen_random_uuid(),$2,'TEST','TEST',gen_random_uuid(),'{}','DEAD',clock_timestamp(),NULL) RETURNING id`, [TENANT_A, TENANT_B])).rows.map(row => row.id);
+    try {
+      const response = (await authorized('get', path).expect(200)).body;
+      expect(BigInt(response.pendingCount)).toBe(BigInt(baseline.pendingCount) + 1n);
+      expect(BigInt(response.processingCount)).toBe(BigInt(baseline.processingCount) + 1n);
+      expect(BigInt(response.deadCount)).toBe(BigInt(baseline.deadCount) + 1n);
+      expect(response.oldestReadySeconds).toBeGreaterThanOrEqual(0);
+      expect(JSON.stringify(response)).not.toContain('hidden');
+    } finally { await pool.query('DELETE FROM outbox_events WHERE id=ANY($1::uuid[])', [ids]); }
   });
 
   it('supports audited branch and room CRUD/status using soft deletion', async () => {
@@ -325,9 +422,14 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('get', listPath).query({ from: '2036-01-01T11:00:00', to: '2036-01-02T00:00:00Z' }).expect(422);
     await authorized('get', listPath).query({ ...range, limit: 101 }).expect(400);
     await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [hold.id]);
+    await authorized('get', '/v1/merchant/booking/hold-expiry/backlog').expect(200).expect(({ body }) => {
+      expect(body.overdueCount).toBe('1'); expect(body.oldestOverdueSeconds).toBeGreaterThanOrEqual(60);
+    });
     await authorized('get', listPath).query(range).expect(200).expect(({ body }) => expect(body.items[0].status).toBe('EXPIRED'));
     expect((await pool.query(`SELECT status FROM booking_holds WHERE id=$1`, [hold.id])).rows[0].status).toBe('HELD');
     await authorized('get', `${path}/${hold.id}`).expect(200).expect(({ body }) => expect(body.status).toBe('EXPIRED'));
+    await authorized('get', '/v1/merchant/booking/hold-expiry/backlog').expect(200)
+      .expect(({ body }) => expect(body).toEqual({ overdueCount: '0', oldestOverdueSeconds: null }));
     expect(await app.get(HoldService).expireBatch()).toBe(0);
     const parallelId = replays[0].body.id;
     await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [parallelId]);
@@ -339,6 +441,31 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(audit.rows.map(row => row.action).sort()).toEqual(['HOLD_CREATED', 'HOLD_EXPIRED']);
   }, 30000);
 
+  it('runs the expiry worker as a process, drains overdue holds and shuts down', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'WORKER-TEST', name: 'Worker branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'WORKER-ROOM', name: 'Worker room', capacity: 8 }).expect(201)).body;
+    const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'worker-process-test')
+      .send({ roomId: room.id, channel: 'WALK_IN', startAt: '2039-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(201)).body;
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [hold.id]);
+    const child = spawn(process.execPath, ['-r', 'ts-node/register', 'scripts/run-hold-expiry-worker.ts'], { cwd: resolve('.'), env: process.env, stdio: 'ignore' });
+    const exited = once(child, 'exit');
+    try {
+      let status = 'HELD';
+      const deadline = Date.now() + 15000;
+      while (status === 'HELD' && Date.now() < deadline && child.exitCode === null) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 100));
+        status = (await pool.query('SELECT status FROM booking_holds WHERE id=$1', [hold.id])).rows[0].status;
+      }
+      expect(status).toBe('EXPIRED');
+      const occupancy = await pool.query(`SELECT o.status FROM room_occupancy o JOIN booking_holds h ON h.occupancy_id=o.id WHERE h.id=$1`, [hold.id]);
+      expect(occupancy.rows[0].status).toBe('RELEASED');
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      const result = await Promise.race([exited, new Promise<never>((_, reject) => setTimeout(() => { child.kill('SIGKILL'); reject(new Error('Worker did not shut down')); }, 5000).unref())]);
+      expect(result).toEqual([0, null]);
+    }
+  }, 25000);
+
   it('attaches customer details and an immutable server-calculated price snapshot to a hold', async () => {
     const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'SNAPSHOT', name: 'Snapshot', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
     const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'SNAP-ROOM', name: 'Snapshot room', capacity: 8 }).expect(201)).body;
@@ -349,6 +476,8 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const input = { roomId: room.id, channel: 'WALK_IN', startAt: '2038-01-01T18:00:00+07:00', durationMinutes: 60 };
     const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'snapshot-hold').send(input).expect(201)).body;
     const detailsPath = `/v1/merchant/booking/holds/${hold.id}/details`;
+    const verificationPath = `/v1/merchant/booking/holds/${hold.id}/phone-verification`;
+    await authorized('post', verificationPath).expect(409);
     await authorized('post', detailsPath).send({ expectedTotalAmountVnd: '100000' }).expect(400);
     await authorized('post', detailsPath).send({ phone: '0912345678', email: 'invalid', expectedTotalAmountVnd: '100000' }).expect(400);
     await authorized('post', detailsPath).send({ phone: '0912345678', expectedTotalAmountVnd: '99999' }).expect(409);
@@ -357,6 +486,13 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const details = { phone: '0912345678', email: 'guest@example.com', expectedTotalAmountVnd: '100000' };
     const saved = (await authorized('post', detailsPath).send(details).expect(200)).body;
     expect(saved).toMatchObject({ customerPhone: details.phone, customerEmail: details.email, priceSnapshot: { totalAmountVnd: '100000', calculation: { priceRuleId: rule.id } } });
+    expect(saved.phoneVerifiedAt).toBeNull();
+    const verifications = await Promise.all(Array.from({ length: 4 }, () => authorized('post', verificationPath).expect(200)));
+    expect(new Set(verifications.map(response => response.body.phoneVerifiedAt)).size).toBe(1);
+    expect(verifications[0].body.phoneVerifiedBy).toBe(OWNER_ID);
+    const verifiedAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE tenant_id=$1 AND entity_id=$2 AND action='HOLD_PHONE_VERIFIED'`, [TENANT_A, hold.id]);
+    expect(verifiedAudit.rows).toHaveLength(1);
+    expect(verifiedAudit.rows[0].after_data).toEqual({ method: 'STAFF_PHONE_CALL' });
     const { pricePlanId: _plan, code: _code, ...ruleValues } = ruleInput;
     await authorized('patch', `/v1/merchant/pricing/rules/${rule.id}`).send({ ...ruleValues, amountVnd: '200000', status: 'ACTIVE' }).expect(200);
     const replay = (await authorized('post', detailsPath).send(details).expect(200)).body;
@@ -368,11 +504,201 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(JSON.stringify(audit.rows[0])).not.toContain(details.email);
     await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [hold.id]);
     await authorized('post', detailsPath).send(details).expect(409);
+    await authorized('post', verificationPath).expect(409);
     await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Snapshot plan', status: 'INACTIVE' }).expect(200);
+  });
+
+  it('publishes only explicitly opted-in merchants, active branches and active rooms', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'PUBLIC-CAT', name: 'Public catalog branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const active = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'PUBLIC-OK', name: 'Public room', capacity: 8 }).expect(201)).body;
+    const inactive = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'PUBLIC-NO', name: 'Inactive room', capacity: 6 }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/rooms/${inactive.id}/status`).send({ status: 'INACTIVE' }).expect(200);
+    await authorized('get', '/v1/merchant/catalog/publication').expect(200).expect(({ body }) => expect(body.published).toBe(false));
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await request(app.getHttpServer()).get('/v1/public/branches').expect(200).expect(({ body }) => expect(body.items.some((item: { id: string }) => item.id === branch.id)).toBe(false));
+    await authorized('patch', '/v1/merchant/catalog/publication').send({ published: true }).expect(200);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await pool.query('UPDATE tenant_public_catalog SET platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)
+      .expect(({ body }) => expect(body.items).toContainEqual(expect.objectContaining({ id: branch.id, merchantId: TENANT_A })));
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(200)
+      .expect(({ body }) => expect(body.items).toEqual([{ id: active.id, branchId: branch.id, name: 'Public room', capacity: 8 }]));
+    await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 101 }).expect(400);
+    await authorized('patch', `/v1/merchant/branches/${branch.id}/status`).send({ status: 'INACTIVE' }).expect(200);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await authorized('patch', '/v1/merchant/catalog/publication').send({ published: false }).expect(200);
+    const audit = await pool.query(`SELECT action FROM audit_logs WHERE tenant_id=$1 AND action='PUBLIC_CATALOG_UPDATED'`, [TENANT_A]);
+    expect(audit.rows).toHaveLength(2);
+  });
+
+  it('confirms a verified no-deposit hold once and snapshots booking terms', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'CONFIRM', name: 'Confirmation', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'CONFIRM-R', name: 'Confirmation room', capacity: 8 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'CONFIRM-PLAN', name: 'Confirmation plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Confirmation plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'CONFIRM-RULE', name: 'Price', priority: 999, amountVnd: '120000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    const createHold = (key: string, startAt: string) => authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', key).send({ roomId: room.id, channel: 'CONFIRM_TEST', startAt, durationMinutes: 60 });
+    const hold = (await createHold('confirm-test', '2040-01-01T18:00:00+07:00').expect(201)).body;
+    const confirmPath = `/v1/merchant/booking/holds/${hold.id}/confirm`;
+    const terms = { cancellationTerms: 'Liên hệ cơ sở để xử lý hủy.' };
+    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '120000' }).expect(200);
+    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/CONFIRM_TEST').send({ allowed: true }).expect(200);
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/CONFIRM_TEST').send({ mode: 'FIXED', fixedAmountVnd: '30000' }).expect(200);
+    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/CONFIRM_TEST').send({ mode: 'NONE' }).expect(200);
+    await authorized('post', confirmPath).send({ cancellationTerms: '   ' }).expect(400);
+    const confirmations = await Promise.all(Array.from({ length: 8 }, () => authorized('post', confirmPath).send(terms).expect(200)));
+    expect(new Set(confirmations.map(response => response.body.id)).size).toBe(1);
+    const booking = confirmations[0].body;
+    expect(booking).toMatchObject({ holdId: hold.id, status: 'CONFIRMED', customerPhone: '0912345678', cancellationTerms: terms.cancellationTerms,
+      priceSnapshot: { totalAmountVnd: '120000' }, confirmationPolicySnapshot: { depositMode: 'NONE', noDepositAllowed: true } });
+    await authorized('get', `/v1/merchant/booking/bookings/${booking.id}`).expect(200).expect(({ body }) => expect(body).toEqual(booking));
+    const paymentPath = `/v1/merchant/booking/bookings/${booking.id}/manual-payments`;
+    await authorized('post', paymentPath).send({ method: 'CASH', amountVnd: '10000' }).expect(400);
+    await authorized('post', paymentPath).set('Idempotency-Key', 'invalid').send({ method: 'CASH', amountVnd: '0' }).expect(400);
+    await authorized('post', paymentPath).set('Idempotency-Key', 'invalid').send({ method: 'CASH', amountVnd: '9223372036854775808' }).expect(422);
+    const payments = await Promise.all(Array.from({ length: 5 }, () => authorized('post', paymentPath).set('Idempotency-Key', 'cash-payment-1').send({ method: 'CASH', amountVnd: '30000', note: 'Phiếu số 1' }).expect(200)));
+    expect(new Set(payments.map(response => response.body.id)).size).toBe(1);
+    await authorized('post', paymentPath).set('Idempotency-Key', 'cash-payment-1').send({ method: 'CASH', amountVnd: '40000' }).expect(409);
+    await authorized('post', paymentPath).set('Idempotency-Key', 'cash-payment-2').send({ method: 'CASH', amountVnd: '90000' }).expect(200);
+    await authorized('get', paymentPath).query({ limit: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ amountVnd: '30000' }], hasMore: true }));
+    await authorized('get', paymentPath).query({ limit: 1, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ amountVnd: '90000' }], hasMore: false }));
+    const payAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE entity_type='MANUAL_PAYMENT' AND after_data->>'bookingId'=$1`, [booking.id]);
+    expect(payAudit.rows).toHaveLength(2);
+    expect(JSON.stringify(payAudit.rows)).not.toContain('Phiếu số 1');
+    const calendarPath = `/v1/merchant/branches/${branch.id}/booking/bookings`;
+    await authorized('get', calendarPath).query({ from: '2040-01-01T11:30:00Z', to: '2040-01-01T12:30:00Z', limit: 1 }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ items: [{ id: booking.id }], limit: 1, offset: 0, hasMore: false }));
+    await authorized('get', calendarPath).query({ from: '2040-01-01T12:00:00Z', to: '2040-01-01T13:00:00Z' }).expect(200)
+      .expect(({ body }) => expect(body.items).toEqual([]));
+    await authorized('get', calendarPath).query({ from: '2040-01-01T11:00:00', to: '2040-01-01T13:00:00Z' }).expect(422);
+    await authorized('get', calendarPath).query({ from: '2040-01-01T11:00:00Z', to: '2040-01-01T13:00:00Z', limit: 101 }).expect(400);
+    const otherMembership = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_B, OWNER_ID])).rows[0].id;
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'OWNER')`, [otherMembership]);
+    await request(app.getHttpServer()).get(`/v1/merchant/booking/bookings/${booking.id}`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(404);
+    await request(app.getHttpServer()).get(paymentPath).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(404);
+    await request(app.getHttpServer()).get(calendarPath).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).query({ from: '2040-01-01T11:00:00Z', to: '2040-01-01T13:00:00Z' }).expect(404);
+    await request(app.getHttpServer()).post(confirmPath).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).send(terms).expect(404);
+    await pool.query('DELETE FROM membership_roles WHERE membership_id=$1', [otherMembership]);
+    await pool.query('DELETE FROM tenant_memberships WHERE id=$1', [otherMembership]);
+    await authorized('post', confirmPath).send({ cancellationTerms: 'Khác' }).expect(409);
+    await authorized('get', `/v1/merchant/booking/holds/${hold.id}`).expect(200).expect(({ body }) => expect(body.status).toBe('CONFIRMED'));
+    const persisted = await pool.query(`SELECT h.status AS hold_status,o.status AS occupancy_status,b.price_snapshot,b.cancellation_terms FROM booking_holds h
+      JOIN room_occupancy o ON o.id=h.occupancy_id JOIN bookings b ON b.hold_id=h.id WHERE h.id=$1`, [hold.id]);
+    expect(persisted.rows[0]).toMatchObject({ hold_status: 'CONFIRMED', occupancy_status: 'CONFIRMED', cancellation_terms: terms.cancellationTerms, price_snapshot: { totalAmountVnd: '120000' } });
+    expect((await pool.query(`SELECT id FROM audit_logs WHERE entity_id=$1 AND action='BOOKING_CONFIRMED'`, [booking.id])).rowCount).toBe(1);
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [hold.id]);
+    await app.get(HoldService).expireBatch();
+    expect((await pool.query('SELECT status FROM room_occupancy WHERE id=(SELECT occupancy_id FROM booking_holds WHERE id=$1)', [hold.id])).rows[0].status).toBe('CONFIRMED');
+    const expired = (await createHold('confirm-expired', '2040-01-02T18:00:00+07:00').expect(201)).body;
+    await authorized('post', `/v1/merchant/booking/holds/${expired.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '120000' }).expect(200);
+    await authorized('post', `/v1/merchant/booking/holds/${expired.id}/phone-verification`).expect(200);
+    const lockingClient = await pool.connect();
+    try {
+      await lockingClient.query('BEGIN');
+      await lockingClient.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [expired.id]);
+      const confirmation = authorized('post', `/v1/merchant/booking/holds/${expired.id}/confirm`).send(terms).then(response => response);
+      const expiryRun = app.get(HoldService).expireBatch();
+      await expiryRun;
+      await lockingClient.query('COMMIT');
+      expect((await confirmation).status).toBe(409);
+    } finally { await lockingClient.query('ROLLBACK'); lockingClient.release(); }
+    await app.get(HoldService).expireBatch();
+    expect((await pool.query(`SELECT h.status,o.status AS occupancy_status FROM booking_holds h JOIN room_occupancy o ON o.id=h.occupancy_id WHERE h.id=$1`, [expired.id])).rows[0]).toEqual({ status: 'EXPIRED', occupancy_status: 'RELEASED' });
+    expect((await pool.query(`SELECT id FROM bookings WHERE hold_id=$1`, [expired.id])).rowCount).toBe(0);
+    const secondHold = (await createHold('confirm-second', '2040-01-03T18:00:00+07:00').expect(201)).body;
+    await authorized('post', `/v1/merchant/booking/holds/${secondHold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '120000' }).expect(200);
+    await authorized('post', `/v1/merchant/booking/holds/${secondHold.id}/phone-verification`).expect(200);
+    const secondBooking = (await authorized('post', `/v1/merchant/booking/holds/${secondHold.id}/confirm`).send(terms).expect(200)).body;
+    const calendarRange = { from: '2040-01-01T00:00:00Z', to: '2040-01-04T00:00:00Z', limit: 1 };
+    await authorized('get', calendarPath).query(calendarRange).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ id: booking.id }], hasMore: true }));
+    await authorized('get', calendarPath).query({ ...calendarRange, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ id: secondBooking.id }], hasMore: false }));
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Confirmation plan', status: 'INACTIVE' }).expect(200);
+    await pool.query(`DELETE FROM tenant_deposit_policies WHERE tenant_id=$1 AND channel='CONFIRM_TEST'`, [TENANT_A]);
+    await pool.query(`DELETE FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel='CONFIRM_TEST'`, [TENANT_A]);
+    await pool.query(`DELETE FROM audit_logs WHERE tenant_id=$1 AND action IN ('DEPOSIT_POLICY_UPDATED','NO_DEPOSIT_CONFIRMATION_POLICY_UPDATED') AND after_data->>'channel'='CONFIRM_TEST'`, [TENANT_A]);
+  }, 30000);
+
+  it('limits manual payment access to permitted roles and assigned branches', async () => {
+    const booking = (await pool.query(`SELECT id,branch_id FROM bookings WHERE tenant_id=$1 LIMIT 1`, [TENANT_A])).rows[0];
+    const user = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'cashier@example.com',$1,'Cashier','ACTIVE') RETURNING id`, [await hash('Cashier-password-123', 4)])).rows[0];
+    const member = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A,user.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'CASHIER')`, [member.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [member.id,TENANT_A,booking.branch_id]);
+    const token = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'cashier@example.com', password: 'Cashier-password-123' }).expect(200)).body.accessToken;
+    const path = `/v1/merchant/booking/bookings/${booking.id}/manual-payments`;
+    await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).expect(200);
+    await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).set('Idempotency-Key', 'cashier-test').send({ method:'CASH',amountVnd:'1' }).expect(200);
+  });
+
+  it('manages audited deposit modes per tenant and channel', async () => {
+    const path = '/v1/merchant/booking/deposit-policy';
+    await authorized('get', path).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [], limit: 50, offset: 0, hasMore: false }));
+    await request(app.getHttpServer()).get(path).set('X-Tenant-ID', TENANT_A).expect(401);
+    await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body).toEqual({ channel: 'WEB', configured: false, mode: 'NONE', fixedAmountVnd: null, percent: null }));
+    await authorized('get', `${path}/web`).expect(400);
+    await authorized('patch', `${path}/WEB`).send({ mode: 'FIXED' }).expect(422);
+    await authorized('patch', `${path}/WEB`).send({ mode: 'FIXED', fixedAmountVnd: '9223372036854775808' }).expect(422);
+    await authorized('patch', `${path}/WEB`).send({ mode: 'PERCENT', percent: '100.0001' }).expect(422);
+    await authorized('patch', `${path}/WEB`).send({ mode: 'NONE', percent: '20' }).expect(422);
+    await authorized('patch', `${path}/WEB`).send({ mode: 'FIXED', fixedAmountVnd: '150000' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ mode: 'FIXED', fixedAmountVnd: '150000', percent: null, version: '0' }));
+    await authorized('patch', `${path}/WEB`).send({ mode: 'PERCENT', percent: '25.125' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ mode: 'PERCENT', percent: '25.1250', fixedAmountVnd: null, version: '1' }));
+    await authorized('get', `${path}/WALK_IN`).expect(200).expect(({ body }) => expect(body.mode).toBe('NONE'));
+    await pool.query(`INSERT INTO tenant_deposit_policies(tenant_id,channel,mode,updated_by) VALUES($1,'WEB','NONE',$2)`, [TENANT_B, OWNER_ID]);
+    await pool.query(`INSERT INTO tenant_deposit_policies(tenant_id,channel,mode,updated_by) VALUES($1,'ZZ_OTHER','NONE',$2),($3,'FOREIGN_ONLY','NONE',$2)`, [TENANT_A, OWNER_ID, TENANT_B]);
+    await authorized('get', path).query({ limit: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'WEB' }], limit: 1, offset: 0, hasMore: true }));
+    await authorized('get', path).query({ limit: 1, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'ZZ_OTHER' }], hasMore: false }));
+    await authorized('get', path).query({ limit: 101 }).expect(400);
+    await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body.mode).toBe('PERCENT'));
+    await expect(pool.query(`INSERT INTO tenant_deposit_policies(tenant_id,channel,mode,updated_by) VALUES($1,'BAD_FIXED','FIXED',$2)`, [TENANT_A, OWNER_ID])).rejects.toMatchObject({ code: '23514' });
+    await Promise.all([{ mode: 'NONE' }, { mode: 'FIXED', fixedAmountVnd: '50000' }].map(body => authorized('patch', `${path}/WEB`).send(body).expect(200)));
+    const audit = await pool.query(`SELECT before_data,after_data FROM audit_logs WHERE tenant_id=$1 AND action='DEPOSIT_POLICY_UPDATED' ORDER BY (after_data->>'version')::integer`, [TENANT_A]);
+    expect(audit.rows).toHaveLength(4);
+    expect(audit.rows[0].before_data.mode).toBe('NONE');
+    expect(audit.rows[3].before_data).toEqual(audit.rows[2].after_data);
+  });
+
+  it('stores audited no-deposit confirmation settings per tenant and channel', async () => {
+    const path = '/v1/merchant/booking/no-deposit-confirmation';
+    await authorized('get', path).expect(200).expect(({ body }) => expect(body.items).toEqual([]));
+    await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body).toEqual({ channel: 'WEB', configured: false, allowed: null }));
+    await authorized('get', `${path}/web`).expect(400);
+    await authorized('patch', `${path}/WEB`).send({ allowed: 'true' }).expect(400);
+    await authorized('patch', `${path}/WEB`).send({ allowed: true }).expect(200)
+      .expect(({ body }) => expect(body).toEqual({ channel: 'WEB', configured: true, allowed: true, version: '0' }));
+    await authorized('get', `${path}/WALK_IN`).expect(200).expect(({ body }) => expect(body).toEqual({ channel: 'WALK_IN', configured: false, allowed: null }));
+    await pool.query(`INSERT INTO tenant_no_deposit_confirmation_policies(tenant_id,channel,allowed,updated_by) VALUES($1,'WEB',false,$2)`, [TENANT_B, OWNER_ID]);
+    await pool.query(`INSERT INTO tenant_no_deposit_confirmation_policies(tenant_id,channel,allowed,updated_by) VALUES($1,'ZZ_OTHER',true,$2),($3,'FOREIGN_ONLY',true,$2)`, [TENANT_A, OWNER_ID, TENANT_B]);
+    await authorized('get', path).query({ limit: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'WEB', configured: true }], hasMore: true }));
+    await authorized('get', path).query({ limit: 1, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'ZZ_OTHER' }], hasMore: false }));
+    await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body.allowed).toBe(true));
+    await Promise.all([false, true].map(allowed => authorized('patch', `${path}/WEB`).send({ allowed }).expect(200)));
+    const audit = await pool.query(`SELECT before_data,after_data FROM audit_logs WHERE tenant_id=$1 AND action='NO_DEPOSIT_CONFIRMATION_POLICY_UPDATED' ORDER BY (after_data->>'version')::integer`, [TENANT_A]);
+    expect(audit.rows).toHaveLength(3);
+    expect(audit.rows[0].before_data).toEqual({ channel: 'WEB', configured: false, allowed: null });
+    expect(audit.rows[1].before_data.allowed).toBe(true);
+    expect(audit.rows[2].before_data.allowed).toBe(audit.rows[1].after_data.allowed);
+  });
+
+  it('restricts policy listings to owner and branch manager', async () => {
+    const user = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'policy-reception@example.com',$1,'Reception','ACTIVE') RETURNING id`, [await hash('Reception-password-123', 4)])).rows[0];
+    const membership = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, user.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'RECEPTIONIST')`, [membership.id]);
+    const token = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'policy-reception@example.com', password: 'Reception-password-123' }).expect(200)).body.accessToken;
+    for (const policy of ['deposit-policy', 'no-deposit-confirmation', 'hold-ttl']) {
+      await request(app.getHttpServer()).get(`/v1/merchant/booking/${policy}`).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    }
   });
 
   it('stores audited hold TTL settings separately by tenant and channel', async () => {
     const path = '/v1/merchant/booking/hold-ttl';
+    await authorized('get', path).expect(200).expect(({ body }) => expect(body.items).toEqual([]));
     await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body).toEqual({ channel: 'WEB', ttlMinutes: 15 }));
     await authorized('get', `${path}/web`).expect(400);
     await authorized('patch', `${path}/WEB`).send({ ttlMinutes: 0 }).expect(400);
@@ -380,6 +706,9 @@ describe('Authentication, membership, RBAC and venue API', () => {
       .expect(({ body }) => expect(body).toMatchObject({ channel: 'WEB', ttlMinutes: 25, version: '0' }));
     await authorized('get', `${path}/WALK_IN`).expect(200).expect(({ body }) => expect(body.ttlMinutes).toBe(15));
     await pool.query(`INSERT INTO tenant_hold_ttl_policies(tenant_id,channel,ttl_minutes,updated_by) VALUES($1,'WEB',60,$2)`, [TENANT_B, OWNER_ID]);
+    await pool.query(`INSERT INTO tenant_hold_ttl_policies(tenant_id,channel,ttl_minutes,updated_by) VALUES($1,'ZZ_OTHER',30,$2),($3,'FOREIGN_ONLY',30,$2)`, [TENANT_A, OWNER_ID, TENANT_B]);
+    await authorized('get', path).query({ limit: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'WEB', ttlMinutes: 25 }], hasMore: true }));
+    await authorized('get', path).query({ limit: 1, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ channel: 'ZZ_OTHER' }], hasMore: false }));
     await authorized('get', `${path}/WEB`).expect(200).expect(({ body }) => expect(body.ttlMinutes).toBe(25));
     await Promise.all([35, 45].map(ttlMinutes => authorized('patch', `${path}/WEB`).send({ ttlMinutes }).expect(200)));
     const audit = await pool.query(`SELECT before_data,after_data FROM audit_logs WHERE tenant_id=$1 AND action='HOLD_TTL_POLICY_UPDATED' ORDER BY (after_data->>'version')::integer`, [TENANT_A]);
@@ -648,10 +977,27 @@ describe('Authentication, membership, RBAC and venue API', () => {
       .send({ email: 'manager@example.com', password: 'Manager-new-password-456' }).expect(200)).body;
     expect(managerLogin.mustChangePassword).toBe(false);
     const managerToken = managerLogin.accessToken;
+    await request(app.getHttpServer()).patch('/v1/merchant/catalog/publication').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ published: true }).expect(403);
+    const otherBranchBooking = (await pool.query(`SELECT b.id FROM bookings b JOIN branches br ON br.id=b.branch_id WHERE b.tenant_id=$1 AND br.code='CONFIRM' LIMIT 1`, [TENANT_A])).rows[0];
+    await request(app.getHttpServer()).get(`/v1/merchant/booking/bookings/${otherBranchBooking.id}`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    await request(app.getHttpServer()).post(`/v1/merchant/booking/bookings/${otherBranchBooking.id}/manual-payments`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).set('Idempotency-Key', 'deny-pay').send({ method: 'CASH', amountVnd: '10000' }).expect(403);
+    const otherBookingBranch = (await pool.query(`SELECT branch_id FROM bookings WHERE id=$1`, [otherBranchBooking.id])).rows[0].branch_id;
+    await request(app.getHttpServer()).get(`/v1/merchant/branches/${otherBookingBranch}/booking/bookings`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).query({ from: '2040-01-01T11:00:00Z', to: '2040-01-01T13:00:00Z' }).expect(403);
+    await request(app.getHttpServer()).get('/v1/merchant/notifications/outbox/backlog').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    await request(app.getHttpServer()).get('/v1/merchant/booking/hold-expiry/backlog').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    for (const policy of ['deposit-policy', 'no-deposit-confirmation', 'hold-ttl']) {
+      await request(app.getHttpServer()).get(`/v1/merchant/booking/${policy}`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(200);
+    }
+    await request(app.getHttpServer()).patch('/v1/merchant/booking/deposit-policy/WALK_IN').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ mode: 'NONE' }).expect(200);
+    await request(app.getHttpServer()).patch('/v1/merchant/booking/no-deposit-confirmation/WALK_IN').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ allowed: true }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ channel: 'WALK_IN', configured: true, allowed: true }));
+    await request(app.getHttpServer()).get('/v1/merchant/booking/no-deposit-confirmation/WALK_IN').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(200);
     const deniedRoom = (await authorized('post', '/v1/merchant/rooms').send({ branchId: unassigned.id, code: 'DENY-HOLD', name: 'Denied hold', capacity: 8 }).expect(201)).body;
     const ownedHold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'manager-denied-hold').send({ roomId: deniedRoom.id, channel: 'WALK_IN', startAt: '2037-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(201)).body;
     await request(app.getHttpServer()).get(`/v1/merchant/booking/holds/${ownedHold.id}`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
     await request(app.getHttpServer()).post(`/v1/merchant/booking/holds/${ownedHold.id}/details`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ phone: '0912345678', expectedTotalAmountVnd: '100000' }).expect(403);
+    await request(app.getHttpServer()).post(`/v1/merchant/booking/holds/${ownedHold.id}/phone-verification`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    await request(app.getHttpServer()).post(`/v1/merchant/booking/holds/${ownedHold.id}/confirm`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ cancellationTerms: 'Terms' }).expect(403);
     await request(app.getHttpServer()).get(`/v1/merchant/branches/${unassigned.id}/booking/holds`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).query({ from: '2037-01-01T00:00:00Z', to: '2037-01-02T00:00:00Z' }).expect(403);
     await request(app.getHttpServer()).post('/v1/merchant/booking/holds').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).set('Idempotency-Key', 'denied').send({ roomId: deniedRoom.id, channel: 'WALK_IN', startAt: '2037-01-02T18:00:00+07:00', durationMinutes: 60 }).expect(403);
     await request(app.getHttpServer()).get(`/v1/merchant/booking/holds/${ownedHold.id}`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_B).expect(403);

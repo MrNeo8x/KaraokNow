@@ -16,13 +16,17 @@ Run `npm test` for API-client contract unit tests. `.github/workflows/frontend-c
 
 ## Sprint hiện tại
 
-- Merchant: login, forced password change, logout, tenant ID selection, branch/room reads and creation, branch name/timezone and room name/capacity edits, and room status changes use the backend API. Session stays in memory; reload requires login. Automatic refresh and tenant discovery remain backlog. Backend enforces role and branch permissions.
+- Merchant: login, forced password change, logout, in-memory scheduled token refresh, tenant ID selection, branch/room reads and creation, branch name/timezone and room name/capacity edits, and branch/room status changes use the backend API. Session stays in memory; reload requires login. Live browser tests for refresh/logout races and tenant discovery remain backlog. Backend enforces role and branch permissions.
 - Room amenities can be listed, added, edited and deleted through the existing backend API. Browser integration and role-based UAT are still pending.
+- Room media metadata can be listed/created/updated/deleted; no binary upload or actual image display. Branch maintenance blocks can be listed/created/released and their reason and time interval edited.
 - Merchant users can query room availability and request a quote for the selected interval. Search does not create a hold.
-- Staff can explicitly create a `WALK_IN` hold, retry the same attempt using its idempotency key and check its returned status, or look up a known hold UUID after reload. This does not confirm a booking or save a customer/quote. An uncertain attempt's retry key is memory-only and is lost on reload/navigation; full recovery and browser/backend integration tests remain pending.
+- Staff can create a `WALK_IN` hold, retry the same request and look up a known hold UUID. After lookup, staff can fetch a current quote, attach phone/optional email and price snapshot, and record a successful verification call. These actions do not confirm a booking. The retry key and request are saved in sessionStorage before sending, scoped by user/tenant/branch, and can be restored manually in the same tab after reload and login. No token or customer data is stored there. Recovery after closing the tab/storage deletion and browser/backend integration tests remain pending.
 - Staff can list holds for the selected branch and an explicit time interval with pagination. This list is not a confirmed-booking calendar; expired status does not itself release occupancy.
 - API errors use the backend error envelope, display safe validation details and correlation ID, and suppress server-side details for 5xx responses. Contract: `../docs/02-architecture/api-reference.md` and `../docs/02-architecture/api-error-contract.md`.
-- Duration and cleanup buffer policies, price plan list/create/update and price rule list/create/edit use existing APIs. Advanced selectors accept room and special-date UUIDs; a selection UI and live browser/role verification remain pending.
+- Duration and cleanup buffer policies, price plan list/create/update, special-date management and price rule list/create/edit use existing APIs. Rules can select a room across accessible branches or a special date; an existing room reference is retained during list changes. Live browser/role verification remains pending.
+- Hold TTL can be read and configured by channel through the existing Owner/Branch Manager API; changes apply to new holds.
+- No-deposit confirmation can be read/configured by channel; unconfigured remains distinct from false. This is not booking confirmation.
+- Deposit mode can be read/configured by channel as NONE, FIXED or PERCENT; unconfigured is shown distinctly. This does not collect payment or confirm a booking.
 - Routes: `/` is the landing page, `/merchant` is the Merchant portal, and `/booking` is the customer experience.
 - Customer: mobile-first location, date, time and room selection uses explicitly labeled demonstration data. It cannot create a booking; public booking/hold APIs remain dependencies.
 - Delivery sequence and backend dependencies are in `../docs/02-architecture/frontend-implementation-plan.md`.
