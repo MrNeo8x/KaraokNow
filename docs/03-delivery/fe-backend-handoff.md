@@ -68,6 +68,17 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 36/36. Qu
 - Giữ phòng trùng phòng/khung giờ dưới tải cao giờ trả 409 trong vài trăm ms (trước có thể treo hơn một phút rồi 500).
 - Seed UAT có thêm `uat.manager@…`, `uat.reception@…`, `uat.cashier@…` (merchant UAT) và `uat2.owner@…` (merchant UAT2, chờ duyệt); mật khẩu và dữ liệu mẫu ở `docs/04-quality/uat-checklist.md`. Có thể dùng cho kịch bản Playwright Branch Manager/Cashier (QA-003).
 
+## FE READY — overtime và khoá merchant (BKG-007, PLT-003, 2026-11-26)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 40/40. Quyết định PO: PD-030, PD-031.
+
+- `GET /v1/merchant/booking/overtime-policy` (mọi vai trò merchant) → `{configured,graceMinutes,version}`; chưa cấu hình trả `configured=false`, `graceMinutes=10`. `PATCH` (Owner, Branch Manager) body `{graceMinutes: 0–60}`.
+- Booking có thêm `lateMinutes`, `overtimeMinutes`, `overtimeGraceMinutes` (null trước check-out). `overtimeMinutes` = `lateMinutes` khi vượt ân hạn, ngược lại 0. Chỉ để hiển thị/báo cáo — **không** có tiền overtime; tiền thu thêm (nếu có) ghi như CASH thường. Không có thao tác gia hạn giờ.
+- `POST /v1/platform/merchants/{tenantId}/suspend` và `/reactivate`, body `{reason}` bắt buộc, không gửi `X-Tenant-ID`; trả summary merchant (`status` `INACTIVE`/`ACTIVE`). Gọi lại khi đã ở trạng thái đích trả 200 không đổi. 403 nếu không phải Platform Admin hoặc admin là thành viên merchant đó; 404 nếu không có merchant. Danh sách `GET /v1/platform/merchants?status=INACTIVE` lọc merchant đang khoá.
+- Khi bị khoá: merchant biến khỏi catalog công khai (public hold trả 404); staff `POST /merchant/booking/holds` trả **409** "Merchant is suspended; new holds are not accepted"; các thao tác khác trên hold/booking đã có vẫn chạy. `GET /v1/merchant/catalog/publication` có thêm `tenantStatus` để Owner hiển thị cảnh báo.
+- Phản hồi "Yêu cầu BE — triển khai": đã ghi nhận thành task **OPS-005** (image/target cho migration và worker, tắt Swagger theo môi trường); chưa triển khai.
+- Lưu ý README: seed UAT nay **đã** tạo bảng giá, điều khoản và cọc WEB 30% cho merchant UAT (xem `docs/04-quality/uat-checklist.md`); câu "Seed UAT chưa tạo bảng giá" trong bản README đang sửa đã cũ.
+
 ## Phiên đăng nhập
 
 - `POST /v1/auth/login` và `POST /v1/auth/refresh` trả `accessToken`, `expiresIn`, `refreshToken`, `refreshExpiresIn`, `mustChangePassword`; thời gian tính theo giây.

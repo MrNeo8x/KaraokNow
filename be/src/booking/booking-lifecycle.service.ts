@@ -5,6 +5,7 @@ import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
 import { BOOKING_SELECT, toBooking } from './booking-read';
 import { RecordBookingOutcomeDto } from './confirmation.dto';
+import { DEFAULT_OVERTIME_GRACE_MINUTES } from './overtime-policy';
 
 interface LockedBooking { id: string; branch_id: string; hold_id: string; occupancy_id: string; status: string; buffer_minutes: number }
 
@@ -34,8 +35,16 @@ export class BookingLifecycleService {
     return this.transaction(actor, id, async (client, booking) => {
       if (booking.status === 'COMPLETED') return;
       if (booking.status !== 'CHECKED_IN') throw new ConflictException(`Booking in status ${booking.status} cannot be checked out`);
-      await client.query(`UPDATE bookings SET status='COMPLETED',checked_out_at=clock_timestamp(),checked_out_by=$3 WHERE tenant_id=$1 AND id=$2`,
-        [actor.tenantId, id, actor.userId]);
+      // PD-030: whole minutes late after the scheduled end; beyond the merchant grace the full lateness is overtime. Recorded only, never charged.
+      const overtime = (await client.query<{ lateMinutes: number; overtimeMinutes: number; graceMinutes: number }>(`WITH now_ AS (SELECT clock_timestamp() AS t),
+          calc AS (SELECT GREATEST(0, FLOOR(EXTRACT(EPOCH FROM ((SELECT t FROM now_) - (b.start_at + b.duration_minutes * interval '1 minute'))) / 60))::int AS late,
+            COALESCE((SELECT grace_minutes FROM tenant_overtime_policies WHERE tenant_id=$1), $4::int) AS grace
+            FROM bookings b WHERE b.tenant_id=$1 AND b.id=$2)
+        UPDATE bookings SET status='COMPLETED',checked_out_at=(SELECT t FROM now_),checked_out_by=$3,
+          late_minutes=calc.late,overtime_grace_minutes=calc.grace,overtime_minutes=CASE WHEN calc.late > calc.grace THEN calc.late ELSE 0 END
+        FROM calc WHERE tenant_id=$1 AND id=$2
+        RETURNING late_minutes AS "lateMinutes",overtime_minutes AS "overtimeMinutes",overtime_grace_minutes AS "graceMinutes"`,
+      [actor.tenantId, id, actor.userId, DEFAULT_OVERTIME_GRACE_MINUTES])).rows[0];
       // Early check-out releases the remainder: occupancy ends at actual end + cleanup buffer (PD-024/PD-025).
       // Late check-out keeps the scheduled occupancy; overtime handling is still an open product question.
       const shortened = await client.query(`UPDATE room_occupancy
@@ -43,7 +52,7 @@ export class BookingLifecycleService {
         WHERE id=$1 AND tenant_id=$2 AND clock_timestamp()>lower(occupied_range)
           AND clock_timestamp()+($3::integer*interval '1 minute')<upper(occupied_range) RETURNING upper(occupied_range) AS "reservedEndAt"`,
       [booking.occupancy_id, actor.tenantId, booking.buffer_minutes]);
-      await this.audit(client, actor, 'BOOKING_CHECKED_OUT', id, { status: 'COMPLETED', occupancyShortened: shortened.rowCount === 1 });
+      await this.audit(client, actor, 'BOOKING_CHECKED_OUT', id, { status: 'COMPLETED', occupancyShortened: shortened.rowCount === 1, ...overtime });
     });
   }
 

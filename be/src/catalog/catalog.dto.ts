@@ -9,6 +9,7 @@ export class PublicationResponseDto {
   @ApiProperty() published!: boolean;
   @ApiProperty({ description: 'Separate platform approval; cannot be changed through the merchant API' }) platformApproved!: boolean;
   @ApiPropertyOptional() version?: string;
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE'], description: 'GET only. INACTIVE = suspended by Platform Admin (PD-031): hidden from customers and no new holds' }) tenantStatus?: string;
 }
 export class UpdatePublicBookingTermsDto {
   @ApiProperty({ maxLength: 5000, description: 'Single public cancellation/booking terms text shown before guest submission' })

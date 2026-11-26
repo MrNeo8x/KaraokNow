@@ -1245,7 +1245,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const lateOut = (await authorized('post', path(late.id, 'check-out')).expect(200)).body;
     expect(lateOut.reservedEndAt).toEqual(late.reservedEndAt);
     expect(new Date(lateOut.checkedOutAt).getTime()).toBeGreaterThan(new Date(late.startAt).getTime() + 90 * 60000);
-    expect((await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CHECKED_OUT' AND entity_id=$1`, [late.id])).rows[0].after_data).toEqual({ status: 'COMPLETED', occupancyShortened: false });
+    expect((await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CHECKED_OUT' AND entity_id=$1`, [late.id])).rows[0].after_data).toMatchObject({ status: 'COMPLETED', occupancyShortened: false, graceMinutes: 10, overtimeMinutes: lateOut.lateMinutes });
 
     // No check-in time window (PD-026): a far-future booking can be checked in.
     const future = await confirmBooking('life-future', '2043-01-01T18:00:00+07:00');
@@ -1366,6 +1366,110 @@ describe('Authentication, membership, RBAC and venue API', () => {
       expect(await block).toBe(201);
     } finally { await blocker.query('ROLLBACK').catch(() => undefined); blocker.release(); }
   }, 60000);
+
+  it('records late minutes and overtime at check-out using the merchant grace snapshot (PD-030)', async () => {
+    const policyPath = '/v1/merchant/booking/overtime-policy';
+    await authorized('get', policyPath).expect(200).expect(({ body }) => expect(body).toEqual({ configured: false, graceMinutes: 10, version: null }));
+    await authorized('patch', policyPath).send({ graceMinutes: 61 }).expect(400);
+    await authorized('patch', policyPath).send({ graceMinutes: -1 }).expect(400);
+    const cashierToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'cashier@example.com', password: 'Cashier-password-123' }).expect(200)).body.accessToken;
+    await request(app.getHttpServer()).get(policyPath).set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).expect(200);
+    await request(app.getHttpServer()).patch(policyPath).set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).send({ graceMinutes: 5 }).expect(403);
+    await authorized('patch', policyPath).send({ graceMinutes: 10 }).expect(200).expect(({ body }) => expect(body).toEqual({ configured: true, graceMinutes: 10, version: '0' }));
+
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'OVERTIME', name: 'Overtime', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'OT-PLAN', name: 'Overtime plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Overtime plan', status: 'ACTIVE' }).expect(200);
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/OT_TEST').send({ allowed: true }).expect(200);
+    const minuteIso = (offsetMinutes: number) => new Date(Math.floor(Date.now() / 60000) * 60000 + offsetMinutes * 60000).toISOString();
+    const completeBooking = async (code: string, startOffset: number) => {
+      const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code, name: code, capacity: 6 }).expect(201)).body;
+      await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code, name: code, priority: 996, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+      const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', `ot-${code}`).send({ roomId: room.id, channel: 'OT_TEST', startAt: minuteIso(startOffset), durationMinutes: 90 }).expect(201)).body;
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '100000' }).expect(200);
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+      const booking = (await authorized('post', `/v1/merchant/booking/holds/${hold.id}/confirm`).send({ cancellationTerms: 'Liên hệ cơ sở.' }).expect(200)).body;
+      expect(booking).toMatchObject({ lateMinutes: null, overtimeMinutes: null, overtimeGraceMinutes: null });
+      await authorized('post', `/v1/merchant/booking/bookings/${booking.id}/check-in`).expect(200);
+      return { before: booking, after: (await authorized('post', `/v1/merchant/booking/bookings/${booking.id}/check-out`).expect(200)).body };
+    };
+
+    const late = await completeBooking('OT-LATE', -300);
+    expect(late.after.lateMinutes).toBeGreaterThanOrEqual(209);
+    expect(late.after.lateMinutes).toBeLessThanOrEqual(211);
+    expect(late.after).toMatchObject({ overtimeMinutes: late.after.lateMinutes, overtimeGraceMinutes: 10, reservedEndAt: late.before.reservedEndAt });
+    const audit = (await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CHECKED_OUT' AND entity_id=$1`, [late.after.id])).rows[0].after_data;
+    expect(audit).toMatchObject({ occupancyShortened: false, lateMinutes: late.after.lateMinutes, overtimeMinutes: late.after.lateMinutes, graceMinutes: 10 });
+
+    const withinGrace = await completeBooking('OT-GRACE', -95);
+    expect(withinGrace.after.lateMinutes).toBeGreaterThanOrEqual(5);
+    expect(withinGrace.after.lateMinutes).toBeLessThanOrEqual(6);
+    expect(withinGrace.after).toMatchObject({ overtimeMinutes: 0, overtimeGraceMinutes: 10 });
+
+    const early = await completeBooking('OT-EARLY', -10);
+    expect(early.after).toMatchObject({ lateMinutes: 0, overtimeMinutes: 0 });
+
+    await authorized('patch', policyPath).send({ graceMinutes: 0 }).expect(200);
+    const noGrace = await completeBooking('OT-NOGRACE', -95);
+    expect(noGrace.after).toMatchObject({ overtimeGraceMinutes: 0, overtimeMinutes: noGrace.after.lateMinutes });
+    expect((await pool.query(`SELECT count(*)::int AS n FROM audit_logs WHERE tenant_id=$1 AND action='OVERTIME_POLICY_UPDATED'`, [TENANT_A])).rows[0].n).toBe(2);
+    await pool.query(`DELETE FROM tenant_overtime_policies WHERE tenant_id=$1`, [TENANT_A]);
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Overtime plan', status: 'INACTIVE' }).expect(200);
+  }, 30000);
+
+  it('lets a Platform Admin suspend and reactivate a merchant: hidden from customers, no new holds, staff keep existing work (PD-031)', async () => {
+    const adminId = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'suspend-admin@example.com',$1,'Suspend Admin','ACTIVE') RETURNING id`, [await hash('Suspend-password-123', 4)])).rows[0].id;
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const adminToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'suspend-admin@example.com', password: 'Suspend-password-123' }).expect(200)).body.accessToken;
+    const asAdmin = (p: string) => request(app.getHttpServer()).post(p).set('Authorization', `Bearer ${adminToken}`);
+    const tenantC = (await pool.query(`INSERT INTO tenants(id,code,name,status) VALUES(gen_random_uuid(),'SUSPEND_ME','Suspend me','ACTIVE') RETURNING id`)).rows[0].id;
+    const membership = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [tenantC, OWNER_ID])).rows[0].id;
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'OWNER')`, [membership]);
+    const asOwner = (method: 'get' | 'post' | 'patch', p: string) => request(app.getHttpServer())[method](p).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', tenantC);
+    const branch = (await asOwner('post', '/v1/merchant/branches').send({ code: 'SUSP-B', name: 'Suspend branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await asOwner('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'SUSP-R', name: 'Suspend room', capacity: 6 }).expect(201)).body;
+    const plan = (await asOwner('post', '/v1/merchant/pricing/plans').send({ code: 'SUSP-PLAN', name: 'Plan' }).expect(201)).body;
+    await asOwner('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Plan', status: 'ACTIVE' }).expect(200);
+    await asOwner('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'SUSP-RULE', name: 'Price', priority: 1, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await asOwner('patch', '/v1/merchant/catalog/public-booking-terms').send({ terms: 'Điều khoản thử.' }).expect(200);
+    await asOwner('patch', '/v1/merchant/catalog/publication').send({ published: true }).expect(200);
+    await asOwner('patch', '/v1/merchant/booking/no-deposit-confirmation/WALK_IN').send({ allowed: true }).expect(200);
+    await asAdmin(`/v1/platform/catalog/listings/${tenantC}/approve`).send({}).expect(200);
+    const publicIds = async () => (await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body.items.map((item: { id: string }) => item.id);
+    expect(await publicIds()).toContain(branch.id);
+    const existing = (await asOwner('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'susp-existing').send({ roomId: room.id, channel: 'WALK_IN', startAt: '2045-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(201)).body;
+
+    await asAdmin(`/v1/platform/merchants/${tenantC}/suspend`).send({}).expect(400);
+    await request(app.getHttpServer()).post(`/v1/platform/merchants/${tenantC}/suspend`).set('Authorization', `Bearer ${ownerToken}`).send({ reason: 'x' }).expect(403);
+    await asAdmin(`/v1/platform/merchants/${tenantC}/suspend`).send({ reason: 'Giấy phép hết hạn' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ tenantId: tenantC, status: 'INACTIVE', published: true, platformApproved: true }));
+    await asAdmin(`/v1/platform/merchants/${tenantC}/suspend`).send({ reason: 'Lặp lại' }).expect(200);
+    expect(await publicIds()).not.toContain(branch.id);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await pool.query('DELETE FROM public_rate_limit_buckets'); // an earlier test deliberately exhausts the IP bucket
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'susp-public').send({ roomId: room.id, startAt: '2045-01-02T18:00:00+07:00', durationMinutes: 60, phone: '0911000111', expectedTotalAmountVnd: '100000', termsVersion: '1' }).expect(404);
+    await asOwner('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'susp-new').send({ roomId: room.id, channel: 'WALK_IN', startAt: '2045-01-03T18:00:00+07:00', durationMinutes: 60 }).expect(409)
+      .expect(({ body }) => expect(body.error.message).toContain('suspended'));
+    await asOwner('get', '/v1/merchant/catalog/publication').expect(200).expect(({ body }) => expect(body).toMatchObject({ tenantStatus: 'INACTIVE', published: true, platformApproved: true }));
+    await asOwner('get', '/v1/merchant/branches').expect(200);
+    await asOwner('post', `/v1/merchant/booking/holds/${existing.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '100000' }).expect(200);
+    await asOwner('post', `/v1/merchant/booking/holds/${existing.id}/phone-verification`).expect(200);
+    await asOwner('post', `/v1/merchant/booking/holds/${existing.id}/confirm`).send({ cancellationTerms: 'Điều khoản thử.' }).expect(200);
+    await request(app.getHttpServer()).get('/v1/platform/merchants').query({ status: 'INACTIVE', limit: 100 }).set('Authorization', `Bearer ${adminToken}`).expect(200)
+      .expect(({ body }) => expect(body.items.map((item: { tenantId: string }) => item.tenantId)).toContain(tenantC));
+
+    await asAdmin(`/v1/platform/merchants/${tenantC}/reactivate`).send({ reason: 'Đã gia hạn giấy phép' }).expect(200).expect(({ body }) => expect(body.status).toBe('ACTIVE'));
+    expect(await publicIds()).toContain(branch.id);
+    await asAdmin('/v1/platform/merchants/cccccccc-cccc-4ccc-8ccc-cccccccccccc/suspend').send({ reason: 'x' }).expect(404);
+    const selfMembership = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [tenantC, adminId])).rows[0].id;
+    await asAdmin(`/v1/platform/merchants/${tenantC}/suspend`).send({ reason: 'x' }).expect(403);
+    await pool.query('DELETE FROM tenant_memberships WHERE id=$1', [selfMembership]);
+    const audit = await pool.query(`SELECT action,actor_user_id,after_data FROM audit_logs WHERE tenant_id=$1 AND action IN ('MERCHANT_SUSPENDED','MERCHANT_REACTIVATED') ORDER BY occurred_at`, [tenantC]);
+    expect(audit.rows.map(row => row.action)).toEqual(['MERCHANT_SUSPENDED', 'MERCHANT_REACTIVATED']);
+    expect(audit.rows[0]).toMatchObject({ actor_user_id: adminId, after_data: { status: 'INACTIVE', reason: 'Giấy phép hết hạn' } });
+    await pool.query('DELETE FROM membership_roles WHERE membership_id=$1', [membership]);
+    await pool.query('DELETE FROM tenant_memberships WHERE id=$1', [membership]);
+  }, 30000);
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)

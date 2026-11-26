@@ -14,7 +14,9 @@ export class CatalogService {
   constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly availabilitySearch: AvailabilitySearchService,
               private readonly pricing: PricingService) {}
   async getPublication(actor: Actor) {
-    return (await this.db.query(`SELECT published,platform_approved AS "platformApproved",version::text FROM tenant_public_catalog WHERE tenant_id=$1`, [actor.tenantId])).rows[0] ?? { published: false, platformApproved: false };
+    const tenantStatus = (await this.db.query<{ status: string }>('SELECT status FROM tenants WHERE id=$1', [actor.tenantId])).rows[0]?.status ?? 'ACTIVE';
+    const row = (await this.db.query(`SELECT published,platform_approved AS "platformApproved",version::text FROM tenant_public_catalog WHERE tenant_id=$1`, [actor.tenantId])).rows[0] ?? { published: false, platformApproved: false };
+    return { ...row, tenantStatus };
   }
   async setPublication(actor: Actor, published: boolean) {
     const client = await this.db.connect();

@@ -53,6 +53,9 @@ export class BookingResponseDto {
   @ApiProperty({ nullable: true, format: 'uuid', type: String }) checkedInBy!: string | null;
   @ApiProperty({ nullable: true, format: 'date-time', type: String, description: 'Actual end of use; may be before or after the scheduled end' }) checkedOutAt!: string | null;
   @ApiProperty({ nullable: true, format: 'uuid', type: String }) checkedOutBy!: string | null;
+  @ApiProperty({ nullable: true, type: Number, description: 'Whole minutes after the scheduled end at check-out (0 when on time or early); null before check-out' }) lateMinutes!: number | null;
+  @ApiProperty({ nullable: true, type: Number, description: 'PD-030: equals lateMinutes when it exceeds the grace snapshot, otherwise 0. Recorded only; not charged' }) overtimeMinutes!: number | null;
+  @ApiProperty({ nullable: true, type: Number, description: 'Merchant grace minutes applied at check-out' }) overtimeGraceMinutes!: number | null;
   @ApiProperty({ nullable: true, type: BookingOutcomeDto, description: 'Staff-recorded cancellation/no-show outcome' }) outcome!: BookingOutcomeDto | null;
 }
 export class BookingListResponseDto {

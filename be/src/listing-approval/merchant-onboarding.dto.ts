@@ -51,3 +51,8 @@ export class MerchantListDto {
   @ApiProperty() offset!: number;
   @ApiProperty() hasMore!: boolean;
 }
+
+export class MerchantStatusChangeDto {
+  @ApiProperty({ minLength: 1, maxLength: 500, description: 'Reason stored in the audit record' })
+  @IsString() @Matches(/\S/) @MaxLength(500) reason!: string;
+}

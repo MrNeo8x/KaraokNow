@@ -3541,6 +3541,84 @@
         ]
       }
     },
+    "/v1/merchant/booking/overtime-policy": {
+      "get": {
+        "operationId": "OvertimePolicyController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OvertimePolicyDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      },
+      "patch": {
+        "operationId": "OvertimePolicyController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOvertimePolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OvertimePolicyDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
     "/v1/merchant/catalog/publication": {
       "get": {
         "operationId": "CatalogPublicationController_get",
@@ -4174,6 +4252,102 @@
           },
           "409": {
             "description": "Merchant code already in use"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/suspend": {
+      "post": {
+        "operationId": "MerchantOnboardingController_suspend",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantStatusChangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merchant INACTIVE: hidden from customers, no new holds; staff still operate existing holds/bookings (PD-031). Idempotent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantSummaryDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the admin belongs to the merchant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/reactivate": {
+      "post": {
+        "operationId": "MerchantOnboardingController_reactivate",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantStatusChangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merchant ACTIVE again; listing reappears if still published and approved. Idempotent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantSummaryDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the admin belongs to the merchant"
           }
         },
         "security": [
@@ -5834,6 +6008,21 @@
             "nullable": true,
             "format": "uuid"
           },
+          "lateMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Whole minutes after the scheduled end at check-out (0 when on time or early); null before check-out"
+          },
+          "overtimeMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "PD-030: equals lateMinutes when it exceeds the grace snapshot, otherwise 0. Recorded only; not charged"
+          },
+          "overtimeGraceMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Merchant grace minutes applied at check-out"
+          },
           "outcome": {
             "nullable": true,
             "description": "Staff-recorded cancellation/no-show outcome",
@@ -5869,6 +6058,9 @@
           "checkedInBy",
           "checkedOutAt",
           "checkedOutBy",
+          "lateMinutes",
+          "overtimeMinutes",
+          "overtimeGraceMinutes",
           "outcome"
         ]
       },
@@ -6373,6 +6565,42 @@
           "note"
         ]
       },
+      "OvertimePolicyDto": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "False when the merchant has not saved a value and the default applies"
+          },
+          "graceMinutes": {
+            "type": "number",
+            "description": "Late check-out within this many minutes after the scheduled end is not overtime"
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "configured",
+          "graceMinutes",
+          "version"
+        ]
+      },
+      "UpdateOvertimePolicyDto": {
+        "type": "object",
+        "properties": {
+          "graceMinutes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 60,
+            "default": 10
+          }
+        },
+        "required": [
+          "graceMinutes"
+        ]
+      },
       "PublicationResponseDto": {
         "type": "object",
         "properties": {
@@ -6385,6 +6613,14 @@
           },
           "version": {
             "type": "string"
+          },
+          "tenantStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "description": "GET only. INACTIVE = suspended by Platform Admin (PD-031): hidden from customers and no new holds"
           }
         },
         "required": [
@@ -7002,6 +7238,20 @@
           "published",
           "platformApproved",
           "owner"
+        ]
+      },
+      "MerchantStatusChangeDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Reason stored in the audit record"
+          }
+        },
+        "required": [
+          "reason"
         ]
       }
     }

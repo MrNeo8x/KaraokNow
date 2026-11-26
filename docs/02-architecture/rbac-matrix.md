@@ -16,9 +16,11 @@ This is the conservative authorization baseline implemented for the current venu
 | Read hold deposit status in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | Assigned only |
 | Record CASH deposit on an active hold | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Check in / check out a booking | Yes, all tenant branches | Assigned only | Assigned only | No |
+| Read overtime grace policy | Yes | Yes | Yes | Yes |
+| Update overtime grace policy | Yes | Yes | No | No |
 | Record cancellation / no-show outcome and CASH refund | Yes, all tenant branches | Assigned only | No | No |
 
-Platform listing approval is outside the merchant matrix. `GET /v1/platform/catalog/listings` and approve/revoke require a global, non-revoked `platform_admins` grant (no `X-Tenant-ID`), provisioned only through data. A Platform Admin who has an active membership in the target tenant is rejected, so merchant users cannot approve their own listing. The same global grant allows `GET/POST /v1/platform/merchants` to list merchants and onboard a merchant with its first Owner (PD-029).
+Platform listing approval is outside the merchant matrix. `GET /v1/platform/catalog/listings` and approve/revoke require a global, non-revoked `platform_admins` grant (no `X-Tenant-ID`), provisioned only through data. A Platform Admin who has an active membership in the target tenant is rejected, so merchant users cannot approve their own listing. The same global grant allows `GET/POST /v1/platform/merchants` to list merchants and onboard a merchant with its first Owner (PD-029), and `POST /v1/platform/merchants/{tenantId}/suspend|reactivate` (PD-031; rejected when the admin belongs to that merchant). A suspended merchant's staff keep their merchant permissions for existing holds/bookings but cannot create new holds.
 
 `INACTIVE` is the current soft-delete state for branches and rooms. Physical deletion is not exposed because future bookings, attribution and audit records must retain referential history.
 

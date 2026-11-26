@@ -2,34 +2,37 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-26, 22:20)
+## Trạng thái hiện tại (cập nhật 2026-11-26, 23:00)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả):
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE overtime + khoá merchant (commit của phiên này), FE `c6663d7` thiết kế tím/admin shell/booking kiểu app, BE `7796a6d` benchmark + sửa deadlock + UAT, FE `221c6d8` cọc/check-in/out/`/platform`/Playwright.
 
-| Commit | Luồng | Nội dung chính |
-|---|---|---|
-| `7796a6d` | BE | Benchmark QA-002, sửa deadlock giữ phòng, checklist + seed UAT-001 |
-| `154eeab` | Người dùng | Script `bench:booking`, ảnh thiết kế `docs/deg/*.png` |
-| `221c6d8` | FE | Màn cọc, check-in/out/hủy, `/platform`, quản trị merchant, Playwright `fe/e2e` |
-| `0c1b62d`, `20619e1` | BE | Task board tiếng Việt + trạng thái `VERIFY`, `AGENTS.md`, work log |
+**Kiểm chứng gần nhất:** BE `npm run verify` 42/42 unit, `npm run test:e2e` 40/40, migration mới up → down → up; benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (theo task board): unit và Playwright đạt.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 42/42 unit, `npm run test:e2e` 38/38, benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (theo task board): unit 32/32, Playwright khách/lễ tân-Owner/Platform đạt.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`, đã seed UAT. **Chưa** áp migration `20261124030000_overtime_recording` và chưa rebuild backend với code overtime/khoá merchant — chạy `npm run db:migrate` rồi `docker compose up -d --build backend` trong `be/` trước khi thử. Worker `holds:expire`/`outbox:work` không chạy trong compose.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100` — đã migrate, seed UAT và chạy image mới nhất (đã kiểm: có khoá theo phòng, 100 request tranh một phòng → 1×201, 99×409 trong 470 ms). Worker `holds:expire`/`outbox:work` không chạy trong compose.
+**Đang dở (working tree, chưa commit):** Luồng FE viết lại `README.md` (tiếng Việt, mục triển khai) và mục "Yêu cầu BE — triển khai" trong handoff. Luồng BE không có việc dở.
 
-**Đang dở (working tree, chưa commit):** Luồng FE làm lại giao diện theo ảnh thiết kế (`fe/src/components/admin-shell.tsx`, `fe/src/app/theme.css`, sửa `experience.tsx`, `customer-booking.tsx`, các màn quản trị và `fe/e2e/*`; ảnh review ở `docs/deg/fe-review/`). Luồng BE không có việc dở.
-
-**Trạng thái task:** `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 2 (REC-003, QA-003) · `BLOCKED` 10 · `BACKLOG` 5 · `DONE` 44. Chi tiết ở `task-board.md`.
+**Trạng thái task:** `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 3 (REC-003, QA-003, FE-013) · `BLOCKED` 9 · `BACKLOG` 6 · `DONE` 46. Chi tiết ở `task-board.md`.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` và ký nhận; trả lời các quyết định BKG-007 (overtime), PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); xác nhận giả định cọc (FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt), giữ duyệt khi publish lại, và quy mô bộ dữ liệu benchmark.
-- *Luồng FE:* hoàn tất và commit phần giao diện mới (chạy lại `npm test`, `next build`, `npm run e2e`); REC-003 lịch hợp nhất hold + booking; QA-003 thêm kịch bản Branch Manager/Cashier (tài khoản có trong seed), bàn phím, 429, mất mạng.
-- *Luồng BE:* chờ quyết định PO ở trên; OPS-004 (pool/timeout PostgreSQL) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: khoá merchant, reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
+- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
+- *Luồng FE:* FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README.
+- *Luồng BE:* OPS-005 (image migration/worker, tắt Swagger theo môi trường — yêu cầu từ FE); chờ PO cho PAY-007/BKG-008; OPS-004 (pool/timeout) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
 
-**Không làm khi chưa có quyết định:** thanh toán online, tự động hoàn tiền/no-show, overtime, khoá merchant, kênh Zalo/Messenger.
+**Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-26 (23:00) — Luồng BE: overtime (BKG-007) và khoá merchant (PLT-003)
+
+- Quyết định PO mới: **PD-030** overtime chỉ ghi phút lúc check-out, không tính tiền, không gia hạn; ân hạn merchant cấu hình 0–60 phút, mặc định 10. **PD-031** khoá merchant: ẩn khỏi khách, chặn hold mới (public + staff), nhân viên vẫn xử lý việc đã có; lý do bắt buộc.
+- Migration `20261124030000_overtime_recording` (`tenant_overtime_policies`; `bookings.late_minutes/overtime_minutes/overtime_grace_minutes`). API `GET/PATCH /v1/merchant/booking/overtime-policy` (`be/src/booking/overtime-policy.ts`); check-out tính phút trễ trong cùng câu UPDATE với một mốc thời gian.
+- API `POST /v1/platform/merchants/{tenantId}/suspend|reactivate`; staff hold kiểm tra `tenants.status` dưới `FOR SHARE` (tuần tự với khoá); publication trả `tenantStatus`.
+- E2E +2 (overtime: trễ quá/trong ân hạn, về sớm, ân hạn 0, quyền, audit; khoá: ẩn công khai, public hold 404, staff hold 409, booking cũ vẫn xác nhận được, mở khoá hiện lại, chặn admin là thành viên, audit). Test check-out cũ đổi sang `toMatchObject` vì audit có thêm trường overtime. Kết quả: unit 42/42, E2E 40/40.
+- Ghi nhận yêu cầu của Luồng FE về triển khai thành OPS-005.
 
 ---
 

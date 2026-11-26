@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
@@ -55,6 +55,31 @@ export class MerchantOnboardingService {
       if ((error as { code?: string }).code === '23505') throw new ConflictException('Merchant code is already in use');
       throw error;
     } finally { client.release(); }
+  }
+
+  /**
+   * PD-031: suspension hides the merchant from customers and stops new holds; staff keep operating existing
+   * holds/bookings. Publication and approval flags are untouched, so reactivation restores the listing.
+   */
+  async setStatus(actor: Actor, tenantId: string, status: 'ACTIVE' | 'INACTIVE', reason: string) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`catalog:${tenantId}`]);
+      const current = (await client.query<{ status: string }>('SELECT status FROM tenants WHERE id=$1 FOR UPDATE', [tenantId])).rows[0];
+      if (!current) throw new NotFoundException('Merchant not found');
+      const member = await client.query(`SELECT 1 FROM tenant_memberships WHERE tenant_id=$1 AND user_id=$2 AND status='ACTIVE'`, [tenantId, actor.userId]);
+      if (member.rowCount) throw new ForbiddenException('Platform Admin cannot change the status of a merchant they belong to');
+      if (current.status !== status) {
+        await client.query('UPDATE tenants SET status=$2 WHERE id=$1', [tenantId, status]);
+        await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,before_data,after_data) VALUES($1,$2,$3,$4,'TENANT',$2,$5,$6)`,
+          [randomUUID(), tenantId, actor.userId, status === 'INACTIVE' ? 'MERCHANT_SUSPENDED' : 'MERCHANT_REACTIVATED',
+            JSON.stringify({ status: current.status }), JSON.stringify({ status, reason })]);
+      }
+      const summary = await this.summary(client, tenantId);
+      await client.query('COMMIT'); return summary;
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   }
 
   private async summary(client: PoolClient, tenantId: string) {

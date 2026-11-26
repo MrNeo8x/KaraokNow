@@ -5,6 +5,7 @@ export const BOOKING_SELECT = `SELECT b.id,b.hold_id AS "holdId",b.branch_id AS 
   b.price_snapshot AS "priceSnapshot",b.cancellation_terms AS "cancellationTerms",b.confirmation_policy_snapshot AS "confirmationPolicySnapshot",
   b.status,b.confirmed_by AS "confirmedBy",b.confirmed_at AS "confirmedAt",
   b.checked_in_at AS "checkedInAt",b.checked_in_by AS "checkedInBy",b.checked_out_at AS "checkedOutAt",b.checked_out_by AS "checkedOutBy",
+  b.late_minutes AS "lateMinutes",b.overtime_minutes AS "overtimeMinutes",b.overtime_grace_minutes AS "overtimeGraceMinutes",
   bo.outcome_type AS "outcomeType",bo.note AS "outcomeNote",bo.refund_amount_vnd::text AS "outcomeRefundAmountVnd",
   bo.recorded_by AS "outcomeRecordedBy",bo.recorded_at AS "outcomeRecordedAt"
   FROM bookings b JOIN room_occupancy o ON o.id=b.occupancy_id

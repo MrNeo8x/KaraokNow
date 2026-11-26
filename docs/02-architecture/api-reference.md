@@ -1833,6 +1833,48 @@ Response được khai báo:
 | 200 | CONFIRMED -> CANCELLED or NO_SHOW with the staff-reviewed outcome; room is released. Same body replays | {"$ref":"#/components/schemas/BookingResponseDto"} |
 | 409 | Booking not CONFIRMED, a different outcome already recorded, or refund above recorded deposits plus payments | Chưa khai báo schema |
 
+### GET /v1/merchant/booking/overtime-policy
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/OvertimePolicyDto"} |
+
+### PATCH /v1/merchant/booking/overtime-policy
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateOvertimePolicyDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/OvertimePolicyDto"} |
+
 ### GET /v1/merchant/catalog/publication
 
 Nhóm: merchant catalog
@@ -2118,6 +2160,60 @@ Response được khai báo:
 | 201 | Active merchant with its first Owner. Catalog starts unpublished and unapproved | {"$ref":"#/components/schemas/CreatedMerchantDto"} |
 | 403 | Caller is not a Platform Admin | Chưa khai báo schema |
 | 409 | Merchant code already in use | Chưa khai báo schema |
+
+### POST /v1/platform/merchants/{tenantId}/suspend
+
+Nhóm: platform merchants
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/MerchantStatusChangeDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Merchant INACTIVE: hidden from customers, no new holds; staff still operate existing holds/bookings (PD-031). Idempotent | {"$ref":"#/components/schemas/MerchantSummaryDto"} |
+| 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
+
+### POST /v1/platform/merchants/{tenantId}/reactivate
+
+Nhóm: platform merchants
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/MerchantStatusChangeDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Merchant ACTIVE again; listing reappears if still published and approved. Idempotent | {"$ref":"#/components/schemas/MerchantSummaryDto"} |
+| 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
 
 ## Các schema request và response
 
@@ -4021,6 +4117,21 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "nullable": true,
       "format": "uuid"
     },
+    "lateMinutes": {
+      "type": "number",
+      "nullable": true,
+      "description": "Whole minutes after the scheduled end at check-out (0 when on time or early); null before check-out"
+    },
+    "overtimeMinutes": {
+      "type": "number",
+      "nullable": true,
+      "description": "PD-030: equals lateMinutes when it exceeds the grace snapshot, otherwise 0. Recorded only; not charged"
+    },
+    "overtimeGraceMinutes": {
+      "type": "number",
+      "nullable": true,
+      "description": "Merchant grace minutes applied at check-out"
+    },
     "outcome": {
       "nullable": true,
       "description": "Staff-recorded cancellation/no-show outcome",
@@ -4056,6 +4167,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "checkedInBy",
     "checkedOutAt",
     "checkedOutBy",
+    "lateMinutes",
+    "overtimeMinutes",
+    "overtimeGraceMinutes",
     "outcome"
   ]
 }
@@ -4627,6 +4741,52 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### OvertimePolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "configured": {
+      "type": "boolean",
+      "description": "False when the merchant has not saved a value and the default applies"
+    },
+    "graceMinutes": {
+      "type": "number",
+      "description": "Late check-out within this many minutes after the scheduled end is not overtime"
+    },
+    "version": {
+      "type": "string",
+      "nullable": true
+    }
+  },
+  "required": [
+    "configured",
+    "graceMinutes",
+    "version"
+  ]
+}
+```
+
+### UpdateOvertimePolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "graceMinutes": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 60,
+      "default": 10
+    }
+  },
+  "required": [
+    "graceMinutes"
+  ]
+}
+```
+
 ### PublicationResponseDto
 
 ```json
@@ -4642,6 +4802,14 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "version": {
       "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ],
+      "description": "GET only. INACTIVE = suspended by Platform Admin (PD-031): hidden from customers and no new holds"
     }
   },
   "required": [
@@ -5364,6 +5532,25 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "published",
     "platformApproved",
     "owner"
+  ]
+}
+```
+
+### MerchantStatusChangeDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Reason stored in the audit record"
+    }
+  },
+  "required": [
+    "reason"
   ]
 }
 ```

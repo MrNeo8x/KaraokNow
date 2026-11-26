@@ -1,12 +1,12 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-029` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-031` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
 **Trong phạm vi:** Platform Admin tạo merchant và duyệt listing; Owner cấu hình merchant; khách đặt chỗ trên web không cần tài khoản; nhân viên gọi xác minh, ghi cọc tiền mặt, xác nhận, check-in/out, ghi hủy/no-show; phân quyền theo vai trò; tách dữ liệu giữa các merchant.
 
-**Ngoài phạm vi:** thanh toán online (PD-007), tin nhắn tự động ZNS/SMS/email (UAT-PD-007), quên mật khẩu (IAM-004), khách tự hủy (UAT-PD-008), overtime khi trả muộn (BKG-007), đối soát sổ quỹ (PAY-007), Zalo/Messenger.
+**Ngoài phạm vi:** thanh toán online (PD-007), tin nhắn tự động ZNS/SMS/email (UAT-PD-007), quên mật khẩu (IAM-004), khách tự hủy (UAT-PD-008), tính tiền overtime hoặc gia hạn giờ (PD-030 chỉ ghi phút), đối soát sổ quỹ (PAY-007), Zalo/Messenger.
 
 ## 2. Chuẩn bị môi trường
 
@@ -43,7 +43,7 @@ Tenant ID: UAT `10000000-0000-4000-8000-000000000001`, UAT2 `10000000-0000-4000-
 | UAT | Đã publish, đã duyệt | VIP 01 — 150.000 đ/giờ; Gia Đình 01 — 100.000 đ/giờ | WEB cọc 30%; PHONE, WALK_IN cho xác nhận không cọc | Version 1 |
 | UAT2 | Đã publish, **chờ duyệt** | Tiêu Chuẩn 01 — 120.000 đ/giờ | WEB không cọc, cho xác nhận không cọc | Version 1 |
 
-Thời lượng mặc định: tối thiểu 60 phút, bước 30 phút, tối đa 8 giờ; buffer dọn phòng 15 phút; hold giữ 15 phút.
+Thời lượng mặc định: tối thiểu 60 phút, bước 30 phút, tối đa 8 giờ; buffer dọn phòng 15 phút; hold giữ 15 phút; ân hạn overtime 10 phút.
 
 ## 3. Cách ghi kết quả
 
@@ -64,6 +64,8 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | A5 | Owner mới | Đăng nhập bằng mật khẩu tạm ở A4 | Bắt buộc đổi mật khẩu trước khi dùng; sau khi đổi thấy merchant trống, tạo được chi nhánh | PD-029 | | |
 | A6 | Platform Admin | Tạo merchant mới với email Owner **đã có** tài khoản (ví dụ `uat2.owner@…`) | Báo rõ mật khẩu tạm không được áp dụng; Owner dùng mật khẩu cũ và thấy thêm merchant mới | PD-029 | | |
 | A7 | Owner UAT | Mở `/platform` | Không có quyền (403), không thấy dữ liệu | UAT-PD-009 | | |
+| A8 | Platform Admin, Khách, Owner UAT2 | Khoá UAT2 (thử bỏ trống lý do, rồi nhập lý do); khách tải `/booking`; Owner UAT2 đăng nhập, thử tạo hold mới và xử lý hold/booking đã có | Bỏ trống lý do bị chặn; khách không thấy UAT2 và không giữ chỗ được; Owner vẫn vào được, thấy báo merchant đang bị khoá, không tạo được hold mới nhưng vẫn xác nhận/check-in booking đã có | PD-031 | | Cần UAT2 đã được duyệt (A2) |
+| A9 | Platform Admin, Khách | Mở khoá UAT2 (nhập lý do) | UAT2 hiện lại cho khách mà không phải duyệt lại; nhật ký UAT2 có sự kiện khoá và mở khoá kèm lý do | PD-031 | | |
 
 ### B. Owner cấu hình merchant (UAT)
 
@@ -111,8 +113,9 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 |---|---|---|---|---|---|---|
 | E1 | Receptionist | Check-in một booking của ngày mai | Cho phép (không giới hạn khung giờ) | PD-026 | | |
 | E2 | Receptionist, Khách | Tạo booking PHONE có giờ bắt đầu đã qua (ví dụ đầu giờ hiện tại, 2 giờ), check-in rồi check-out ngay; khách tìm phòng ở khung giờ còn lại | Ghi giờ trả phòng thực tế; phòng mở lại sau giờ trả + 15 phút dọn phòng | PD-025 | | Check-out trước giờ bắt đầu không rút ngắn thời gian giữ phòng |
-| E3 | Receptionist | Check-out một booking đã quá giờ kết thúc | Ghi giờ thực tế; không tính thêm tiền, không kéo dài giờ giữ phòng | PD-025 | | Overtime chưa có (BKG-007) |
+| E3 | Receptionist | Check-out một booking đã quá giờ kết thúc hơn 10 phút; check-out một booking khác trễ dưới 10 phút | Cả hai ghi giờ thực tế và số phút trễ; booking trễ quá ân hạn có overtime = toàn bộ số phút trễ, booking trong ân hạn có overtime 0; không tính tiền, không kéo dài giờ giữ phòng | PD-025, PD-030 | | Giả định chờ PO: quá ân hạn thì tính toàn bộ phút trễ |
 | E4 | Receptionist | Thử check-out booking chưa check-in; check-in booking đã hoàn tất | Đều bị chặn | FR-009/010 | | |
+| E5 | Owner, Cashier | Owner đổi thời gian ân hạn overtime (ví dụ 0 hoặc 30 phút); Cashier thử đổi | Owner/Branch Manager đổi được và có trong nhật ký; Cashier chỉ xem; check-out sau đó dùng ân hạn mới, booking đã check-out giữ ân hạn cũ | PD-030 | | |
 
 ### F. Hủy và no-show
 

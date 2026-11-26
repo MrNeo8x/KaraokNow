@@ -124,6 +124,8 @@ export class HoldService {
         const replay = await this.find(client, actor.tenantId!, existing.id);
         await client.query('COMMIT'); return replay;
       }
+      const tenantStatus = (await client.query<{ status: string }>('SELECT status FROM tenants WHERE id=$1 FOR SHARE', [actor.tenantId])).rows[0]?.status;
+      if (tenantStatus !== 'ACTIVE') throw new ConflictException('Merchant is suspended; new holds are not accepted');
       const room = (await client.query(`SELECT r.branch_id AS "branchId" FROM rooms r JOIN branches b ON b.id=r.branch_id AND b.tenant_id=r.tenant_id WHERE r.id=$1 AND r.tenant_id=$2 AND r.status='ACTIVE' AND b.status='ACTIVE' FOR SHARE OF r,b`, [dto.roomId, actor.tenantId])).rows[0];
       if (!room) throw new NotFoundException('Active room not found');
       this.assertBranch(actor, room.branchId);
