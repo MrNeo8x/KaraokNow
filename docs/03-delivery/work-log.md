@@ -50,16 +50,20 @@ Migration mới: `20261124000000_hold_deposits`, `20261124010000_platform_listin
 
 **BE**
 
-1. Chờ PO: overtime khi trả muộn, đối soát sổ quỹ (phải thu/đã thu, sửa/đảo giao dịch, hoàn cọc khi hold hết hạn), xác nhận các giả định ở trên.
+1. Chờ PO: BKG-007 overtime khi trả muộn, PAY-007 đối soát sổ quỹ (phải thu/đã thu, sửa/đảo giao dịch, hoàn cọc khi hold hết hạn, xác nhận các giả định ở trên), BKG-008 điều kiện không cọc theo trường hợp.
 2. IAM-004 reset mật khẩu qua ZBS — bị chặn đến khi có OA/App/template.
-3. QA/vận hành: benchmark booking/concurrency (QA-002), giám sát worker `holds:expire`/`outbox:work`, backup/restore (OPS-002).
+3. QA/vận hành: QA-002 benchmark booking/đồng thời (READY), OPS-003 giám sát worker `holds:expire`/`outbox:work`, OPS-002 backup/restore.
 4. Có thể cần (chưa có quyết định): khoá merchant, reset mật khẩu Owner bởi Platform Admin, `GET /platform/me` thay cho cách dò quyền bằng 403.
 
 **FE**
 
 1. Commit các màn đang làm dở; smoke test với backend local đã rebuild bằng `uat.owner@karaokenow.local` và `uat.platform@karaokenow.local`.
-2. Màn lịch hợp nhất hold + booking (REC-002), lọc trạng thái hủy/no-show.
-3. Browser/mobile/accessibility test và FE–BE role test (Owner, Branch Manager, Receptionist, Cashier, Platform Admin).
+2. REC-003 lịch hợp nhất hold + booking, lọc trạng thái hủy/no-show.
+3. QA-003 kiểm thử trình duyệt/mobile/accessibility và FE–BE theo vai trò (Owner, Branch Manager, Receptionist, Cashier, Platform Admin) — cần môi trường trình duyệt tự động.
+
+### Chỉnh task board (cuối phiên)
+
+Task board viết lại bằng tiếng Việt và thêm trạng thái `VERIFY` (code + test tự động xong, chỉ chờ kiểm thử trình duyệt/UAT). `IN_PROGRESS` chỉ còn FE-005, FE-009, FE-010 (code FE chưa commit). Tách việc dở thành task mới: BKG-007 overtime, BKG-008 không cọc theo trường hợp, PAY-007 đối soát sổ quỹ (cả ba `BLOCKED` chờ PO), OPS-003 giám sát worker, REC-003 lịch hợp nhất (`READY`), QA-003 kiểm thử trình duyệt theo vai trò (`BLOCKED` chờ môi trường), FE-011 sinh type từ OpenAPI, FE-012 giữ phiên/chọn tenant (`BACKLOG`). BKG-003, BKG-005, PAY-005 chuyển `DONE` cho phạm vi pilot; QA-002, UAT-001 chuyển `READY`.
 
 ### Cảnh báo
 

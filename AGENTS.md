@@ -64,6 +64,10 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Cột thời gian của `audit_logs` là `occurred_at`.
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
 
+## Trạng thái task
+
+`DONE` (xong hẳn) · `VERIFY` (code + test tự động xong, chỉ chờ kiểm thử trình duyệt QA-003/UAT-001) · `IN_PROGRESS` (đang code hoặc code chưa commit — giữ ít) · `READY` · `BLOCKED` (chờ PO/điều kiện ngoài) · `BACKLOG`. Còn việc dở trong task gần xong thì **tách task mới** với trạng thái đúng thực tế, không giữ task cũ ở `IN_PROGRESS`. Task board viết bằng tiếng Việt; mã trạng thái và mã task giữ nguyên.
+
 ## Definition of Done
 
 Code + migration (có down) + unit/E2E phù hợp + `npm run verify` + `npm run test:e2e` pass; OpenAPI/Markdown sinh lại; quyền và audit đúng; task board, handoff (FE READY), traceability, Master Plan và `work-log.md` cập nhật; quyết định PO mới ghi vào decision log. Commit chỉ khi người dùng yêu cầu; không push nếu không được bảo.
