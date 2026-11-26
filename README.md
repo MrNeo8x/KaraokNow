@@ -2,11 +2,13 @@
 
 KaraokeNow is organized as separate frontend and backend projects:
 
-- `fe/` — frontend applications live here. They are built and released separately and consume the backend HTTPS API/OpenAPI contract. No frontend framework has been scaffolded yet.
+- `fe/` — Next.js frontend (customer `/booking`, merchant workspace `/merchant`, Platform Admin `/platform`), built and released separately; it consumes the backend HTTPS API/OpenAPI contract.
 - `be/` — NestJS/TypeScript backend, migrations, tests, scripts, local Compose setup and backend package manifests.
 - `docs/` — shared product, requirements, architecture and delivery documentation.
 
-The backend currently implements identity/tenant foundations, branch and room management, maintenance blocks, pricing, availability foundations and operational infrastructure. Booking lifecycle and user-facing frontends are still under development; consult the task board before treating a capability as released.
+The backend implements identity/tenant foundations, branch and room management, maintenance blocks, pricing, availability, staff and public holds, deposits on holds, confirmation, check-in/out, staff-reviewed cancellation/no-show, manual CASH payments, public catalog and Platform Admin listing approval/merchant onboarding. Online payment and live channel integrations are out of pilot scope. Consult the task board before treating a capability as released.
+
+**Agents (Codex/Claude Code):** start with [`AGENTS.md`](AGENTS.md) and [`docs/03-delivery/work-log.md`](docs/03-delivery/work-log.md).
 
 ## Backend local development
 
@@ -38,12 +40,15 @@ The persistent local UAT stack runs PostgreSQL, backend and frontend in Docker D
 
 ```bash
 cd be
+docker compose up -d postgres
+npm run db:migrate          # the backend container does not migrate by itself
+npm run db:seed:uat         # Owner and Platform Admin UAT accounts
 docker compose up -d --build
-npm run db:migrate
-npm run db:seed:uat
 ```
 
-Open `http://localhost:3100/merchant`. Backend health is available at `http://localhost:3000/v1/health/ready` and Swagger at `http://localhost:3000/docs`.
+The hold-expiry and outbox workers are not part of Compose; run `npm run holds:expire` / `npm run outbox:work` from `be/` when testing expiry or notifications.
+
+Open `http://localhost:3100/merchant` (merchant) or `http://localhost:3100/platform` (Platform Admin). Backend health is available at `http://localhost:3000/v1/health/ready` and Swagger at `http://localhost:3000/docs`.
 
 Frontend developers can read `docs/02-architecture/api-reference.md`. After API changes run `npm run openapi:generate` and `npm run api:docs` from `be/` to refresh both contracts.
 

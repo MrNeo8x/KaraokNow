@@ -104,7 +104,8 @@ Chưa có API (không làm màn): quên/reset mật khẩu (IAM-004 chờ ZBS), 
 
 ## Ưu tiên tiếp theo
 
-1. FE: màn ghi cọc tiền mặt trên hold, hiển thị số cọc còn thiếu trước khi xác nhận; màn Platform Admin duyệt/thu hồi listing. BE: overtime và đối soát sổ quỹ khi PO chốt.
-2. FE có thể tích hợp lịch booking, hiển thị tổng tiền mặt đã ghi nhận và ghi tiền mặt cơ bản; BE tiếp tục trạng thái check-in/check-out và xác nhận có cọc sau quyết định chính sách.
-3. FE có thể nối public catalog → availability → quote → terms → hold → lookup theo OpenAPI. Hiển thị `depositRequiredVnd` cho khách sau khi tạo hold.
-4. FE: kiểm thử refresh/logout, mất mạng, reload, quyền từng vai trò và tenant/chi nhánh với backend thật khi môi trường trình duyệt sẵn sàng.
+Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.
+
+1. FE: commit các màn đang làm (cọc, check-in/out/hủy, `/platform`, quản trị merchant) và smoke test với backend local đã rebuild (xem hướng dẫn smoke test phía trên).
+2. FE: lịch lễ tân hợp nhất hold + booking, lọc trạng thái; kiểm thử refresh/logout, mất mạng, reload, quyền từng vai trò và tenant/chi nhánh trên trình duyệt.
+3. BE: chờ PO về overtime và đối soát sổ quỹ; không có contract mới nào FE đang phải chờ.

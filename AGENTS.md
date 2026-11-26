@@ -1,0 +1,69 @@
+# KaraokeNow — hướng dẫn cho agent (Codex / Claude Code)
+
+Đọc file này trước khi làm bất kỳ việc gì. `fe/AGENTS.md` bổ sung quy tắc riêng cho Next.js trong `fe/`.
+
+## Bắt đầu một phiên
+
+1. `git status --short` và `git log --oneline -10`. Working tree có thể chứa thay đổi **chưa commit của session khác** (BE và FE chạy song song trên cùng thư mục) — không revert, không commit hộ.
+2. Đọc theo thứ tự:
+   - `docs/03-delivery/work-log.md` — nhật ký phiên gần nhất, việc dở dang và cảnh báo.
+   - `docs/03-delivery/task-board.md` — nguồn sự thật về trạng thái task và hàng đợi tiếp theo.
+   - `docs/03-delivery/fe-backend-handoff.md` — contract BE→FE (marker `FE READY` / `FE INTEGRATED`).
+   - `docs/00-product/decision-log.md` — quyết định PO đã duyệt (PD-xxx, UAT-PD-xxx). **Không tự suy ra quyết định sản phẩm**; nếu thiếu, hỏi người dùng rồi ghi PD mới.
+3. Nếu phiên trước bị ngắt (ví dụ hết usage limit), đối chiếu code với tài liệu và chạy lại verify trước khi tin trạng thái "DONE".
+
+## Cấu trúc
+
+| Thư mục | Nội dung |
+|---|---|
+| `be/` | NestJS 11 + TypeScript, `pg` thuần (SQL viết tay, không ORM), migrations `node-pg-migrate` (`be/migrations/*.cjs`), E2E Testcontainers trong `be/test/venue.e2e-spec.ts` |
+| `fe/` | Next.js (phiên bản mới, xem `fe/AGENTS.md`), gọi BE qua HTTPS/OpenAPI; không truy cập PostgreSQL |
+| `docs/` | Sản phẩm, kiến trúc, delivery, quality. `docs/02-architecture/openapi.json` và `api-reference.md` là **file sinh tự động** |
+
+## Hai luồng làm việc song song
+
+- **Luồng BE** chỉ sửa `be/` và tài liệu; **Luồng FE** chỉ sửa `fe/` và tài liệu. Không sửa chồng code của luồng kia.
+- BE xong một contract → thêm mục `## FE READY — <tên> (<task>, <ngày>)` trong handoff (endpoint, body, response, mã lỗi, quyền, lưu ý). FE nối xong → thêm `### FE INTEGRATED — …`.
+- `task-board.md` và `fe-backend-handoff.md` bị cả hai luồng sửa. Khi commit, **chỉ stage phần của mình**: lưu diff của luồng kia (`git diff -- <file> > other.patch`), tạo bản tạm đã `patch -R`, rồi `git update-index --cacheinfo` bản đó. Kiểm tra `git diff --cached` không chứa hunk của luồng kia.
+- Khi thêm dòng mới vào bảng task board, tránh sửa dòng luồng kia đang sửa; thêm dòng mới ở cuối bảng nếu cần.
+
+## Lệnh
+
+Node 26 (Homebrew): `export PATH=/opt/homebrew/opt/node@26/bin:$PATH`. CI dùng Node 24.
+
+```bash
+cd be
+npm run verify            # build + unit + OpenAPI drift + API Markdown drift (bắt buộc trước commit)
+npm run test:e2e          # PostgreSQL Testcontainers, cần Docker đang chạy (~15s)
+npm run openapi:generate && npm run api:docs   # sau mọi thay đổi controller/DTO
+npm run db:migrate        # áp migration vào Postgres compose (localhost:5433, từ .env)
+npm run db:seed:uat       # tài khoản UAT: uat.owner@… (Owner) và uat.platform@… (Platform Admin)
+
+cd fe
+npm test && npx tsc --noEmit && npm run build
+```
+
+Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger `/docs`), frontend `:3100`. **Container backend không tự chạy migration** — luôn `npm run db:migrate` từ host trước `docker compose up -d --build backend`. Worker `npm run holds:expire` và `npm run outbox:work` **không** chạy trong compose; hold chỉ hết hạn khi có request đọc/ghi chạm vào nó.
+
+## Quy ước backend
+
+- Mọi API merchant: `AuthGuard` → `TenantGuard` (header `X-Tenant-ID`, kiểm membership) → `RolesGuard` + `@RequireRoles`. Role phạm vi chi nhánh phải kiểm `actor.branchIds` (Owner thấy mọi chi nhánh). API Platform: `AuthGuard` → `PlatformAdminGuard`, không dùng `X-Tenant-ID`. API public: không auth, chỉ thấy merchant `published && platform_approved`.
+- Mutation: một transaction; khoá dòng `FOR UPDATE` hoặc `pg_advisory_xact_lock(hashtextextended(...))`; ghi `audit_logs` trong cùng transaction. **Audit không chứa PII hay ghi chú tự do** (SĐT, email, mật khẩu, booking code, note).
+- Lệnh tạo tiền/booking dùng header `Idempotency-Key` (ASCII 1–100) + `request_hash`; replay cùng body trả cùng kết quả, body khác trả 409.
+- Tiền là chuỗi số nguyên VND, xử lý bằng `BigInt`. Thời gian nhận vào phải có múi giờ tường minh.
+- Snapshot bất biến: giá + chính sách cọc chụp khi gắn thông tin khách/tạo public hold; điều khoản hủy chụp khi xác nhận. Đổi chính sách sau đó không ảnh hưởng hold/booking đã có.
+- Occupancy: `room_occupancy` với `tstzrange [)` và exclusion GiST trên trạng thái `HELD/CONFIRMED/IN_USE/MAINTENANCE`; buffer dọn phòng cộng **sau** giờ kết thúc (PD-024).
+- Migration mới: `be/migrations/<YYYYMMDDHHMMSS>_<tên>.cjs`, có `down`. Kiểm up → down → up trên Postgres tạm khi thêm/sửa ràng buộc.
+- Sau khi đổi API: regenerate OpenAPI + Markdown, cập nhật `rbac-matrix.md` nếu đổi quyền, thêm marker FE READY.
+
+## Bẫy đã gặp
+
+- `@ValidateNested()` bỏ qua `undefined` → thiếu object lồng nhau gây 500; luôn kèm `@IsDefined()`.
+- PostgreSQL lưu micro giây, `Date` JS chỉ mili giây: so sánh/đặt lịch sát biên `upper(occupied_range)` có thể chồng lấn 1µs.
+- E2E dùng chung một database theo thứ tự: test trước đổi chính sách tenant A (duration min 90/bước 45, buffer 10, deposit WEB…). **Thêm test mới ở cuối file** (trước helper `authorized`), tự tạo branch/room/plan/kênh riêng, đọc giá trị thực từ response thay vì giả định mặc định. Test `limits manual payment access…` dùng `bookings LIMIT 1`.
+- Cột thời gian của `audit_logs` là `occurred_at`.
+- Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
+
+## Definition of Done
+
+Code + migration (có down) + unit/E2E phù hợp + `npm run verify` + `npm run test:e2e` pass; OpenAPI/Markdown sinh lại; quyền và audit đúng; task board, handoff (FE READY), traceability, Master Plan và `work-log.md` cập nhật; quyết định PO mới ghi vào decision log. Commit chỉ khi người dùng yêu cầu; không push nếu không được bảo.

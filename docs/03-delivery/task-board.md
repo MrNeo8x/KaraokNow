@@ -107,15 +107,20 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 
 ## Recommended execution queue
 
-Work in this order under the approved pilot decisions:
+Updated 2026-11-26. Session history and pending assumptions: [`work-log.md`](work-log.md).
 
-1. **FE-005 can integrate now:** use hold create/read and branch hold listing (`BKG-006`); retain the same idempotency key for retries and label the list as holds. FE verifies branch roles and expired/empty/error states.
-2. **BKG-003:** FE may integrate hold details and staff phone-call verification; no-deposit confirmation copies the snapshot. Verify supervised expiry worker operation.
-3. **BKG-005 / REC-001:** FE may integrate no-deposit confirmation, booking-by-ID read and the confirmed-booking calendar. Deposit-required confirmation (PAY-006) and check-in/out are implemented. Check-in/out implemented under PD-025/PD-026; overtime remains open.
-4. **Manual payment / CAN-002:** manual CASH entries, hold deposits, check-in/out and staff-reviewed cancellation/no-show outcomes are FE READY; next BE work is overtime/cash-ledger reconciliation once PO decides.
-5. **Customer booking API:** public discovery, availability, quote, versioned terms, guest hold and lookup are in OpenAPI with FE READY. Session Luồng FE may integrate them; staff confirmation and deposit-on-hold (now available, FE READY) govern whether a hold becomes a booking. Platform Admin approval API is FE READY for the approval UI.
-6. **IAM-004:** create/configure ZBS OA, App, account and approved OTP template in parallel, then verify live reset delivery. Email is deferred.
-7. **QA/operations:** complete booking benchmarks, worker supervision, monitoring and backup/restore; online payment and settlement remain post-pilot.
+**Luồng FE**
+
+1. Commit the in-progress screens (hold deposits, check-in/out/outcome, `/platform` listings + merchants, catalog publication, memberships, audit log, sessions, ops backlog) and smoke-test them against the rebuilt local backend with `uat.owner@karaokenow.local` and `uat.platform@karaokenow.local`.
+2. REC-002: unified reception calendar merging holds and bookings, with status filtering (cancelled/no-show).
+3. Browser/mobile/accessibility checks and FE–BE role tests for Owner, Branch Manager, Receptionist, Cashier and Platform Admin; refresh/logout races and network errors.
+
+**Luồng BE**
+
+1. Ask PO, then implement: overtime on late check-out, cash reconciliation (amount due vs paid, corrections/voids, deposit refund on hold expiry), and confirm the deposit-rounding/over-collection assumptions in the handoff.
+2. IAM-004: ZBS OA/App/template setup, then live reset delivery. Email deferred.
+3. QA/operations: QA-002 booking benchmark, worker supervision/alerts for `holds:expire` and `outbox:work`, OPS-002 backup/restore.
+4. Optional, needs a decision: merchant suspension, Platform Admin owner-password reset, `GET /platform/me`.
 
 ## External setup and post-pilot decision queue
 

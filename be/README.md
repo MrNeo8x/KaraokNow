@@ -1,10 +1,10 @@
 # KaraokeNow
 
-The backend implements authentication and membership, tenant-scoped branch and room management, maintenance blocks, pricing quotes and availability search. Booking holds and lifecycle, payment and live channel integrations remain in development. See `../docs/03-delivery/task-board.md` for current status.
+The backend implements authentication and membership, tenant-scoped branch and room management, maintenance blocks, pricing quotes, availability search, staff/public holds, hold deposits, confirmation, check-in/out, cancellation/no-show, manual CASH payments, public catalog and Platform Admin listing approval/merchant onboarding. Online payment and live channel integrations are out of pilot scope. See `../docs/03-delivery/task-board.md` for current status and `../AGENTS.md` for agent conventions.
 
 ## Run locally
 
-Requirements: Node.js 24+, npm and Docker.
+Requirements: Node.js 24+ (local verification used Node 26), npm and Docker.
 
 ```bash
 docker compose up -d postgres
