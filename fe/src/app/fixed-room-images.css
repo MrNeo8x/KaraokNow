@@ -57,3 +57,14 @@
   .quote-actions { align-items: stretch; flex-direction: column; }
   .quote-actions .primary { width: 100%; }
 }
+.customer-contact { margin-top: 20px; padding-top: 16px; border-top: 1px solid #ece6f3; }
+.contact-fields { grid-template-columns: 1fr 1fr auto; align-items: end; }
+.customer-receipt { margin-top: 20px; padding: 20px; border-radius: 14px; border: 1px solid #c9b3ec; background: #faf6ff; }
+.customer-receipt h3 { margin-top: 4px; }
+.customer-receipt label { margin-top: 12px; }
+.booking-code { display: block; margin-top: 6px; padding: 12px; border-radius: 9px; background: white; border: 1px dashed #8b5cf6; font: 600 16px/1.4 ui-monospace, monospace; letter-spacing: .04em; word-break: break-all; color: #3b176b; }
+.hold-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+.secondary { border: 1px solid #d6c8ec; background: white; color: #5b21b6; border-radius: 9px; padding: 12px 18px; font-weight: 700; }
+.secondary:disabled { opacity: .6; }
+.customer-lookup { margin-top: 24px; }
+@media (max-width: 700px) { .contact-fields { grid-template-columns: 1fr; } .contact-fields label:first-child { grid-column: auto; } }

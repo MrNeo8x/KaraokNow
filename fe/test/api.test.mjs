@@ -58,3 +58,12 @@ test('không che lỗi mạng và hủy yêu cầu', async () => {
   globalThis.fetch = async () => { throw aborted; };
   await assert.rejects(request('/merchant/branches', { signal: AbortSignal.abort() }), error => error === aborted);
 });
+
+test('lỗi API mang theo HTTP status để phân biệt 409/429', async () => {
+  globalThis.fetch = async () => Response.json({ error: { code: 'TOO_MANY_REQUESTS', message: 'Too many public booking requests' } }, { status: 429 });
+  await assert.rejects(request('/public/booking/lookup', { method: 'POST', body: '{}' }), error => {
+    assert.equal(error.status, 429);
+    assert.equal(error.name, 'ApiError');
+    return true;
+  });
+});

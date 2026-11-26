@@ -27,7 +27,7 @@ Session Luồng FE có thể nối tiếp luồng khách từ quote sang hold v�
 
 - Merchant FE đã nối GET/PATCH điều khoản công khai và hiển thị version hiện tại.
 - Customer FE đã nối catalog → availability → quote → đọc/chấp nhận điều khoản; snapshot `terms` và `version` được giữ nguyên trong state khi khách tick đồng ý.
-- Build Next.js/TypeScript Node 26 đã qua. FE chưa gọi public hold/lookup vì các endpoint WEB-004 chưa xuất hiện trong OpenAPI; cần marker FE READY mới trước khi nối.
+- Build Next.js/TypeScript Node 26 đã qua. FE đã nối public hold/lookup theo marker FE READY WEB-004 (2026-11-26); chưa smoke test với backend thật.
 
 ## FE READY — cọc tiền mặt trên hold và xác nhận có cọc (PAY-006, 2026-11-26)
 

@@ -1,3 +1,8 @@
+export class ApiError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) { super(message); this.name = 'ApiError'; this.status = status; }
+}
+
 export async function request<T>(path: string, init: RequestInit = {}, token?: string, tenant?: string): Promise<T> {
   const headers = new Headers(init.headers);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -11,7 +16,7 @@ export async function request<T>(path: string, init: RequestInit = {}, token?: s
     const distinctDetails = details.filter((item: string) => item !== message);
     const rawCorrelation = typeof body.correlationId === 'string' ? body.correlationId : response.headers.get('X-Correlation-ID');
     const correlation = rawCorrelation && /^[A-Za-z0-9._-]{1,128}$/.test(rawCorrelation) ? rawCorrelation : null;
-    throw new Error([message, ...distinctDetails, ...(correlation ? [`Mã tra cứu lỗi: ${correlation}`] : [])].join(' · '));
+    throw new ApiError([message, ...distinctDetails, ...(correlation ? [`Mã tra cứu lỗi: ${correlation}`] : [])].join(' · '), response.status);
   }
   return response.status === 204 ? undefined as T : response.json();
 }
