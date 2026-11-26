@@ -30,6 +30,9 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     errors.push('PORT must be an integer between 1 and 65535');
   }
+  if (config.SWAGGER_ENABLED !== undefined && config.SWAGGER_ENABLED !== '' && !['true', 'false'].includes(String(config.SWAGGER_ENABLED))) {
+    errors.push('SWAGGER_ENABLED must be true or false');
+  }
   if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
     errors.push('TRUST_PROXY_HOPS must be an integer between 0 and 10');
   }

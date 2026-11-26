@@ -25,7 +25,7 @@ export class ConfirmationController {
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant/booking/bookings')
 export class BookingReadController {
   constructor(private readonly service: ConfirmationService) {}
-  @Get(':id') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
+  @Get(':id') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST', 'CASHIER')
   @ApiResponse({ status: 200, type: BookingResponseDto })
   get(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.service.get(req.actor, id); }
 }
@@ -34,7 +34,7 @@ export class BookingReadController {
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant/branches')
 export class BranchBookingController {
   constructor(private readonly service: ConfirmationService) {}
-  @Get(':branchId/booking/bookings') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
+  @Get(':branchId/booking/bookings') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST', 'CASHIER')
   @ApiResponse({ status: 200, type: BookingListResponseDto, description: 'Bookings whose scheduled intervals overlap [from,to), excluding the cleanup buffer' })
   list(@Req() req: AuthenticatedRequest, @Param('branchId', ParseUUIDPipe) branchId: string, @Query() query: ListHoldsDto) {
     return this.service.list(req.actor, branchId, query);

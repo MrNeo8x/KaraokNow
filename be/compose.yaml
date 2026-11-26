@@ -22,6 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
     environment:
       DATABASE_URL: postgresql://karaokenow:karaokenow_local_only@postgres:5432/karaokenow
       JWT_SECRET: local-uat-docker-secret-change-before-production
@@ -38,6 +39,51 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+
+  # OPS-005 operations containers (image target `tools`). Opt-in via profiles:
+  #   docker compose --profile tools run --rm migrate      # apply migrations from inside Docker
+  #   docker compose --profile workers up -d               # hold-expiry and outbox workers
+  migrate:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tools
+    environment:
+      DATABASE_URL: postgresql://karaokenow:karaokenow_local_only@postgres:5432/karaokenow
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  hold-expiry-worker:
+    profiles: ["workers"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tools
+    command: ["npm", "run", "holds:expire"]
+    environment: &worker-env
+      DATABASE_URL: postgresql://karaokenow:karaokenow_local_only@postgres:5432/karaokenow
+      JWT_SECRET: local-uat-docker-secret-change-before-production
+      OTEL_SERVICE_NAME: karaokenow-worker-uat
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  outbox-worker:
+    profiles: ["workers"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tools
+    command: ["npm", "run", "outbox:work"]
+    environment: *worker-env
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     build:

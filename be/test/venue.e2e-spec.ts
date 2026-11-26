@@ -1471,6 +1471,48 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await pool.query('DELETE FROM tenant_memberships WHERE id=$1', [membership]);
   }, 30000);
 
+  it('serves FE role needs: accepted public terms on WEB holds, cashier read access and /merchant/me', async () => {
+    // WEB hold created by the public catalog test: detail exposes the exact accepted terms so non-Owner staff can confirm.
+    const publicHold = (await pool.query(`SELECT id,branch_id,public_accepted_terms FROM booking_holds WHERE tenant_id=$1 AND created_by IS NULL AND status='HELD' ORDER BY created_at LIMIT 1`, [TENANT_A])).rows[0];
+    const receptionist = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'web-reception@example.com',$1,'Web Reception','ACTIVE') RETURNING id`, [await hash('Reception-password-123', 4)])).rows[0];
+    const member = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, receptionist.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'RECEPTIONIST')`, [member.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [member.id, TENANT_A, publicHold.branch_id]);
+    const receptionToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'web-reception@example.com', password: 'Reception-password-123' }).expect(200)).body.accessToken;
+    const asReception = (method: 'get' | 'post', p: string) => request(app.getHttpServer())[method](p).set('Authorization', `Bearer ${receptionToken}`).set('X-Tenant-ID', TENANT_A);
+    const detail = (await asReception('get', `/v1/merchant/booking/holds/${publicHold.id}`).expect(200)).body;
+    expect(detail).toMatchObject({ channel: 'WEB', publicAcceptedTerms: publicHold.public_accepted_terms, publicAcceptedTermsVersion: '1' });
+    await asReception('get', '/v1/merchant/catalog/public-booking-terms').expect(403);
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/WEB').send({ allowed: true }).expect(200);
+    await asReception('post', `/v1/merchant/booking/holds/${publicHold.id}/phone-verification`).expect(200);
+    await asReception('post', `/v1/merchant/booking/holds/${publicHold.id}/confirm`).send({ cancellationTerms: detail.publicAcceptedTerms }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ status: 'CONFIRMED', channel: 'WEB', cancellationTerms: publicHold.public_accepted_terms }));
+    const staffHold = (await pool.query(`SELECT id FROM booking_holds WHERE tenant_id=$1 AND created_by IS NOT NULL LIMIT 1`, [TENANT_A])).rows[0];
+    await authorized('get', `/v1/merchant/booking/holds/${staffHold.id}`).expect(200).expect(({ body }) => expect(body).toMatchObject({ publicAcceptedTerms: null, publicAcceptedTermsVersion: null }));
+
+    // Cashier can now find the hold/booking it records money against, still limited to granted branches.
+    const cashierToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'cashier@example.com', password: 'Cashier-password-123' }).expect(200)).body.accessToken;
+    const asCashier = (p: string) => request(app.getHttpServer()).get(p).set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A);
+    const me = (await asCashier('/v1/merchant/me').expect(200)).body;
+    expect(me).toMatchObject({ email: 'cashier@example.com', tenantId: TENANT_A, tenantName: 'Tenant A', tenantStatus: 'ACTIVE', roles: ['CASHIER'], platformAdmin: false });
+    expect(me.branchIds).toHaveLength(1);
+    const cashierBranch = me.branchIds[0];
+    const range = { from: '2000-01-01T00:00:00Z', to: '2100-01-01T00:00:00Z', limit: 100 };
+    const bookings = (await asCashier(`/v1/merchant/branches/${cashierBranch}/booking/bookings`).query(range).expect(200)).body.items;
+    expect(bookings.length).toBeGreaterThan(0);
+    await asCashier(`/v1/merchant/booking/bookings/${bookings[0].id}`).expect(200);
+    const holds = (await asCashier(`/v1/merchant/branches/${cashierBranch}/booking/holds`).query(range).expect(200)).body.items;
+    await asCashier(`/v1/merchant/booking/holds/${holds[0].id}`).expect(200);
+    const otherBranchHold = (await pool.query(`SELECT id,branch_id FROM booking_holds WHERE tenant_id=$1 AND branch_id<>$2 LIMIT 1`, [TENANT_A, cashierBranch])).rows[0];
+    await asCashier(`/v1/merchant/booking/holds/${otherBranchHold.id}`).expect(403);
+    await asCashier(`/v1/merchant/branches/${otherBranchHold.branch_id}/booking/bookings`).query(range).expect(403);
+
+    await authorized('get', '/v1/merchant/me').expect(200).expect(({ body }) => expect(body).toMatchObject({ userId: OWNER_ID, roles: ['OWNER'], branchIds: [], platformAdmin: false }));
+    await request(app.getHttpServer()).get('/v1/merchant/me').set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(403);
+    await request(app.getHttpServer()).get('/v1/merchant/me').set('X-Tenant-ID', TENANT_A).expect(401);
+    await pool.query(`DELETE FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel='WEB'`, [TENANT_A]);
+  }, 30000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

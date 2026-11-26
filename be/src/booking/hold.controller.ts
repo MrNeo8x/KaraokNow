@@ -27,6 +27,8 @@ export class HoldResponseDto {
   @ApiPropertyOptional({ nullable: true, format: 'date-time', description: 'Time staff recorded a successful verification call; individual responses only' }) phoneVerifiedAt?: string | null;
   @ApiPropertyOptional({ nullable: true, format: 'uuid', description: 'Staff user who recorded the verification call; individual responses only' }) phoneVerifiedBy?: string | null;
   @ApiPropertyOptional({ nullable: true, type: DepositPolicySnapshotDto, description: 'Deposit policy frozen with the price snapshot; individual responses only' }) depositPolicySnapshot?: DepositPolicySnapshotDto | null;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'WEB holds: exact public terms the customer accepted. Confirmation must send this text as cancellationTerms. Null for staff holds; individual responses only' }) publicAcceptedTerms?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'Version of publicAcceptedTerms; individual responses only' }) publicAcceptedTermsVersion?: string | null;
 }
 
 class HoldListResponseDto {
@@ -40,7 +42,7 @@ class HoldListResponseDto {
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant/booking/holds')
 export class HoldController {
   constructor(private readonly holds: HoldService) {}
-  @Get(':id') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
+  @Get(':id') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST', 'CASHIER')
   @ApiResponse({ status: 200, type: HoldResponseDto, description: 'Current hold status; an overdue hold is expired before returning' })
   get(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.holds.get(req.actor, id); }
   @Post(':id/details') @HttpCode(200) @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
@@ -69,7 +71,7 @@ export class HoldController {
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant/branches')
 export class BranchHoldController {
   constructor(private readonly holds: HoldService) {}
-  @Get(':branchId/booking/holds') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
+  @Get(':branchId/booking/holds') @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST', 'CASHIER')
   @ApiResponse({ status: 200, type: HoldListResponseDto, description: 'Holds whose booking intervals overlap [from,to); overdue holds are reported as EXPIRED without releasing occupancy' })
   list(@Req() req: AuthenticatedRequest, @Param('branchId', ParseUUIDPipe) branchId: string, @Query() query: ListHoldsDto) {
     return this.holds.list(req.actor, branchId, query);

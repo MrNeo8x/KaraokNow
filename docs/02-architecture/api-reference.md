@@ -291,6 +291,23 @@ Response được khai báo:
 |---|---|---|
 | 200 | Chưa mô tả | Chưa khai báo schema |
 
+### GET /v1/merchant/me
+
+Nhóm: memberships
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/MerchantMeDto"} |
+| 403 | No active membership in X-Tenant-ID | Chưa khai báo schema |
+
 ### POST /v1/merchant/branches
 
 Nhóm: merchant venues
@@ -2389,6 +2406,80 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### MerchantMeDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "userId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "email": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantName": {
+      "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ],
+      "description": "INACTIVE = suspended by Platform Admin (PD-031)"
+    },
+    "membershipId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "branchIds": {
+      "description": "Granted branches; Owner sees every branch regardless of this list",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "platformAdmin": {
+      "type": "boolean",
+      "description": "True when the user also holds the global Platform Admin grant"
+    }
+  },
+  "required": [
+    "userId",
+    "email",
+    "displayName",
+    "tenantId",
+    "tenantName",
+    "tenantStatus",
+    "membershipId",
+    "roles",
+    "branchIds",
+    "platformAdmin"
+  ]
+}
+```
+
 ### CreateBranchDto
 
 ```json
@@ -3596,6 +3687,16 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
           "$ref": "#/components/schemas/DepositPolicySnapshotDto"
         }
       ]
+    },
+    "publicAcceptedTerms": {
+      "type": "string",
+      "nullable": true,
+      "description": "WEB holds: exact public terms the customer accepted. Confirmation must send this text as cancellationTerms. Null for staff holds; individual responses only"
+    },
+    "publicAcceptedTermsVersion": {
+      "type": "string",
+      "nullable": true,
+      "description": "Version of publicAcceptedTerms; individual responses only"
     }
   },
   "required": [

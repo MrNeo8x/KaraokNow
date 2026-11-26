@@ -35,6 +35,11 @@ describe('environment validation', () => {
       .toThrow('PUBLIC_HOLD_PHONE_LIMIT must be an integer between 1 and 10000');
   });
 
+  it('accepts SWAGGER_ENABLED true/false/unset and rejects other values', () => {
+    for (const value of ['true', 'false', '', undefined]) expect(() => validateEnvironment({ ...validConfig, SWAGGER_ENABLED: value })).not.toThrow();
+    expect(() => validateEnvironment({ ...validConfig, SWAGGER_ENABLED: 'no' })).toThrow('SWAGGER_ENABLED must be true or false');
+  });
+
   it('rejects a non-PostgreSQL database URL', () => {
     expect(() => validateEnvironment({ ...validConfig, DATABASE_URL: 'mysql://localhost/karaokenow' }))
       .toThrow('DATABASE_URL must use the postgres:// or postgresql:// protocol');

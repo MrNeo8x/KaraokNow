@@ -140,6 +140,15 @@ Chrome headless (Playwright) với container backend/frontend đã rebuild: lu�
 
 **Yêu cầu BE (chặn lễ tân xác nhận hold online):** xác nhận hold kênh WEB yêu cầu `cancellationTerms` trùng khớp từng ký tự với `public_accepted_terms`, nhưng `GET /v1/merchant/booking/holds/{id}` không trả trường này. Lễ tân (không phải Owner) không đọc được điều khoản công khai, nên không thể xác nhận hold online. Đề xuất trả `publicAcceptedTerms` và `publicAcceptedTermsVersion` trong hold chi tiết. FE đã đọc sẵn `publicAcceptedTerms` nếu có. Hiện FE tạm điền điều khoản công khai hiện tại (chỉ Owner đọc được); cách này sai nếu Owner sửa điều khoản sau khi khách đặt.
 
+## FE READY — phản hồi yêu cầu từ FE ROLE TEST và triển khai (2026-11-26)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
+
+1. **Xác nhận hold online:** `GET /v1/merchant/booking/holds/{id}` trả thêm `publicAcceptedTerms` và `publicAcceptedTermsVersion` (null với hold do nhân viên tạo). Lễ tân gửi đúng `publicAcceptedTerms` làm `cancellationTerms` khi xác nhận hold WEB; không dùng điều khoản công khai hiện tại. E2E: Lễ tân (không đọc được điều khoản công khai) xác nhận hold WEB thành công.
+2. **Quyền Thu ngân:** CASHIER được đọc `GET /v1/merchant/booking/holds/{id}`, `GET /v1/merchant/branches/{branchId}/booking/holds`, `GET /v1/merchant/booking/bookings/{id}` và `GET /v1/merchant/branches/{branchId}/booking/bookings`, chỉ trong chi nhánh được cấp (chi nhánh khác 403). Thu ngân vẫn không tạo/xác nhận hold, không check-in/out, không hủy.
+3. **`GET /v1/merchant/me`** (cần `X-Tenant-ID`, mọi vai trò) → `{userId,email,displayName,tenantId,tenantName,tenantStatus,membershipId,roles,branchIds,platformAdmin}`. Owner có `branchIds` rỗng nhưng thấy mọi chi nhánh. Chỉ để hiển thị; endpoint vẫn tự kiểm quyền. Không có membership trong tenant → 403.
+4. **OPS-005 (triển khai):** `be/Dockerfile` có target `tools` (migration + worker) bên cạnh `runtime` (API). Compose: `docker compose --profile tools run --rm migrate`, `docker compose --profile workers up -d` (hai worker). `SWAGGER_ENABLED=false` tắt `/docs`; `/v1/metrics` vẫn bật — chặn ở reverse proxy. Phần "Giới hạn hiện tại" trong README cần cập nhật theo các lệnh này.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

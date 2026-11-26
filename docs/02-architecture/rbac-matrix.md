@@ -10,13 +10,14 @@ This is the conservative authorization baseline implemented for the current venu
 | Create/update room or status | Yes | Assigned only | No | No |
 | Manage memberships, roles and branch grants | Yes | No | No | No |
 | Read tenant audit log | Yes | No | No | No |
-| Read confirmed-booking calendar in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | No |
+| Read booking calendar, booking detail, hold list and hold detail in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | Assigned only (read-only, since 2026-11-26 API-003) |
 | Read/record manual CASH payment for confirmed booking | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Publish merchant catalog (does not approve listing for marketplace) | Yes | No | No | No |
 | Read hold deposit status in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | Assigned only |
 | Record CASH deposit on an active hold | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Check in / check out a booking | Yes, all tenant branches | Assigned only | Assigned only | No |
 | Read overtime grace policy | Yes | Yes | Yes | Yes |
+| Read own identity, roles and branch grants (`GET /v1/merchant/me`) | Yes | Yes | Yes | Yes |
 | Update overtime grace policy | Yes | Yes | No | No |
 | Record cancellation / no-show outcome and CASH refund | Yes, all tenant branches | Assigned only | No | No |
 
@@ -27,3 +28,5 @@ Platform listing approval is outside the merchant matrix. `GET /v1/platform/cata
 JWT proves the user identity. `X-Tenant-ID` selects the working tenant, but access is granted only when the authenticated user has an active membership for that tenant. Branch-scoped roles additionally require an explicit branch grant.
 
 Password reset, email verification and external identity providers are not implemented. MFA is explicitly deferred until after the pilot (PD-018); password rate-limit and lockout controls remain in place.
+
+Cashier read access to holds and bookings (API-003, 2026-11-26) was added so cashiers can reach the hold/booking they record deposits and CASH against; it grants no create, confirm, check-in/out or outcome rights. Revisit with PO/security if cashiers must not see customer phone numbers.

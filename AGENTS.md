@@ -43,7 +43,7 @@ cd fe
 npm test && npx tsc --noEmit && npm run build
 ```
 
-Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger `/docs`), frontend `:3100`. **Container backend không tự chạy migration** — luôn `npm run db:migrate` từ host trước `docker compose up -d --build backend`. Worker `npm run holds:expire` và `npm run outbox:work` **không** chạy trong compose; hold chỉ hết hạn khi có request đọc/ghi chạm vào nó.
+Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger `/docs`, tắt bằng `SWAGGER_ENABLED=false`), frontend `:3100`. **Container backend không tự chạy migration** — chạy `npm run db:migrate` từ host hoặc `docker compose --profile tools run --rm migrate` trước `docker compose up -d --build backend`. Worker chỉ chạy khi bật `docker compose --profile workers up -d` (hoặc `npm run holds:expire` / `npm run outbox:work` từ host); nếu không, hold chỉ hết hạn khi có request chạm vào nó.
 
 ## Quy ước backend
 
@@ -62,6 +62,7 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - PostgreSQL lưu micro giây, `Date` JS chỉ mili giây: so sánh/đặt lịch sát biên `upper(occupied_range)` có thể chồng lấn 1µs.
 - E2E dùng chung một database theo thứ tự: test trước đổi chính sách tenant A (duration min 90/bước 45, buffer 10, deposit WEB…). **Thêm test mới ở cuối file** (trước helper `authorized`), tự tạo branch/room/plan/kênh riêng, đọc giá trị thực từ response thay vì giả định mặc định. Test `limits manual payment access…` dùng `bookings LIMIT 1`.
 - Cột thời gian của `audit_logs` là `occurred_at`.
+- Script Python sửa file: **đọc nội dung xong mới mở file để ghi**. `open(p,'w').write(f(open(p).read()))` xoá trắng file trước khi đọc (đã làm mất tạm thời phần FE chưa commit trong handoff ngày 2026-11-26).
 - Ràng buộc exclusion GiST có thể **deadlock** khi nhiều transaction cùng chèn khoảng chồng lấn (lỗi `40P01`, mỗi chu trình mất 1 s phát hiện). Mọi lệnh tạo hoặc nới rộng `room_occupancy` phải gọi `lockRoomOccupancy(client, roomId)` (`be/src/availability/occupancy-lock.ts`) ngay trước khi ghi. `ApiExceptionFilter` trả 409 cho `40P01`/`40001` và ghi log mọi lỗi 5xx (không ghi message).
 - Benchmark: `npm run bench:booking` (cần Docker); chạy lại sau thay đổi ở đường giữ phòng/xác nhận và so với `docs/04-quality/booking-benchmark.md`.
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.

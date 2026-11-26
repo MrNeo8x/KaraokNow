@@ -12,7 +12,8 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  SwaggerModule.setup('docs', app, createOpenApiDocument(app));
+  // OPS-005: set SWAGGER_ENABLED=false in production; defaults to enabled for local development.
+  if (process.env.SWAGGER_ENABLED !== 'false') SwaggerModule.setup('docs', app, createOpenApiDocument(app));
   await app.listen(Number(process.env.PORT ?? 3000));
 }
 

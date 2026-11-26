@@ -326,6 +326,44 @@
         ]
       }
     },
+    "/v1/merchant/me": {
+      "get": {
+        "operationId": "MerchantMeController_me",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantMeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No active membership in X-Tenant-ID"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "memberships"
+        ]
+      }
+    },
     "/v1/merchant/branches": {
       "post": {
         "operationId": "VenueController_createBranch",
@@ -4523,6 +4561,75 @@
           }
         }
       },
+      "MerchantMeDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "tenantStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            "description": "INACTIVE = suspended by Platform Admin (PD-031)"
+          },
+          "membershipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OWNER",
+                "BRANCH_MANAGER",
+                "RECEPTIONIST",
+                "CASHIER"
+              ]
+            }
+          },
+          "branchIds": {
+            "description": "Granted branches; Owner sees every branch regardless of this list",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "platformAdmin": {
+            "type": "boolean",
+            "description": "True when the user also holds the global Platform Admin grant"
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "displayName",
+          "tenantId",
+          "tenantName",
+          "tenantStatus",
+          "membershipId",
+          "roles",
+          "branchIds",
+          "platformAdmin"
+        ]
+      },
       "CreateBranchDto": {
         "type": "object",
         "properties": {
@@ -5557,6 +5664,16 @@
                 "$ref": "#/components/schemas/DepositPolicySnapshotDto"
               }
             ]
+          },
+          "publicAcceptedTerms": {
+            "type": "string",
+            "nullable": true,
+            "description": "WEB holds: exact public terms the customer accepted. Confirmation must send this text as cancellationTerms. Null for staff holds; individual responses only"
+          },
+          "publicAcceptedTermsVersion": {
+            "type": "string",
+            "nullable": true,
+            "description": "Version of publicAcceptedTerms; individual responses only"
           }
         },
         "required": [

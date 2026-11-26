@@ -25,6 +25,18 @@ Run `npm run holds:expire` in a separate supervised process while using holds. I
 
 Run `npm run outbox:work` as a separate supervised process when dispatching events. Owner can query `GET /v1/merchant/notifications/outbox/backlog` for tenant-scoped queue counts. Before applying migration `20261123050000_outbox_claim_token`, stop old outbox workers and restart them with the updated code; see `../docs/02-architecture/transactional-outbox.md`. No live notification provider is configured.
 
+### Docker images and operations (OPS-005)
+
+`Dockerfile` has two targets: `runtime` (default; API only, production dependencies) and `tools` (migrations and workers; includes `node-pg-migrate`, `ts-node`, `migrations/` and `scripts/`). With Compose:
+
+```bash
+docker compose --profile tools run --rm migrate     # apply migrations from inside Docker
+docker compose --profile workers up -d              # hold-expiry and outbox workers
+docker compose --profile workers stop               # stop the workers
+```
+
+Outside Compose: `docker build --target tools -t karaokenow-tools .` then run it with `DATABASE_URL` (default command `npm run db:migrate`) or with command `npm run holds:expire` / `npm run outbox:work` plus `DATABASE_URL` and `JWT_SECRET`. Set `SWAGGER_ENABLED=false` in production to disable `/docs`; block `/v1/metrics` at the reverse proxy.
+
 Access tokens last 15 minutes and are tied to a server-side session. Refresh tokens rotate on every use; reuse revokes the token family. Staff created with temporary passwords must call `POST /v1/auth/password/change` before accessing merchant APIs.
 
 Run unit tests:

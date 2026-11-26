@@ -2,27 +2,38 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-26, 23:15)
+## Trạng thái hiện tại (cập nhật 2026-11-26, 23:50)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031), FE `c6663d7` thiết kế tím/admin shell/booking kiểu app, BE `7796a6d` benchmark + sửa deadlock + UAT, FE `221c6d8` cọc/check-in/out/`/platform`/Playwright.
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE (commit của phiên này) API-003 + OPS-005 theo yêu cầu FE ROLE TEST, BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031), FE `c6663d7` thiết kế tím/admin shell, BE `7796a6d` benchmark + sửa deadlock + UAT.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 42/42 unit, `npm run test:e2e` 40/40, migration mới up → down → up; benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (theo task board): unit và Playwright đạt.
+**Kiểm chứng gần nhất:** BE `npm run verify` 43/43 unit, `npm run test:e2e` 41/41; image `tools` chạy migrate và hai worker trong Docker; `SWAGGER_ENABLED=false` → `/docs` 404. Benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (handoff): `npm run e2e` 132/134 trước API-003 — hai bước Thu ngân đỏ đang chờ API-003, nay đã có.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration (mới nhất `20261124030000_overtime_recording`) và backend chạy code `da2eb69` (smoke: overtime-policy mặc định 10 phút, publication có `tenantStatus`, khoá thiếu lý do → 400). Frontend container là bản build lúc 22:17, chưa có màn FE-013. Worker `holds:expire`/`outbox:work` không chạy trong compose.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration. Backend container được rebuild với code API-003/OPS-005 ở cuối phiên này (xem nhật ký). Worker chỉ chạy khi bật `docker compose --profile workers up -d` (đang tắt).
 
-**Đang dở (working tree, chưa commit):** Luồng FE làm FE-013 (`fe/src/components/overtime-settings.tsx` mới; sửa `platform-merchants.tsx`, `catalog-publication.tsx`, `booking-operations.tsx`, `experience.tsx`, `lib/api.ts`, `fe/e2e/*`), viết lại `README.md` (tiếng Việt, mục triển khai) và mục "Yêu cầu BE — triển khai" trong handoff (đã ghi nhận thành OPS-005). Luồng BE không có việc dở.
+**Đang dở (working tree, chưa commit):** Luồng FE: FE-013 và QA-003 (`overtime-settings.tsx`, `fe/e2e/roles.mjs`, các màn `/platform`, publication, lịch), viết lại `README.md`, các mục FE INTEGRATED/FE ROLE TEST/Yêu cầu BE trong handoff, dòng FE-013/QA-003 trên task board. Luồng BE không có việc dở.
 
 **Trạng thái task:** `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 3 (REC-003, QA-003, FE-013) · `BLOCKED` 9 · `BACKLOG` 6 · `DONE` 46. Chi tiết ở `task-board.md`.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
-- *Luồng FE:* hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
-- *Luồng BE:* OPS-005 (image migration/worker, tắt Swagger theo môi trường — yêu cầu từ FE); chờ PO cho PAY-007/BKG-008; OPS-004 (pool/timeout) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
+- *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
+- *Luồng BE:* chờ PO cho PAY-007/BKG-008; OPS-004 (pool/timeout) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-26 (23:50) — Luồng BE: xử lý yêu cầu từ FE ROLE TEST (API-003) và OPS-005
+
+- **Hold WEB:** `GET /merchant/booking/holds/{id}` trả `publicAcceptedTerms`/`publicAcceptedTermsVersion` — yêu cầu này đã có trong handoff từ commit FE `221c6d8` nhưng Luồng BE bỏ sót ở các lượt trước; nay Lễ tân xác nhận được hold WEB (E2E).
+- **Thu ngân:** thêm CASHIER vào bốn endpoint đọc hold/booking (theo chi nhánh được cấp). Ghi chú trong RBAC matrix: cần PO/bảo mật xem lại nếu Thu ngân không được thấy SĐT khách.
+- **`GET /v1/merchant/me`** (`be/src/membership/merchant-me.controller.ts`).
+- **OPS-005:** `be/Dockerfile` target `tools`; compose service `migrate` (profile `tools`), `hold-expiry-worker`, `outbox-worker` (profile `workers`); `SWAGGER_ENABLED` (+ kiểm tra env, unit test, `.env.example`).
+- Kiểm chứng: unit 43/43, E2E 41/41; migrate trong container ("No migrations to run"), hai worker khởi động và dừng sạch rồi đã tắt; `SWAGGER_ENABLED=false` → `/docs` 404.
+- **Sự cố và khôi phục:** script Python của Luồng BE dùng `open(p,'w').write(f(open(p).read()))` nên xoá trắng `docs/03-delivery/fe-backend-handoff.md` trong working tree (gồm phần FE chưa commit). Đã khôi phục từ HEAD + nguyên văn diff FE đọc được ngay trước đó (17 dòng: FE INTEGRATED, FE ROLE TEST, Yêu cầu BE — triển khai). **Luồng FE nên kiểm lại các mục này trong handoff.** Đã thêm cảnh báo vào `AGENTS.md`.
 
 ---
 

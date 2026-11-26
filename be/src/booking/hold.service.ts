@@ -8,7 +8,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { snapshotDepositPolicy } from './deposit-snapshot';
 import { lockRoomOccupancy } from '../availability/occupancy-lock';
 
-const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy",h.deposit_policy_snapshot AS "depositPolicySnapshot"`;
+const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy",h.deposit_policy_snapshot AS "depositPolicySnapshot",h.public_accepted_terms AS "publicAcceptedTerms",h.public_accepted_terms_version::text AS "publicAcceptedTermsVersion"`;
 
 @Injectable()
 export class HoldService {
