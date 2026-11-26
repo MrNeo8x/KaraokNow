@@ -37,7 +37,7 @@ npm run verify            # build + unit + OpenAPI drift + API Markdown drift (b
 npm run test:e2e          # PostgreSQL Testcontainers, cần Docker đang chạy (~15s)
 npm run openapi:generate && npm run api:docs   # sau mọi thay đổi controller/DTO
 npm run db:migrate        # áp migration vào Postgres compose (localhost:5433, từ .env)
-npm run db:seed:uat       # tài khoản UAT: uat.owner@… (Owner) và uat.platform@… (Platform Admin)
+npm run db:seed:uat       # merchant UAT (đủ 4 vai trò) + UAT2 (chờ duyệt) + Platform Admin; xem docs/04-quality/uat-checklist.md
 
 cd fe
 npm test && npx tsc --noEmit && npm run build
@@ -62,6 +62,8 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - PostgreSQL lưu micro giây, `Date` JS chỉ mili giây: so sánh/đặt lịch sát biên `upper(occupied_range)` có thể chồng lấn 1µs.
 - E2E dùng chung một database theo thứ tự: test trước đổi chính sách tenant A (duration min 90/bước 45, buffer 10, deposit WEB…). **Thêm test mới ở cuối file** (trước helper `authorized`), tự tạo branch/room/plan/kênh riêng, đọc giá trị thực từ response thay vì giả định mặc định. Test `limits manual payment access…` dùng `bookings LIMIT 1`.
 - Cột thời gian của `audit_logs` là `occurred_at`.
+- Ràng buộc exclusion GiST có thể **deadlock** khi nhiều transaction cùng chèn khoảng chồng lấn (lỗi `40P01`, mỗi chu trình mất 1 s phát hiện). Mọi lệnh tạo hoặc nới rộng `room_occupancy` phải gọi `lockRoomOccupancy(client, roomId)` (`be/src/availability/occupancy-lock.ts`) ngay trước khi ghi. `ApiExceptionFilter` trả 409 cho `40P01`/`40001` và ghi log mọi lỗi 5xx (không ghi message).
+- Benchmark: `npm run bench:booking` (cần Docker); chạy lại sau thay đổi ở đường giữ phòng/xác nhận và so với `docs/04-quality/booking-benchmark.md`.
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
 
 ## Trạng thái task

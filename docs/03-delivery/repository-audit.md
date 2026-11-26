@@ -12,7 +12,7 @@ Audit date: 2026-11-26.
 | Branch management | Audited create/read/update/status API and tenant/branch authorization | Implemented baseline |
 | Room management | Audited create/read/update/status API and tenant/branch authorization; free-form amenities and metadata-only media CRUD are tenant/room scoped and audited | Implemented baseline; binary upload/fetch awaits storage decision |
 | OpenAPI | Swagger UI, versioned 73-path JSON contract and generated frontend Markdown reference, with drift checks | Booking lifecycle, hold deposits, platform listing/merchant APIs, public catalog/hold/lookup documented; some older response schemas still missing |
-| Automated tests | Ten Jest unit suites (40 tests) plus 37 PostgreSQL HTTP/E2E tests covering identity, venue, pricing, holds, deposits, confirmation, check-in/out, cancellation/no-show, worker recovery, calendar, manual CASH, public browse/hold/lookup, Platform Admin listing approval and merchant onboarding | Passing locally on 2026-11-26; migrations verified up/down/up; FE–BE browser verification and production benchmarks absent |
+| Automated tests | Ten Jest unit suites (42 tests) plus 38 PostgreSQL HTTP/E2E tests (identity, venue, pricing, holds, deposits, confirmation, check-in/out, cancellation/no-show, workers, calendar, CASH, public flows, Platform Admin, deterministic per-room lock regression); reproducible booking benchmark `npm run bench:booking` (QA-002); FE Playwright browser scripts in `fe/e2e` | Passing locally on 2026-11-26; benchmark meets p95 targets on a local machine; staging benchmark, Branch Manager/Cashier browser runs and UAT execution pending |
 | Pricing | Tenant-scoped plans, special dates, rules, explicit priority, hourly/per-booking units, audited management, duration settings and quote API | Implemented; price snapshot persisted on hold and booking |
 | Availability | Audited maintenance-block CRUD/release, audited merchant buffer-policy API and tenant/branch-scoped availability search | Search excludes inactive branches/rooms and overlapping active occupancy; applies approved post-booking cleanup buffer. Search is not an atomic hold |
 | Booking/holds | `tstzrange` occupancy and GiST no-overlap invariant; staff/public holds with price + deposit-policy snapshot, verification, confirmation (no-deposit or deposit-covered), check-in, check-out (early departure shortens occupancy, PD-025) and staff-reviewed cancellation/no-show (PD-027) | Implemented for pilot scope; overtime, case-level eligibility and production worker supervision/alerts pending |
@@ -39,7 +39,7 @@ Audit date: 2026-11-26.
 4. Run browser FE–BE role verification and UAT for reception, customer and Platform Admin flows.
 5. Payment abstraction, provider selection, webhook inbox and reconciliation (post-pilot, PD-007).
 6. Production notification provider selection/adapter, outbox monitoring and operational recovery.
-7. Booking performance/concurrency benchmark (QA-002) and backup/restore drill (OPS-002).
+7. Backup/restore drill (OPS-002), pool/timeout limits (OPS-004) and a staging re-run of the QA-002 benchmark.
 
 ## Immediate risks
 

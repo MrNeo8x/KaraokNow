@@ -40,6 +40,6 @@ import { ListingApprovalModule } from './listing-approval/listing-approval.modul
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationMiddleware, RequestLoggerMiddleware).forRoutes('*');
+    consumer.apply(CorrelationMiddleware, RequestLoggerMiddleware).forRoutes('{*splat}');
   }
 }

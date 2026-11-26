@@ -1,0 +1,158 @@
+{
+  "generatedAt": "2026-11-26T15:00:46.534Z",
+  "environment": {
+    "node": "v26.5.0",
+    "platform": "darwin 25.5.0",
+    "cpus": 8,
+    "cpuModel": "Apple M1 Pro",
+    "memoryGb": 16,
+    "postgres": "17.11",
+    "note": "App and PostgreSQL container on the same machine; single Node process; Docker Desktop"
+  },
+  "dataset": {
+    "branches": 5,
+    "rooms": 100,
+    "occupancyRows": 12350,
+    "historyDays": 30,
+    "bookingsPerRoomDay": 4,
+    "upcomingEveningPeakBookedShare": 0.5
+  },
+  "correctness": {
+    "activeOverlappingOccupancyPairs": 0,
+    "contentionRoundsWithSingleWinner": 10,
+    "confirmedStaffFlows": 100,
+    "staffFlows": 100
+  },
+  "scenarios": [
+    {
+      "name": "availability-search",
+      "requests": 600,
+      "concurrency": 20,
+      "wallMs": 667.7,
+      "throughputRps": 898.7,
+      "p50": 21.1,
+      "p95": 30.6,
+      "p99": 47,
+      "max": 56.1,
+      "statuses": {
+        "200": 600
+      },
+      "targetP95Ms": 1000,
+      "pass": true
+    },
+    {
+      "name": "quote",
+      "requests": 600,
+      "concurrency": 20,
+      "wallMs": 537.9,
+      "throughputRps": 1115.4,
+      "p50": 17.8,
+      "p95": 21.8,
+      "p99": 24.9,
+      "max": 26.9,
+      "statuses": {
+        "201": 600
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "hold-distinct-slots",
+      "requests": 600,
+      "concurrency": 20,
+      "wallMs": 877.3,
+      "throughputRps": 683.9,
+      "p50": 29,
+      "p95": 35.4,
+      "p99": 42.4,
+      "max": 49.3,
+      "statuses": {
+        "201": 600
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "hold-contention-100x10",
+      "requests": 1000,
+      "concurrency": 100,
+      "wallMs": 1379.6,
+      "throughputRps": 724.8,
+      "p50": 91.8,
+      "p95": 133.2,
+      "p99": 140.5,
+      "max": 146.6,
+      "statuses": {
+        "201": 10,
+        "409": 990
+      },
+      "notes": "10/10 rounds had exactly one 201 and 99 x 409",
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "staff-flow-hold",
+      "requests": 100,
+      "concurrency": 10,
+      "wallMs": 618.1,
+      "throughputRps": 161.8,
+      "p50": 10.8,
+      "p95": 17,
+      "p99": 19.2,
+      "max": 22.7,
+      "statuses": {
+        "201": 100
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "staff-flow-details",
+      "requests": 100,
+      "concurrency": 10,
+      "wallMs": 618.1,
+      "throughputRps": 161.8,
+      "p50": 10.9,
+      "p95": 28.9,
+      "p99": 42.7,
+      "max": 44.8,
+      "statuses": {
+        "200": 100
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "staff-flow-verify",
+      "requests": 100,
+      "concurrency": 10,
+      "wallMs": 618.1,
+      "throughputRps": 161.8,
+      "p50": 6.2,
+      "p95": 8.8,
+      "p99": 10.6,
+      "max": 11.7,
+      "statuses": {
+        "200": 100
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    },
+    {
+      "name": "staff-flow-confirm",
+      "requests": 100,
+      "concurrency": 10,
+      "wallMs": 618.1,
+      "throughputRps": 161.8,
+      "p50": 29.5,
+      "p95": 39.8,
+      "p99": 42.1,
+      "max": 42.8,
+      "statuses": {
+        "200": 100
+      },
+      "targetP95Ms": 500,
+      "pass": true
+    }
+  ]
+}

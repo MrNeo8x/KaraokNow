@@ -25,3 +25,11 @@ Updated: 2026-11-26. Requirements below are copied from the master plan. API and
 Reception confirmed-booking calendar, audited manual CASH recording with an exact recorded-total summary, and gated public browse/availability/quote are implemented. Public availability and quote do not reserve a room and are not a guest booking flow. Manual payment summary reports entries only and does not establish that an amount is due or paid in full.
 
 The automated references above are present in the repository; planned `TC-*` cases are not represented as passed tests. The proposed `UAT-FR-*` checks have not been run with merchants. This matrix is a traceability artifact, not a claim that all 15 requirements are implemented or accepted.
+
+## Non-functional and UAT evidence (2026-11-26)
+
+| Requirement | Evidence | Status |
+|---|---|---|
+| Standard API p95 < 500 ms; availability search p95 < 1 s | QA-002 `npm run bench:booking`, report `booking-benchmark.md`: search p95 31–36 ms, quote 22–34 ms, hold 35–46 ms, contention 133–173 ms, staff flow ≤ 50 ms on a local machine (100 rooms, 12,350 occupancy rows) | Met locally; dataset awaiting PO/BA confirmation; staging run pending |
+| TC-001: 100 concurrent holds for one room/time → at most one active | E2E BKG-004 (100 keys → 1×201, 99×409); E2E regression 10×100 rounds plus deterministic per-room lock check; benchmark 10/10 rounds, 0 overlapping occupancy | Met; exclusion-constraint deadlock found and fixed |
+| UAT scope UAT-PD-001…012, PD-025…029 | `uat-checklist.md` (45 cases) and `npm run db:seed:uat` (two merchants, all roles) | Ready; execution and sign-off pending |

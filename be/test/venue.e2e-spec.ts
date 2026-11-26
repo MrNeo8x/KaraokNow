@@ -1340,6 +1340,33 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(JSON.stringify(audit.rows)).not.toContain('Temp-password-123');
   }, 30000);
 
+  it('serializes conflicting concurrent holds per room without deadlocks or 5xx (QA-002 regression)', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'CONTENTION', name: 'Contention', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'CONT-R', name: 'Contention room', capacity: 8 }).expect(201)).body;
+    for (let round = 0; round < 10; round++) {
+      const startAt = new Date(Date.UTC(2044, 0, 1 + round, 12)).toISOString();
+      const statuses = (await Promise.all(Array.from({ length: 100 }, (_, i) => authorized('post', '/v1/merchant/booking/holds')
+        .set('Idempotency-Key', `contention-${round}-${i}`).send({ roomId: room.id, channel: 'CONTENTION', startAt, durationMinutes: 90 })))).map(response => response.status);
+      expect({ round, created: statuses.filter(s => s === 201).length, conflicts: statuses.filter(s => s === 409).length }).toEqual({ round, created: 1, conflicts: 99 });
+    }
+    // Deterministic check that writers take the per-room occupancy lock before inserting (the deadlock itself is probabilistic).
+    const blocker = await pool.connect();
+    const settlesWithin = (promise: Promise<unknown>, ms: number) => Promise.race([promise.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), ms))]);
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`room-occupancy:${room.id}`]);
+      const hold = authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'contention-lock-check')
+        .send({ roomId: room.id, channel: 'CONTENTION', startAt: '2044-02-01T12:00:00Z', durationMinutes: 90 }).then(response => response.status);
+      const block = authorized('post', '/v1/merchant/room-blocks')
+        .send({ roomId: room.id, startAt: '2044-02-02T12:00:00Z', endAt: '2044-02-02T14:00:00Z', reason: 'Lock check' }).then(response => response.status);
+      expect(await settlesWithin(hold, 500)).toBe(false);
+      expect(await settlesWithin(block, 100)).toBe(false);
+      await blocker.query('COMMIT');
+      expect(await hold).toBe(201);
+      expect(await block).toBe(201);
+    } finally { await blocker.query('ROLLBACK').catch(() => undefined); blocker.release(); }
+  }, 60000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

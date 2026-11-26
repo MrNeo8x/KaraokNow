@@ -8,14 +8,28 @@ const CODES: Record<number, string> = {
   503: 'SERVICE_UNAVAILABLE'
 };
 
+/** PostgreSQL concurrency aborts that a client can safely retry. */
+const RETRYABLE_PG_CODES = new Set(['40P01', '40001']);
+
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const request = context.getRequest<CorrelatedRequest>();
     const response = context.getResponse<Response>();
-    const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-    const payload = exception instanceof HttpException ? exception.getResponse() : null;
+    const pgCode = typeof (exception as { code?: unknown })?.code === 'string' ? (exception as { code: string }).code : undefined;
+    const retryable = !(exception instanceof HttpException) && pgCode !== undefined && RETRYABLE_PG_CODES.has(pgCode);
+    const status = exception instanceof HttpException ? exception.getStatus() : retryable ? HttpStatus.CONFLICT : HttpStatus.INTERNAL_SERVER_ERROR;
+    const payload = exception instanceof HttpException ? exception.getResponse()
+      : retryable ? { message: 'The resource was changed concurrently; retry the request' } : null;
+    if (status >= 500 || retryable) {
+      // Error class and database code only: messages and parameters may contain customer data.
+      process.stdout.write(`${JSON.stringify({
+        level: status >= 500 ? 'error' : 'warn', event: 'request_failed', correlationId: request.correlationId,
+        method: request.method, path: request.originalUrl.split('?')[0], status,
+        errorName: exception instanceof Error ? exception.name : typeof exception, pgCode
+      })}\n`);
+    }
     const rawMessage = typeof payload === 'string' ? payload
       : payload && typeof payload === 'object' && 'message' in payload ? (payload as { message: string | string[] }).message
       : null;

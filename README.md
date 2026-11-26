@@ -32,6 +32,8 @@ npm run dev
 
 Open `http://localhost:3100/merchant`. Local UAT credentials are printed by `npm run db:seed:uat`; the stable tenant ID is `10000000-0000-4000-8000-000000000001`.
 
+UAT scenarios and accounts: `docs/04-quality/uat-checklist.md`. Booking benchmark: `npm run bench:booking` in `be/` (see `docs/04-quality/booking-benchmark.md`).
+
 Backend API documentation is generated into `docs/02-architecture/openapi.json`. Run backend checks from `be/` with `npm run verify` and `npm run test:e2e`.
 
 ## Browser UAT with Docker Desktop
@@ -42,7 +44,7 @@ The persistent local UAT stack runs PostgreSQL, backend and frontend in Docker D
 cd be
 docker compose up -d postgres
 npm run db:migrate          # the backend container does not migrate by itself
-npm run db:seed:uat         # Owner and Platform Admin UAT accounts
+npm run db:seed:uat         # merchants UAT (all roles) and UAT2 (awaiting approval) + Platform Admin
 docker compose up -d --build
 ```
 

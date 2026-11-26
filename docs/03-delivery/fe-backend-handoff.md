@@ -62,6 +62,12 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 36/36. Qu
 - `hold-details.tsx`: đọc/ghi cọc CASH trên hold, xác nhận theo snapshot cọc. `booking-operations.tsx`: check-in, check-out, kết quả hủy/no-show. `/platform`: duyệt/thu hồi listing. Khách thấy `depositRequiredVnd`, `bookingStatus` và cọc đã ghi.
 - `tsc`, `next build` và FE unit test 27/27 qua. **Chưa smoke test với backend thật**: container `karaokenow-backend-1` local vẫn là bản cũ, trả 404 cho `/v1/public/booking/lookup` và `/v1/platform/catalog/listings`.
 
+## Thay đổi BE ảnh hưởng FE (2026-11-26, QA-002/UAT-001)
+
+- Lỗi tranh chấp đồng thời của PostgreSQL (deadlock/serialization) giờ trả **409** với message `The resource was changed concurrently; retry the request` thay vì 500. FE xử lý như 409 xung đột thông thường: tải lại dữ liệu và cho người dùng thử lại; không tự retry liên tục.
+- Giữ phòng trùng phòng/khung giờ dưới tải cao giờ trả 409 trong vài trăm ms (trước có thể treo hơn một phút rồi 500).
+- Seed UAT có thêm `uat.manager@…`, `uat.reception@…`, `uat.cashier@…` (merchant UAT) và `uat2.owner@…` (merchant UAT2, chờ duyệt); mật khẩu và dữ liệu mẫu ở `docs/04-quality/uat-checklist.md`. Có thể dùng cho kịch bản Playwright Branch Manager/Cashier (QA-003).
+
 ## Phiên đăng nhập
 
 - `POST /v1/auth/login` và `POST /v1/auth/refresh` trả `accessToken`, `expiresIn`, `refreshToken`, `refreshExpiresIn`, `mustChangePassword`; thời gian tính theo giây.

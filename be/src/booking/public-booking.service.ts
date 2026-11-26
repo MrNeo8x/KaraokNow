@@ -7,6 +7,7 @@ import type { Actor } from '../platform/auth/auth.types';
 import { PricingService } from '../pricing/pricing.service';
 import { normalizePhone } from './phone';
 import { snapshotDepositPolicy } from './deposit-snapshot';
+import { lockRoomOccupancy } from '../availability/occupancy-lock';
 import { CreatePublicHoldDto, PublicBookingLookupDto } from './public-booking.dto';
 
 @Injectable()
@@ -72,6 +73,7 @@ export class PublicBookingService {
       const deposit = await snapshotDepositPolicy(client, room.tenantId, 'WEB', quote.priceSnapshot.totalAmountVnd);
       const holdId = randomUUID(), occupancyId = randomUUID();
       const bookingCode = this.bookingCode(holdId);
+      await lockRoomOccupancy(client, dto.roomId);
       try {
         await client.query(`INSERT INTO room_occupancy(id,tenant_id,branch_id,room_id,source_type,source_id,occupied_range,status)
           VALUES($1,$2,$3,$4,'BOOKING',$5,tstzrange($6::timestamptz,$6::timestamptz+(($7::integer+$8::integer)*interval '1 minute'),'[)'),'HELD')`,

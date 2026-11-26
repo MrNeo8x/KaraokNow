@@ -25,10 +25,33 @@ describe('ApiExceptionFilter', () => {
   });
 
   it('does not expose internal exception messages', () => {
+    const write = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     new ApiExceptionFilter().catch(new Error('database password=secret'), host);
+    write.mockRestore();
     expect(status).toHaveBeenCalledWith(500);
     const body = json.mock.calls[0][0];
     expect(body.error).toEqual({ code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
     expect(JSON.stringify(body)).not.toContain('secret');
+  });
+
+  it('maps PostgreSQL deadlock and serialization aborts to a retryable 409', () => {
+    const write = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    for (const code of ['40P01', '40001']) {
+      status.mockClear(); json.mockClear();
+      new ApiExceptionFilter().catch(Object.assign(new Error('deadlock detected'), { code }), host);
+      expect(status).toHaveBeenCalledWith(409);
+      expect(json.mock.calls[0][0].error).toEqual({ code: 'CONFLICT', message: 'The resource was changed concurrently; retry the request' });
+    }
+    write.mockRestore();
+  });
+
+  it('logs failed requests with error class and database code but no message or query string', () => {
+    const write = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    new ApiExceptionFilter().catch(Object.assign(new Error('value 0912345678 violates constraint'), { code: '23514' }), host);
+    const line = JSON.parse(String(write.mock.calls[0][0]));
+    expect(line).toMatchObject({ level: 'error', event: 'request_failed', correlationId: 'correlation-1', path: '/v1/test', status: 500, errorName: 'Error', pgCode: '23514' });
+    expect(String(write.mock.calls[0][0])).not.toContain('0912345678');
+    expect(String(write.mock.calls[0][0])).not.toContain('secret');
+    write.mockRestore();
   });
 });

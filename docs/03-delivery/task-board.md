@@ -21,11 +21,11 @@ Khi còn việc dở trong một task gần xong, **tách việc dở thành tas
 
 ## Tóm tắt hiện trạng
 
-- **Backend** (chạy từ `be/`, Node 26, 2026-11-26): `npm run verify` đạt — build, 10/10 unit suite (40/40 test, gồm kiểm tra env `TRUST_PROXY_HOPS`/rate limit public, chuẩn hoá SĐT và tính cọc), kiểm tra drift OpenAPI (73 path) và API Markdown. PostgreSQL Docker E2E đạt 37/37: tạo merchant bởi Platform Admin, duyệt listing, check-in/out, hủy/no-show, cọc trên hold và xác nhận khi đủ cọc, lịch booking, catalog công khai, CASH thủ công (idempotency/tổng), phạm vi vai trò/tenant. Migration mới đã kiểm up → down → up.
+- **Backend** (chạy từ `be/`, Node 26, 2026-11-26): `npm run verify` đạt — build, 10/10 unit suite (42/42 test, gồm kiểm tra env `TRUST_PROXY_HOPS`/rate limit public, chuẩn hoá SĐT, tính cọc và ghi log/ánh xạ lỗi tranh chấp), kiểm tra drift OpenAPI (73 path) và API Markdown. PostgreSQL Docker E2E đạt 38/38, thêm hồi quy tranh chấp giữ phòng (10×100 request và kiểm tra khoá theo phòng tất định): tạo merchant bởi Platform Admin, duyệt listing, check-in/out, hủy/no-show, cọc trên hold và xác nhận khi đủ cọc, lịch booking, catalog công khai, CASH thủ công (idempotency/tổng), phạm vi vai trò/tenant. Migration mới đã kiểm up → down → up. Benchmark QA-002 (`npm run bench:booking`) đạt mọi mục tiêu p95 trên máy local — xem `docs/04-quality/booking-benchmark.md`.
 - **Frontend** (`fe/`, session Luồng FE): FE unit test 32/32 (2026-11-26). Smoke test API qua proxy FE (`localhost:3100`, container backend/frontend đã rebuild, migrate + seed UAT) đạt 44/44: trang `/booking`, `/merchant`, `/platform`; PLT-001/002, publication, memberships, audit, backlog, sessions; luồng khách hold → cọc PERCENT → xác minh → xác nhận → check-in/out → tra cứu `COMPLETED`. **Kiểm thử trình duyệt** (Chrome headless qua Playwright, cùng ngày, container đã rebuild): khách mobile 390px và desktop (tìm phòng → báo giá → điều khoản → giữ chỗ → booking code và cọc → tra cứu → reload giữ mã, không cuộn ngang); lễ tân/Owner 19/19 (cọc, xác minh, xác nhận đủ cọc, check-in/out, thu tiền mặt, hủy có hoàn tiền, audit, phiên); Platform và phân quyền 14/14 (tạo merchant, Owner bị chặn `/platform`, Owner tạo Lễ tân → đổi mật khẩu bắt buộc → Lễ tân không thấy màn Owner). Lỗi FE phát hiện và đã sửa xem handoff. Script nằm ở `fe/e2e/`, chạy `npm run e2e` (setup UAT → API smoke → 3 bộ trình duyệt).
 - **Chưa có:** kiểm thử screen reader/bàn phím, Safari/Firefox, 429, mất mạng và refresh/logout đồng thời trên trình duyệt; vai trò Branch Manager/Cashier (QA-003), UAT (UAT-001), kết quả CI trên GitHub.
 
-Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 22, `READY` 3, `BLOCKED` 11, `BACKLOG` 4, `DONE` 43.
+Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 23, `READY` 2, `BLOCKED` 10, `BACKLOG` 5, `DONE` 44.
 
 ## Luồng Frontend
 
@@ -117,10 +117,11 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 | OPS-001 | Health/readiness, metrics và nền OpenTelemetry | Operations | 7 | P0 | DONE | FND-001 | E2E lỗi readiness, metrics Prometheus, traceparent W3C; export OTLP cấu hình được, chưa thử với collector thật |
 | OPS-002 | Backup/restore và diễn tập phục hồi | Operations | 8 | P0 | BACKLOG | Thiết kế môi trường production | Báo cáo diễn tập có đo RPO/RTO |
 | OPS-003 | Giám sát và cảnh báo worker `holds:expire`, `outbox:work` | Operations | 8 | P0 | BACKLOG | BKG-003, EVT-002, thiết kế môi trường production | Supervisor tự khởi động lại, ngưỡng cảnh báo backlog/heartbeat. Lưu ý: compose local không chạy hai worker này |
+| OPS-004 | Giới hạn pool kết nối và timeout PostgreSQL | Operations | 8 | P1 | BACKLOG | QA-002 | Pool `pg` đang mặc định (10 kết nối, không timeout chờ kết nối), chưa đặt `statement_timeout`/`lock_timeout`. Cần chọn giá trị theo môi trường production và đo lại bằng `npm run bench:booking` |
 | QA-001 | Ma trận truy vết FR → API → test tự động → UAT | Quality | 7 | P0 | DONE | API-002 | `docs/04-quality/requirement-traceability.md` FR-001 → FR-015 |
-| QA-002 | Bộ test hiệu năng và đồng thời cho booking | Quality | 8 | P0 | READY | BKG-004 | Benchmark có tài liệu và kết quả tái lập được |
-| QA-003 | Kiểm thử FE–BE theo vai trò trên trình duyệt | Quality | 8 | P0 | BLOCKED | Môi trường có trình duyệt tự động (ví dụ Playwright) | Kịch bản cho Owner, Branch Manager, Receptionist, Cashier, Platform Admin và khách: phân quyền, tenant/chi nhánh sai, xoay token/đăng xuất đồng thời, lỗi mạng, mobile/accessibility. Đạt thì các task `VERIFY` liên quan chuyển `DONE` (cùng UAT-001) |
-| UAT-001 | Quy trình và checklist UAT nhiều merchant | Quality/Ops | 8 | P0 | READY | REC-002, WEB-001, PAY-005 | Phạm vi đã chốt `UAT-PD-001`–`012` (+ PD-025…029). Viết checklist có thể bắt đầu ngay; chạy UAT sau QA-003 |
+| QA-002 | Bộ test hiệu năng và đồng thời cho booking | Quality | 8 | P0 | DONE | BKG-004 | `npm run bench:booking` (`be/scripts/benchmark-booking.ts`): Testcontainers PostgreSQL 17, 100 phòng, 12.350 occupancy, app thật qua HTTP. 3 lần chạy: tìm phòng p95 31–36 ms, báo giá 22–34 ms, giữ phòng 35–46 ms, tranh chấp 100×10 p95 133–173 ms, luồng nhân viên ≤ 50 ms; 0 chồng lấn, 10/10 vòng một người thắng. Phát hiện và sửa deadlock exclusion constraint (500 sau 72–91 s) bằng khoá theo phòng; lỗi 5xx nay được ghi log. Chi tiết: `docs/04-quality/booking-benchmark.md`. Bộ dữ liệu cần PO/BA xác nhận; chưa đo trên hạ tầng staging |
+| QA-003 | Kiểm thử FE–BE theo vai trò trên trình duyệt | Quality | 8 | P0 | READY | FE `npm run e2e` (Playwright-core) | Đã có (Luồng FE): khách mobile/desktop, lễ tân/Owner 19/19, Platform + phân quyền 14/14. Còn lại: vai trò Branch Manager và Cashier (seed UAT nay có sẵn `uat.manager@…`, `uat.cashier@…`), bàn phím/screen reader, Safari/Firefox, 429, mất mạng, refresh/logout đồng thời. Đạt thì các task `VERIFY` liên quan chuyển `DONE` (cùng UAT-001) |
+| UAT-001 | Quy trình và checklist UAT nhiều merchant | Quality/Ops | 8 | P0 | VERIFY | REC-002, WEB-001, PAY-005 | Checklist 45 ca tiếng Việt `docs/04-quality/uat-checklist.md` (Platform, Owner, khách, lễ tân/thu ngân, check-in/out, hủy/no-show, phân quyền/tách merchant; nhật ký lỗi, tiêu chí kết thúc, ký nhận). `npm run db:seed:uat` dựng merchant UAT (đã duyệt, giá VIP 150.000 đ/giờ và Gia Đình 100.000 đ/giờ, cọc WEB 30%, đủ 4 vai trò) và UAT2 (chờ duyệt, WEB không cọc), đã kiểm luồng khách → cọc → xác nhận và duyệt UAT2 qua API. Còn: người dùng chạy UAT và ký nhận |
 | ZAL-001 | Xác minh quyền Zalo Mini App và tương thích SDK | Channel | Pilot | P1 | BLOCKED | Phê duyệt nền tảng bên ngoài | Văn bản xác minh; không tuyên bố tích hợp trước khi được duyệt |
 | META-001 | Xác minh quyền Meta và cách dùng web/deep-link | Channel | Pilot | P1 | BLOCKED | Phê duyệt nền tảng bên ngoài | Văn bản xác minh; không tuyên bố tích hợp trước khi được duyệt |
 
@@ -132,16 +133,16 @@ Cập nhật 2026-11-26. Lịch sử phiên và giả định đang chờ: [`wor
 
 1. FE-005, FE-009, FE-010 đã commit và chuyển `VERIFY`; kiểm thử trình duyệt lặp lại bằng `npm run e2e` trong `fe/` (xem `fe/e2e/README.md`). BE: trả `publicAcceptedTerms` trong hold chi tiết để Lễ tân xác nhận được hold online (xem handoff).
 2. REC-003: lịch lễ tân hợp nhất hold + booking, lọc trạng thái.
-3. QA-003 khi có môi trường trình duyệt; sau đó FE-011, FE-012 theo ưu tiên.
+3. QA-003: thêm kịch bản Branch Manager/Cashier (tài khoản có sẵn trong seed), bàn phím/screen reader, 429, mất mạng; sau đó FE-011, FE-012 theo ưu tiên.
 
 **Luồng BE**
 
 1. Hỏi PO rồi làm: BKG-007 (overtime), PAY-007 (đối soát sổ quỹ, hoàn cọc khi hết hạn, xác nhận giả định cọc), BKG-008 (điều kiện không cọc theo trường hợp).
-2. QA-002 benchmark booking/đồng thời (sẵn sàng làm ngay).
+2. OPS-004 đặt giới hạn pool/timeout khi có thiết kế production (QA-002 đã xong).
 3. IAM-004 khi có ZBS OA/App/mẫu tin; OPS-002/OPS-003 khi có thiết kế môi trường production.
 4. Tuỳ chọn, cần quyết định: khoá merchant, Platform Admin reset mật khẩu Owner, `GET /platform/me`; bổ sung response schema OpenAPI còn thiếu (hỗ trợ FE-011).
 
-**Chung:** UAT-001 viết checklist ngay; chạy sau QA-003.
+**Chung:** UAT-001 đã có checklist và seed — người dùng có thể chạy UAT theo `docs/04-quality/uat-checklist.md`; QA-003 bổ sung vai trò Branch Manager/Cashier.
 
 ## Thiết lập bên ngoài và quyết định sau pilot
 

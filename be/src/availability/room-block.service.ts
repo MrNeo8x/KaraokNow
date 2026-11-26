@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
 import { CreateRoomBlockDto, UpdateRoomBlockDto } from './room-block.dto';
+import { lockRoomOccupancy } from './occupancy-lock';
 
 export interface RoomBlock {
   id: string; branchId: string; roomId: string; reason: string; status: 'ACTIVE' | 'RELEASED';
@@ -22,6 +23,7 @@ export class RoomBlockService {
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
+      await lockRoomOccupancy(client, dto.roomId);
       await this.withConflictMapping(() => client.query(
         `INSERT INTO room_occupancy(id,tenant_id,branch_id,room_id,source_type,source_id,occupied_range,status)
          VALUES ($1,$2,$3,$4,'MAINTENANCE',$5,tstzrange($6,$7,'[)'),'MAINTENANCE')`,
@@ -60,6 +62,7 @@ export class RoomBlockService {
       const startAt = dto.startAt ?? before.startAt.toISOString();
       const endAt = dto.endAt ?? before.endAt.toISOString();
       this.validateRange(startAt, endAt);
+      await lockRoomOccupancy(client, before.roomId);
       await this.withConflictMapping(() => client.query(
         `UPDATE room_occupancy SET occupied_range=tstzrange($3,$4,'[)'),updated_at=now()
          WHERE tenant_id=$1 AND source_type='MAINTENANCE' AND source_id=$2`,
