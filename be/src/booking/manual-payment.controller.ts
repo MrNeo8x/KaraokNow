@@ -5,7 +5,7 @@ import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
 import { RolesGuard } from '../platform/auth/roles.guard';
 import { TenantGuard } from '../platform/tenant/tenant.guard';
-import { ManualPaymentListDto, ManualPaymentResponseDto, RecordManualPaymentDto } from './manual-payment.dto';
+import { ManualPaymentListDto, ManualPaymentResponseDto, ManualPaymentSummaryDto, RecordManualPaymentDto } from './manual-payment.dto';
 import { ManualPaymentService } from './manual-payment.service';
 import { PolicyListQueryDto } from './policy-list.dto';
 
@@ -13,6 +13,10 @@ import { PolicyListQueryDto } from './policy-list.dto';
 @UseGuards(AuthGuard, TenantGuard, RolesGuard) @Controller('merchant/booking/bookings/:id/manual-payments')
 export class ManualPaymentController {
   constructor(private readonly payments: ManualPaymentService) {}
+  @Get('summary') @RequireRoles('OWNER','BRANCH_MANAGER','CASHIER') @ApiResponse({ status: 200, type: ManualPaymentSummaryDto })
+  summary(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    return this.payments.summary(req.actor,id);
+  }
   @Get() @RequireRoles('OWNER','BRANCH_MANAGER','CASHIER') @ApiResponse({ status: 200, type: ManualPaymentListDto })
   list(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Query() query: PolicyListQueryDto) {
     return this.payments.list(req.actor,id,query);

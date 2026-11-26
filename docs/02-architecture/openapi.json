@@ -3008,6 +3008,49 @@
         ]
       }
     },
+    "/v1/merchant/booking/bookings/{id}/manual-payments/summary": {
+      "get": {
+        "operationId": "ManualPaymentController_summary",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualPaymentSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "manual payments"
+        ]
+      }
+    },
     "/v1/merchant/booking/bookings/{id}/manual-payments": {
       "get": {
         "operationId": "ManualPaymentController_list",
@@ -3144,6 +3187,98 @@
         ]
       }
     },
+    "/v1/public/booking/holds": {
+      "post": {
+        "operationId": "PublicBookingController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Visible ASCII 1–100 characters; scoped to published merchant and normalized phone",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePublicHoldDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicHoldResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Occupancy, price, terms version or idempotency conflict"
+          },
+          "429": {
+            "description": "IP or phone rate limit exceeded"
+          }
+        },
+        "tags": [
+          "public booking"
+        ]
+      }
+    },
+    "/v1/public/booking/lookup": {
+      "post": {
+        "operationId": "PublicBookingController_lookup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicBookingLookupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingStatusDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Generic response for an invalid phone/code pair"
+          },
+          "429": {
+            "description": "IP or phone rate limit exceeded"
+          }
+        },
+        "tags": [
+          "public booking"
+        ]
+      }
+    },
     "/v1/merchant/catalog/publication": {
       "get": {
         "operationId": "CatalogPublicationController_get",
@@ -3207,6 +3342,84 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicationResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant catalog"
+        ]
+      }
+    },
+    "/v1/merchant/catalog/public-booking-terms": {
+      "get": {
+        "operationId": "PublicBookingTermsController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingTermsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant catalog"
+        ]
+      },
+      "patch": {
+        "operationId": "PublicBookingTermsController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePublicBookingTermsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingTermsResponseDto"
                 }
               }
             }
@@ -3308,6 +3521,127 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublicRoomListDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "public catalog"
+        ]
+      }
+    },
+    "/v1/public/branches/{id}/availability": {
+      "get": {
+        "operationId": "PublicCatalogController_availability",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startAt",
+            "required": true,
+            "in": "query",
+            "description": "ISO-8601 timestamp with explicit offset",
+            "schema": {
+              "example": "2030-05-10T11:00:00+07:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "durationMinutes",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1440,
+              "example": 60,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicAvailabilityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "public catalog"
+        ]
+      }
+    },
+    "/v1/public/rooms/{id}/quote": {
+      "post": {
+        "operationId": "PublicCatalogController_quote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicQuoteResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "public catalog"
+        ]
+      }
+    },
+    "/v1/public/branches/{id}/booking-terms": {
+      "get": {
+        "operationId": "PublicCatalogController_terms",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBookingTermsResponseDto"
                 }
               }
             }
@@ -4898,6 +5232,23 @@
           "hasMore"
         ]
       },
+      "ManualPaymentSummaryDto": {
+        "type": "object",
+        "properties": {
+          "totalRecordedVnd": {
+            "type": "string",
+            "description": "Sum of recorded payments in VND; decimal string to preserve integer precision"
+          },
+          "paymentCount": {
+            "type": "number",
+            "description": "Number of recorded manual payment entries"
+          }
+        },
+        "required": [
+          "totalRecordedVnd",
+          "paymentCount"
+        ]
+      },
       "ManualPaymentResponseDto": {
         "type": "object",
         "properties": {
@@ -4996,6 +5347,183 @@
           "amountVnd"
         ]
       },
+      "CreatePublicHoldDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": "string",
+            "example": "2035-01-01T18:00:00+07:00"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440
+          },
+          "phone": {
+            "type": "string",
+            "example": "0912345678"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "expectedTotalAmountVnd": {
+            "type": "string",
+            "example": "180000"
+          },
+          "termsVersion": {
+            "type": "string",
+            "example": "1",
+            "description": "Version returned by the public booking-terms endpoint"
+          }
+        },
+        "required": [
+          "roomId",
+          "startAt",
+          "durationMinutes",
+          "phone",
+          "expectedTotalAmountVnd",
+          "termsVersion"
+        ]
+      },
+      "PublicHoldResponseDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "reservedEndAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "HELD",
+              "EXPIRED",
+              "CONFIRMED"
+            ]
+          },
+          "totalAmountVnd": {
+            "type": "string"
+          },
+          "termsVersion": {
+            "type": "string"
+          },
+          "bookingCode": {
+            "type": "string",
+            "description": "128-bit lookup code. Store securely; returned again only for matching idempotent replay."
+          }
+        },
+        "required": [
+          "holdId",
+          "branchId",
+          "roomId",
+          "startAt",
+          "durationMinutes",
+          "reservedEndAt",
+          "expiresAt",
+          "status",
+          "totalAmountVnd",
+          "termsVersion",
+          "bookingCode"
+        ]
+      },
+      "PublicBookingLookupDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string"
+          },
+          "bookingCode": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "phone",
+          "bookingCode"
+        ]
+      },
+      "PublicBookingStatusDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bookingId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "HELD",
+              "EXPIRED",
+              "CONFIRMED"
+            ]
+          },
+          "totalAmountVnd": {
+            "type": "string"
+          },
+          "termsVersion": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "holdId",
+          "bookingId",
+          "branchId",
+          "roomId",
+          "startAt",
+          "durationMinutes",
+          "status",
+          "totalAmountVnd",
+          "termsVersion"
+        ]
+      },
       "PublicationResponseDto": {
         "type": "object",
         "properties": {
@@ -5025,6 +5553,46 @@
         },
         "required": [
           "published"
+        ]
+      },
+      "PublicBookingTermsResponseDto": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "terms": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "nullable": true,
+            "description": "Opaque version that must be submitted when accepting these terms"
+          },
+          "updatedAt": {
+            "type": "object",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "configured",
+          "terms",
+          "version"
+        ]
+      },
+      "UpdatePublicBookingTermsDto": {
+        "type": "object",
+        "properties": {
+          "terms": {
+            "type": "string",
+            "maxLength": 5000,
+            "description": "Single public cancellation/booking terms text shown before guest submission"
+          }
+        },
+        "required": [
+          "terms"
         ]
       },
       "PublicBranchDto": {
@@ -5131,6 +5699,146 @@
           "offset",
           "hasMore",
           "items"
+        ]
+      },
+      "PublicAvailableRoomDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "capacity"
+        ]
+      },
+      "PublicAvailabilityResponseDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requestedEndAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "bufferEnabled": {
+            "type": "boolean"
+          },
+          "bufferMinutes": {
+            "type": "number"
+          },
+          "appliedBufferMinutes": {
+            "type": "number"
+          },
+          "reservedEndAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicAvailableRoomDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "startAt",
+          "requestedEndAt",
+          "durationMinutes",
+          "bufferEnabled",
+          "bufferMinutes",
+          "appliedBufferMinutes",
+          "reservedEndAt",
+          "rooms"
+        ]
+      },
+      "PublicBookingDurationPolicyDto": {
+        "type": "object",
+        "properties": {
+          "durationStepMinutes": {
+            "type": "number"
+          },
+          "minDurationMinutes": {
+            "type": "number"
+          },
+          "maxDurationMinutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "durationStepMinutes",
+          "minDurationMinutes",
+          "maxDurationMinutes"
+        ]
+      },
+      "PublicQuoteResponseDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "VND"
+            ]
+          },
+          "totalAmountVnd": {
+            "type": "string",
+            "description": "Final integer VND amount encoded as a decimal string"
+          },
+          "bookingDurationPolicy": {
+            "$ref": "#/components/schemas/PublicBookingDurationPolicyDto"
+          }
+        },
+        "required": [
+          "branchId",
+          "roomId",
+          "timezone",
+          "startAt",
+          "endAt",
+          "durationMinutes",
+          "currency",
+          "totalAmountVnd",
+          "bookingDurationPolicy"
         ]
       }
     }

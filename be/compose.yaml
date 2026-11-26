@@ -1,3 +1,5 @@
+name: karaokenow
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -15,6 +17,42 @@ services:
       retries: 10
     volumes:
       - karaokenow-postgres:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://karaokenow:karaokenow_local_only@postgres:5432/karaokenow
+      JWT_SECRET: local-uat-docker-secret-change-before-production
+      PORT: 3000
+      OTEL_SERVICE_NAME: karaokenow-backend-uat
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  frontend:
+    build:
+      context: ../fe
+      dockerfile: Dockerfile
+      args:
+        BACKEND_API_ORIGIN: http://backend:3000
+    environment:
+      BACKEND_API_ORIGIN: http://backend:3000
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   karaokenow-postgres:

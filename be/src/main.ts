@@ -7,6 +7,8 @@ import { createOpenApiDocument } from './platform/http/openapi';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? 0);
+  if (trustProxyHops > 0) app.getHttpAdapter().getInstance().set('trust proxy', trustProxyHops);
   app.enableShutdownHooks();
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

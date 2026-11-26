@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { request } from '@/lib/api';
+import BookingOperations from './booking-operations';
 
 type Hold = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; expiresAt: string; status: 'HELD' | 'EXPIRED' };
 type Result = { items: Hold[]; limit: number; offset: number; hasMore: boolean };
@@ -39,7 +40,7 @@ export default function BranchHolds({ token, tenant, branchId, timezone, rooms }
   }
 
   const format = (value: string) => new Date(value).toLocaleString('vi-VN', { timeZone: timezone });
-  return <section className="card availability" aria-labelledby="branch-holds-title">
+  return <><section className="card availability" aria-labelledby="branch-holds-title">
     <h2 id="branch-holds-title">Danh sách giữ phòng tạm thời</h2>
     <p>Chỉ gồm hold của chi nhánh, không phải lịch booking đã xác nhận. Khoảng lọc xét thời gian sử dụng, không gồm buffer. Múi giờ chi nhánh: {timezone}.</p>
     <form className="availability-form" onSubmit={search}>
@@ -54,5 +55,5 @@ export default function BranchHolds({ token, tenant, branchId, timezone, rooms }
       <p>Thời gian hiển thị theo {timezone}. Trạng thái hết hạn trong danh sách không tự giải phóng phòng; worker hết hạn phải hoạt động.</p>
       <div className="amenity-buttons"><button type="button" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - 20))}>← Trang trước</button><span>Trang {Math.floor(offset / 20) + 1}</span><button type="button" disabled={loading || !result.hasMore || offset >= 10000} onClick={() => setOffset(value => value + 20)}>Trang sau →</button></div><small>Danh sách có thể thay đổi giữa các trang khi phát sinh hold mới.</small>
     </div>}
-  </section>;
+  </section><BookingOperations token={token} tenant={tenant} branchId={branchId} timezone={timezone} rooms={rooms} /></>;
 }

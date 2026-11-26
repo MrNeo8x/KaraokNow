@@ -512,23 +512,62 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'PUBLIC-CAT', name: 'Public catalog branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
     const active = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'PUBLIC-OK', name: 'Public room', capacity: 8 }).expect(201)).body;
     const inactive = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'PUBLIC-NO', name: 'Inactive room', capacity: 6 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'PUBLIC-PLAN', name: 'Public plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Public plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'PUBLIC-RULE', name: 'Public price', priority: 1000, amountVnd: '180000', amountUnit: 'PER_BOOKING', roomId: active.id }).expect(201);
     await authorized('patch', `/v1/merchant/rooms/${inactive.id}/status`).send({ status: 'INACTIVE' }).expect(200);
     await authorized('get', '/v1/merchant/catalog/publication').expect(200).expect(({ body }) => expect(body.published).toBe(false));
+    await authorized('get', '/v1/merchant/catalog/public-booking-terms').expect(200).expect(({ body }) => expect(body).toEqual({ configured: false, terms: null, version: null, updatedAt: null }));
+    await authorized('patch', '/v1/merchant/catalog/public-booking-terms').send({ terms: '   ' }).expect(400);
+    await authorized('patch', '/v1/merchant/catalog/public-booking-terms').send({ terms: 'Khách liên hệ chi nhánh để xử lý hủy booking.' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ configured: true, terms: 'Khách liên hệ chi nhánh để xử lý hủy booking.', version: '1' }));
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/booking-terms`).expect(404);
     await request(app.getHttpServer()).get('/v1/public/branches').expect(200).expect(({ body }) => expect(body.items.some((item: { id: string }) => item.id === branch.id)).toBe(false));
     await authorized('patch', '/v1/merchant/catalog/publication').send({ published: true }).expect(200);
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/availability`).query({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(404);
+    await request(app.getHttpServer()).post(`/v1/public/rooms/${active.id}/quote`).send({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(404);
     await pool.query('UPDATE tenant_public_catalog SET platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
     await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)
       .expect(({ body }) => expect(body.items).toContainEqual(expect.objectContaining({ id: branch.id, merchantId: TENANT_A })));
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(200)
       .expect(({ body }) => expect(body.items).toEqual([{ id: active.id, branchId: branch.id, name: 'Public room', capacity: 8 }]));
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/booking-terms`).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ configured: true, terms: 'Khách liên hệ chi nhánh để xử lý hủy booking.', version: '1' }));
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/availability`).query({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(200)
+      .expect(({ body }) => { expect(body).toMatchObject({ branchId: branch.id, durationMinutes: 60, rooms: [{ id: active.id, name: 'Public room', capacity: 8 }] }); expect(JSON.stringify(body)).not.toContain('PUBLIC-OK'); });
+    await request(app.getHttpServer()).post(`/v1/public/rooms/${active.id}/quote`).send({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(201)
+      .expect(({ body }) => { expect(body).toMatchObject({ roomId: active.id, branchId: branch.id, totalAmountVnd: '180000', currency: 'VND' }); expect(body).not.toHaveProperty('priceSnapshot'); expect(JSON.stringify(body)).not.toContain('PUBLIC-RULE'); });
+    const publicHoldBody = { roomId: active.id, startAt: '2041-01-02T18:00:00+07:00', durationMinutes: 60, phone: '0911222333',
+      email: 'public-guest@example.com', expectedTotalAmountVnd: '180000', termsVersion: '1' };
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').send(publicHoldBody).expect(400);
+    const publicHold = (await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1').send(publicHoldBody).expect(201)).body;
+    expect(publicHold).toMatchObject({ roomId: active.id, branchId: branch.id, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1' });
+    expect(publicHold.bookingCode).toMatch(/^[a-f0-9]{32}$/);
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1').send(publicHoldBody).expect(201)
+      .expect(({ body }) => expect(body).toEqual(publicHold));
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1')
+      .send({ ...publicHoldBody, expectedTotalAmountVnd: '180001' }).expect(409);
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: '0911222334', bookingCode: publicHold.bookingCode }).expect(404);
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: publicHold.bookingCode }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ holdId: publicHold.holdId, bookingId: null, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1' }));
+    const publicAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE action='PUBLIC_HOLD_CREATED' AND entity_id=$1`, [publicHold.holdId]);
+    expect(publicAudit.rows).toHaveLength(1);
+    expect(JSON.stringify(publicAudit.rows)).not.toContain(publicHoldBody.phone);
+    expect(JSON.stringify(publicAudit.rows)).not.toContain(publicHold.bookingCode);
+    expect(JSON.stringify((await pool.query('SELECT key_hash FROM public_rate_limit_buckets')).rows)).not.toContain(publicHoldBody.phone);
+    await pool.query(`UPDATE public_rate_limit_buckets SET request_count=20 WHERE scope='PUBLIC_HOLD_IP'`);
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-rate-limit')
+      .send({ ...publicHoldBody, startAt: '2041-01-03T18:00:00+07:00' }).expect(429);
     await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 101 }).expect(400);
     await authorized('patch', `/v1/merchant/branches/${branch.id}/status`).send({ status: 'INACTIVE' }).expect(200);
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(404);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/availability`).query({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(404);
     await authorized('patch', '/v1/merchant/catalog/publication').send({ published: false }).expect(200);
     const audit = await pool.query(`SELECT action FROM audit_logs WHERE tenant_id=$1 AND action='PUBLIC_CATALOG_UPDATED'`, [TENANT_A]);
     expect(audit.rows).toHaveLength(2);
+    expect((await pool.query(`SELECT action FROM audit_logs WHERE tenant_id=$1 AND action='PUBLIC_BOOKING_TERMS_UPDATED'`, [TENANT_A])).rows).toHaveLength(1);
   });
 
   it('confirms a verified no-deposit hold once and snapshots booking terms', async () => {
@@ -567,6 +606,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('post', paymentPath).set('Idempotency-Key', 'cash-payment-2').send({ method: 'CASH', amountVnd: '90000' }).expect(200);
     await authorized('get', paymentPath).query({ limit: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ amountVnd: '30000' }], hasMore: true }));
     await authorized('get', paymentPath).query({ limit: 1, offset: 1 }).expect(200).expect(({ body }) => expect(body).toMatchObject({ items: [{ amountVnd: '90000' }], hasMore: false }));
+    await authorized('get', `${paymentPath}/summary`).expect(200).expect(({ body }) => expect(body).toEqual({ totalRecordedVnd: '120000', paymentCount: 2 }));
     const payAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE entity_type='MANUAL_PAYMENT' AND after_data->>'bookingId'=$1`, [booking.id]);
     expect(payAudit.rows).toHaveLength(2);
     expect(JSON.stringify(payAudit.rows)).not.toContain('Phiếu số 1');
@@ -632,6 +672,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const token = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'cashier@example.com', password: 'Cashier-password-123' }).expect(200)).body.accessToken;
     const path = `/v1/merchant/booking/bookings/${booking.id}/manual-payments`;
     await request(app.getHttpServer()).get(path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).expect(200);
+    await request(app.getHttpServer()).get(`${path}/summary`).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).expect(200).expect(({ body }) => expect(body.paymentCount).toBe(2));
     await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).set('Idempotency-Key', 'cashier-test').send({ method:'CASH',amountVnd:'1' }).expect(200);
   });
 
@@ -978,6 +1019,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(managerLogin.mustChangePassword).toBe(false);
     const managerToken = managerLogin.accessToken;
     await request(app.getHttpServer()).patch('/v1/merchant/catalog/publication').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ published: true }).expect(403);
+    await request(app.getHttpServer()).patch('/v1/merchant/catalog/public-booking-terms').set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).send({ terms: 'Không được phép' }).expect(403);
     const otherBranchBooking = (await pool.query(`SELECT b.id FROM bookings b JOIN branches br ON br.id=b.branch_id WHERE b.tenant_id=$1 AND br.code='CONFIRM' LIMIT 1`, [TENANT_A])).rows[0];
     await request(app.getHttpServer()).get(`/v1/merchant/booking/bookings/${otherBranchBooking.id}`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
     await request(app.getHttpServer()).post(`/v1/merchant/booking/bookings/${otherBranchBooking.id}/manual-payments`).set('Authorization', `Bearer ${managerToken}`).set('X-Tenant-ID', TENANT_A).set('Idempotency-Key', 'deny-pay').send({ method: 'CASH', amountVnd: '10000' }).expect(403);

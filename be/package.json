@@ -13,6 +13,7 @@
     "start:prod": "node dist/main.js",
     "db:migrate": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js up -m migrations",
     "db:rollback": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js down -m migrations",
+    "db:seed:uat": "node --env-file-if-exists=.env -r ts-node/register scripts/seed-uat.ts",
     "openapi:generate": "node -r ts-node/register scripts/generate-openapi.ts",
     "openapi:check": "node -r ts-node/register scripts/generate-openapi.ts --check",
     "api:docs": "node scripts/generate-api-markdown.cjs",

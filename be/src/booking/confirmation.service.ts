@@ -44,7 +44,7 @@ export class ConfirmationService {
     try {
       await client.query('BEGIN');
       const hold = (await client.query(`SELECT id,branch_id,room_id,occupancy_id,channel,start_at,duration_minutes,buffer_minutes,
-        customer_phone,customer_email,phone_verified_at,phone_verified_by,price_snapshot,status,expires_at>clock_timestamp() AS valid
+        customer_phone,customer_email,phone_verified_at,phone_verified_by,price_snapshot,public_accepted_terms,status,expires_at>clock_timestamp() AS valid
         FROM booking_holds WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, [actor.tenantId, holdId])).rows[0];
       if (!hold) throw new NotFoundException('Hold not found');
       if (!actor.roles.includes('OWNER') && !actor.branchIds.includes(hold.branch_id)) throw new ForbiddenException('Branch access denied');
@@ -55,6 +55,7 @@ export class ConfirmationService {
       }
       if (hold.status !== 'HELD' || !hold.valid) throw new ConflictException('Hold has expired');
       if (!hold.customer_phone || !hold.price_snapshot || !hold.phone_verified_at || !hold.phone_verified_by) throw new ConflictException('Customer details, price snapshot and phone verification are required');
+      if (hold.public_accepted_terms && hold.public_accepted_terms !== dto.cancellationTerms) throw new ConflictException('Confirmation terms must match the terms accepted by the customer');
 
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`deposit:${actor.tenantId}:${hold.channel}`]);
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`no-deposit:${actor.tenantId}:${hold.channel}`]);

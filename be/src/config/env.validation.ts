@@ -6,6 +6,9 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
   const jwtSecret = typeof config.JWT_SECRET === 'string' ? config.JWT_SECRET : '';
   const portValue = config.PORT ?? DEFAULT_PORT;
   const port = Number(portValue);
+  const trustProxyHops = Number(config.TRUST_PROXY_HOPS ?? 0);
+  const positiveIntegerSettings = ['PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 'PUBLIC_HOLD_IP_LIMIT', 'PUBLIC_HOLD_PHONE_LIMIT',
+    'PUBLIC_LOOKUP_IP_LIMIT', 'PUBLIC_LOOKUP_PHONE_LIMIT'];
 
   if (!databaseUrl) {
     errors.push('DATABASE_URL is required');
@@ -27,10 +30,18 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     errors.push('PORT must be an integer between 1 and 65535');
   }
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 10) {
+    errors.push('TRUST_PROXY_HOPS must be an integer between 0 and 10');
+  }
+  for (const name of positiveIntegerSettings) {
+    if (config[name] === undefined || config[name] === '') continue;
+    const value = Number(config[name]);
+    if (!Number.isInteger(value) || value < 1 || value > 10000) errors.push(`${name} must be an integer between 1 and 10000`);
+  }
 
   if (errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);
   }
 
-  return { ...config, DATABASE_URL: databaseUrl, PORT: port };
+  return { ...config, DATABASE_URL: databaseUrl, PORT: port, TRUST_PROXY_HOPS: trustProxyHops };
 }

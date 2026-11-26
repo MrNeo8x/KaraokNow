@@ -83,12 +83,12 @@ Enforce authorization in APIs and database queries, not just UI.
 | ID | Module | Priority | Release | Trạng thái hiện tại |
 |---|---|---|---|---|
 | MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — auth, tenant membership, roles, branch grants; reset-code delivery còn phụ thuộc ZBS |
-| MOD-02 | Branch and room management | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — CRUD, trạng thái, tiện nghi, metadata media; chưa có upload file thật |
+| MOD-02 | Branch and room management | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — CRUD, trạng thái, tiện nghi, metadata media; FE tạm dùng ảnh phòng cố định, upload file thật được bổ sung sau |
 | MOD-03 | Pricing and availability | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — quote API, quản lý giá, room blocks, buffer policy và search đã có; xác nhận staff không cọc lưu snapshot giá vào booking |
-| MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, xác nhận không cọc theo kênh, lưu snapshot và đọc booking đã có; tính tiền cọc, điều kiện theo trường hợp và các chuyển trạng thái tiếp theo còn thiếu |
-| MOD-05 | Deposit and payment | P0 | MVP | **PHẠM VI PILOT ĐÃ CHỐT** — chỉ ghi nhận thanh toán thủ công; online payment ngoài pilot |
-| MOD-06 | Reception dashboard | P0 | MVP | **MỘT PHẦN** — FE có tìm phòng, báo giá, staff hold và danh sách hold theo chi nhánh; chưa có lịch booking xác nhận, check-in/out hay UAT |
-| MOD-07 | Customer web booking | P0 | MVP | **PROTOTYPE** — FE responsive với dữ liệu minh họa; public catalog, guest booking API và xử lý booking thật chưa có |
+| MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, xác nhận không cọc theo kênh, lưu snapshot, đọc booking và lịch booking xác nhận theo chi nhánh đã có; tính cọc, xác nhận có cọc, check-in/out còn thiếu |
+| MOD-05 | Deposit and payment | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — chỉ ghi nhận CASH thủ công, danh sách và tổng đã ghi nhận; chưa xác nhận cọc, chỉnh/đảo giao dịch hoặc đối soát phải thu/đã thu. Online payment ngoài pilot |
+| MOD-06 | Reception dashboard | P0 | MVP | **MỘT PHẦN** — FE có tìm phòng, báo giá, staff hold; BE có lịch booking xác nhận theo chi nhánh và ghi nhận CASH; check-in/out và browser FE–BE/UAT chưa có bằng chứng |
+| MOD-07 | Customer web booking | P0 | MVP | **IN PROGRESS** — FE đã nối catalog/availability/quote/terms; BE đã cấp atomic public hold, rate limit/idempotency, booking code và phone+code lookup. FE SIT đang nối contract; hold vẫn chờ nhân viên xác minh/xác nhận và chưa hỗ trợ cọc trước xác nhận |
 | MOD-08 | Zalo Mini App | P1 | Pilot | **CHƯA TÍCH HỢP** — quyền/SDK cần xác nhận; pilot channel approach phải được duyệt |
 | MOD-09 | Messenger chatbot/deep-link integration | P1 | Pilot | **CHƯA TÍCH HỢP** — chờ xác minh quyền Meta và lựa chọn luồng |
 | MOD-10 | CRM and loyalty | P1 | V1 | BACKLOG |
@@ -98,6 +98,8 @@ Enforce authorization in APIs and database queries, not just UI.
 | MOD-14 | Analytics and reporting | P1 | V1 | BACKLOG — observability kỹ thuật không đồng nghĩa báo cáo kinh doanh |
 | MOD-15 | AI recommendations | P2 | V2 | BACKLOG |
 | MOD-16 | POS/inventory integration | P2 | V2 | BACKLOG |
+
+Customer UAT scope was narrowed on 2026-11-26 (`UAT-PD-001`–`012`): multiple merchants; guest phone required/email optional; public availability/quote; guest submission remains a hold until staff phone verification and confirmation; no-deposit or manually recorded deposit before confirmation; one merchant-configured public terms text snapshotted on acceptance; lookup by phone plus booking code; web result with staff call fallback; audited Platform Admin listing approval; explicit conflict instead of automatic room substitution; rate limits by IP/phone, idempotency and strong booking code without CAPTCHA/OTP. Online payment, customer accounts/OTP, automated messaging, public self-cancellation/refund, waiting lists and automatic room substitution are outside this UAT.
 
 ### Business requirements
 
@@ -547,7 +549,7 @@ Các checkbox bên dưới phản ánh đúng trạng thái trong Decision Log t
 
 ### 13.1 Evidence-backed implementation progress
 
-Backend source, migrations, package and tests reside in `be/`; shared documentation remains in `docs/`. Pricing catalog, staff hold, contact and price snapshot, manual phone verification, buffered occupancy, TTL and expiry worker are implemented. BKG-005 includes atomic staff no-deposit confirmation and booking-by-ID read; case-level eligibility, deposit calculation, deposit-required confirmation and later transitions remain. Outbox uses claim-token fencing, redacted errors and retrying worker shutdown, with owner backlog visibility. Branch hold listing is not a confirmed-booking calendar. Production worker supervision/alerts remain. Verify passed and PostgreSQL Docker E2E passed 31/31 with Node 26, including 100 concurrent holds and concurrent confirmation.
+Backend source, migrations, package and tests reside in `be/`; shared documentation remains in `docs/`. Pricing, buffered occupancy, TTL/expiry, staff and public atomic holds, immutable quote/terms snapshots, IP/phone rate limiting, idempotency, strong booking code and non-enumerating guest lookup are implemented. Staff no-deposit confirmation, booking read/calendar and manual CASH recording have PostgreSQL E2E coverage. Public browse/search/quote/terms/hold require merchant publication plus independent platform approval. Platform Admin approval workflow, hold-level deposit and deposit-required confirmation remain absent. Check-in/out, payment correction/reconciliation and browser FE–BE validation remain incomplete. Checkout occupancy/buffer semantics are awaiting PO decision. Production trusted-proxy hop count must be set exactly for correct client-IP rate limiting.
 
 This section records repository evidence as of 2026-11-22. The checklist above distinguishes product decisions approved by the PO from technical/product approvals still open; neither is proof that an implementation exists.
 
@@ -565,7 +567,7 @@ This section records repository evidence as of 2026-11-22. The checklist above d
 | Requirement traceability | Matrix done | `docs/04-quality/requirement-traceability.md` maps FR-001–FR-015 to current APIs, automated evidence and proposed UAT cases; missing modules and unexecuted UAT remain explicit |
 | Payment, customer/reception frontends | Not implemented | Pilot defers online payment and records manual payments only (PD-007); provider/MoR selection remains post-pilot. Customer booking identity is guest-first, phone required with staff call verification, email optional (PD-010) |
 
-Verification executed on 2026-11-22: `npm run verify` passed build, 8/8 unit suites (19/19 tests), OpenAPI drift validation with 53 paths and generated API Markdown validation. `npm run test:e2e` passed 31/31 PostgreSQL Docker E2E tests, including no-deposit confirmation replay and expiry lock scenario, refresh/logout race, outbox worker and hold concurrency. FE–BE browser verification remains pending.
+Verification executed on 2026-11-26 with Node 26: `npm run verify` passed build, 8/8 unit suites (19/19 tests), 65-path OpenAPI drift and generated API Markdown checks. `npm run test:e2e` passed 33/33 PostgreSQL Docker E2E tests, including public visibility/availability/quote/terms/hold/lookup, rate limiting, confirmed-booking calendar, manual CASH idempotency/summary, tenant scope and role authorization. Backend E2E is not browser FE–BE verification. Browser automation is unavailable in the current environment, so role-based browser flows remain unverified.
 
 ## 14. Codex execution prompts
 

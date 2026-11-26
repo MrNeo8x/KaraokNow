@@ -1,0 +1,59 @@
+.room-card .room-icon {
+  width: 100%;
+  height: 126px;
+  border-radius: 12px;
+  background-image: url('/rooms/room-violet.svg');
+  background-position: center;
+  background-size: cover;
+  color: transparent;
+}
+
+.room-grid .room-card:nth-child(3n + 2) .room-icon { background-image: url('/rooms/room-rose.svg'); }
+.room-grid .room-card:nth-child(3n) .room-icon { background-image: url('/rooms/room-blue.svg'); }
+
+.choice-art {
+  position: relative;
+  padding: 0;
+  background: #291052;
+}
+
+.choice-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.choice-art span {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
+  max-width: calc(100% - 20px);
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgb(22 10 42 / 72%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customer-search { grid-template-columns: 2fr repeat(4, 1fr) auto; align-items: end; }
+.customer-search .primary { min-height: 44px; white-space: nowrap; }
+.quote-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; padding: 16px; border: 1px solid #e8e0f2; border-radius: 12px; }
+.customer-quote { display: grid; gap: 4px; margin-top: 16px; padding: 20px; border-radius: 14px; color: white; background: linear-gradient(125deg,#3b176b,#8b3fc4); }
+.customer-quote span,.customer-quote small { color: #eadbfa; }
+.customer-quote strong { font-size: 28px; }
+.customer-terms { margin-top: 20px; padding: 16px; border: 1px solid #e8e0f2; border-radius: 12px; background: #fcfaff; }
+.customer-terms summary { cursor: pointer; color: #5b21b6; font-weight: 800; }
+.customer-terms details p { white-space: pre-wrap; color: #4b4159; }
+.customer-terms .check-row { margin-top: 16px; }
+
+@media (max-width: 900px) {
+  .customer-search { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .customer-search label:first-child,.customer-search .primary { grid-column: 1 / -1; }
+}
+
+@media (max-width: 700px) {
+  .quote-actions { align-items: stretch; flex-direction: column; }
+  .quote-actions .primary { width: 100%; }
+}

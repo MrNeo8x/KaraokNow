@@ -44,6 +44,25 @@ No default is implied by this table. Code must not hard-code these decisions bef
 | PD-021 | Pilot geography | **Approved by PO 2026-11-22:** Hanoi is the pilot geography. Merchant count, exact districts and launch dates remain subject to supply readiness and separate planning. | Pilot recruitment and operations |
 | PD-022 | MVP scope and pilot gates | **Approved by PO 2026-11-22:** MVP scope is tenant/RBAC, branch-room setup, pricing/availability, booking and reception workflow, customer web booking, and manual payment recording. Online payment/provider/MoR is excluded from pilot. Pilot may start only after merchant data and access sign-off, booking/availability correctness and concurrency gates pass, customer and reception flows pass UAT, operational support/monitoring are ready, and selected pilot Merchants accept the workflow. Zalo/Messenger WebView entry and result messaging are conditional channel work: they require platform permission/technical verification and must not block a web-based pilot. Pilot scale and dates are not fixed by this decision. | MVP prioritization and pilot go/no-go |
 
+## Customer UAT scope decisions — 2026-11-26
+
+These decisions constrain the earliest customer UAT. Capabilities not listed as approved remain outside the UAT unless separately approved.
+
+| ID | UAT subject | PO decision | Implementation consequence |
+|---|---|---|---|
+| UAT-PD-001 | Booking confirmation | **Approved: option 1A.** Staff calls the customer to verify, then staff confirms the booking. | Public submission creates a hold/request; it must not self-confirm. Reuse the existing staff phone-verification audit and authorized confirmation path. |
+| UAT-PD-002 | Deposit during UAT | **Approved: option 2B.** UAT supports no-deposit bookings and manually recorded deposits before confirmation when the merchant policy requires a deposit. | Add hold-level deposit recording because the current manual-payment API requires an already confirmed booking. No online payment/provider integration. Deposit sufficiency must be derived from the snapshotted fixed/percentage policy and exact quote total. |
+| UAT-PD-003 | Guest identity | **Approved: option 3A.** Phone is required, email is optional, and no customer account is required. | Aligns with PD-010; do not add account registration or automated OTP to this UAT. |
+| UAT-PD-004 | Public-hold abuse protection | **Approved: option 4A.** Apply rate limits by IP address and normalized phone number, require an idempotency key for hold creation, and use a strong booking code; do not add CAPTCHA or OTP. | Store only keyed hashes for rate-limit/lookup keys, keep thresholds configurable, return non-enumerating errors and audit security blocks without logging raw phone/IP values. |
+| UAT-PD-005 | Public cancellation terms | **Approved: option 5A.** Merchant configures one public terms text; customer explicitly accepts it and the exact text is snapshotted. | Add versioned merchant public terms configuration and acceptance evidence to the guest hold/booking path. Do not build a template/rules engine. |
+| UAT-PD-006 | Guest booking lookup | **Approved: option 6B.** Customer supplies phone plus booking code; no account is required. | Booking code must be high entropy or separately protected; lookup attempts require the abuse-control decision in UAT-PD-004 and must not reveal whether a phone exists. |
+| UAT-PD-007 | Customer notification | **Approved: option 7A.** Show the result on the web; staff calls when needed. | Automated ZNS/SMS/email delivery is not an UAT prerequisite. |
+| UAT-PD-008 | Customer cancellation | **Use already approved PD-006/PD-015 unless PO overrides it:** customer contacts the branch and authorized staff records the reviewed outcome; no automatic refund decision. | No public self-cancel/refund automation in the earliest UAT. |
+| UAT-PD-009 | Platform listing approval | **Approved: option 9B.** Provide Platform Admin API and UI to approve merchant publication. | Introduce an explicit platform role and audited approval workflow; merchant users cannot approve themselves. Keep scope to listing approval only. |
+| UAT-PD-010 | UAT merchant scale | **Approved: option 10C.** Support multiple merchants. | UAT data, admin approval and test evidence must prove tenant separation; this does not add multi-region or automated merchant onboarding. |
+| UAT-PD-011 | Hold TTL | **Use existing approved PD-003 unless PO overrides it:** merchant configures TTL per channel, default 15 minutes. | No separate UAT-only TTL setting is needed. |
+| UAT-PD-012 | Conflict during confirmation | **Approved: option 12A.** Return a conflict and ask the customer/staff to select again. | Do not auto-substitute another room and do not add a waiting list. |
+
 ## PO decision questions and options
 
 The options below are proposals for PO discussion. **No option is approved by being listed or recommended.** Select one option per question or replace it with a written rule. Decisions affecting legal, payment or customer-data obligations should be checked with the relevant specialist before implementation.

@@ -10,7 +10,7 @@ npm ci
 npm run dev
 ```
 
-Next.js runs on port 3001 and rewrites `/v1` to `http://localhost:3000` by default. Set server-side `BACKEND_API_ORIGIN` for another backend origin. Use Node 24 or newer, and run `npm run build` to build. Webpack is used for builds because this environment blocks Turbopack's internal port.
+Next.js runs on port 3100 and rewrites `/v1` to `http://localhost:3000` by default. Port 3100 is used because Dolphin Anty reserves port 3001 on the current UAT machine. Set server-side `BACKEND_API_ORIGIN` for another backend origin. Use Node 24 or newer, and run `npm run build` to build. Webpack is used for builds because this environment blocks Turbopack's internal port.
 
 Run `npm test` for API-client contract unit tests. `.github/workflows/frontend-ci.yml` runs install, tests and build independently of backend CI; browser and live FE–BE tests are not yet configured.
 
@@ -18,17 +18,17 @@ Run `npm test` for API-client contract unit tests. `.github/workflows/frontend-c
 
 - Merchant: login, forced password change, logout, in-memory scheduled token refresh, tenant ID selection, branch/room reads and creation, branch name/timezone and room name/capacity edits, and branch/room status changes use the backend API. Session stays in memory; reload requires login. Live browser tests for refresh/logout races and tenant discovery remain backlog. Backend enforces role and branch permissions.
 - Room amenities can be listed, added, edited and deleted through the existing backend API. Browser integration and role-based UAT are still pending.
-- Room media metadata can be listed/created/updated/deleted; no binary upload or actual image display. Branch maintenance blocks can be listed/created/released and their reason and time interval edited.
+- Room media metadata can be listed/created/updated/deleted. Merchant and customer room cards currently display a bundled set of fixed room illustrations; binary upload and storage-backed display are deferred. Branch maintenance blocks can be listed/created/released and their reason and time interval edited.
 - Merchant users can query room availability and request a quote for the selected interval. Search does not create a hold.
-- Staff can create a `WALK_IN` hold, retry the same request and look up a known hold UUID. After lookup, staff can fetch a current quote, attach phone/optional email and price snapshot, and record a successful verification call. These actions do not confirm a booking. The retry key and request are saved in sessionStorage before sending, scoped by user/tenant/branch, and can be restored manually in the same tab after reload and login. No token or customer data is stored there. Recovery after closing the tab/storage deletion and browser/backend integration tests remain pending.
-- Staff can list holds for the selected branch and an explicit time interval with pagination. This list is not a confirmed-booking calendar; expired status does not itself release occupancy.
+- Staff can create a `WALK_IN` hold, retry the same request and look up a known hold UUID. After lookup, staff can fetch a current quote, attach phone/optional email and price snapshot, record a successful verification call, and confirm an eligible no-deposit hold with the agreed cancellation terms. The retry key and request are saved in sessionStorage before sending, scoped by user/tenant/branch, and can be restored manually in the same tab after reload and login. No token or customer data is stored there. Recovery after closing the tab/storage deletion and browser/backend integration tests remain pending.
+- Staff can list holds and confirmed bookings for the selected branch and explicit time intervals. Owner, Branch Manager and Cashier roles can read the exact manual-cash summary and record an idempotent cash entry. Check-in/out, cancellation outcomes and payment sufficiency remain backend dependencies.
 - API errors use the backend error envelope, display safe validation details and correlation ID, and suppress server-side details for 5xx responses. Contract: `../docs/02-architecture/api-reference.md` and `../docs/02-architecture/api-error-contract.md`.
 - Duration and cleanup buffer policies, price plan list/create/update, special-date management and price rule list/create/edit use existing APIs. Rules can select a room across accessible branches or a special date; an existing room reference is retained during list changes. Live browser/role verification remains pending.
 - Hold TTL can be read and configured by channel through the existing Owner/Branch Manager API; changes apply to new holds.
 - No-deposit confirmation can be read/configured by channel; unconfigured remains distinct from false. This is not booking confirmation.
 - Deposit mode can be read/configured by channel as NONE, FIXED or PERCENT; unconfigured is shown distinctly. This does not collect payment or confirm a booking.
 - Routes: `/` is the landing page, `/merchant` is the Merchant portal, and `/booking` is the customer experience.
-- Customer: mobile-first location, date, time and room selection uses explicitly labeled demonstration data. It cannot create a booking; public booking/hold APIs remain dependencies.
+- Customer: mobile-first location, date, time, duration and guest selection reads approved branches from the public catalog, finds live available rooms, filters by capacity and displays a backend quote. It reads versioned public terms and keeps the exact terms/version snapshot when accepted. Guest hold/lookup is still absent from OpenAPI, so the page does not submit a booking.
 - Delivery sequence and backend dependencies are in `../docs/02-architecture/frontend-implementation-plan.md`.
 
 ## Architecture contract
@@ -40,4 +40,4 @@ Run `npm test` for API-client contract unit tests. `.github/workflows/frontend-c
 - Customer booking UI must work in a normal mobile browser and may also be hosted in Zalo/Messenger WebView. Chat integrations are conditional on platform approval.
 - Source organization (separate repository versus monorepo/workspace) is not yet decided; this directory is the current project boundary.
 
-Customer demonstration data is not a live booking service. Merchant session is in memory and is cleared when navigating away or reloading.
+The public catalog is not yet a live booking service. Merchant session is in memory and is cleared when navigating away or reloading.

@@ -8,5 +8,6 @@ import { AvailabilityPolicyService } from './availability-policy.service';
 import { AvailabilitySearchService } from './availability-search.service';
 
 @Module({ imports: [AuthModule], controllers: [RoomBlockController, AvailabilityPolicyController],
-  providers: [RoomBlockService, AvailabilityPolicyService, AvailabilitySearchService, TenantGuard] })
+  providers: [RoomBlockService, AvailabilityPolicyService, AvailabilitySearchService, TenantGuard],
+  exports: [AvailabilitySearchService] })
 export class AvailabilityModule {}

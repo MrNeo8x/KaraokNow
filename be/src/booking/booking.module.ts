@@ -15,6 +15,8 @@ import { BookingReadController, BranchBookingController, ConfirmationController 
 import { ConfirmationService } from './confirmation.service';
 import { ManualPaymentController } from './manual-payment.controller';
 import { ManualPaymentService } from './manual-payment.service';
+import { PublicBookingController } from './public-booking.controller';
+import { PublicBookingService } from './public-booking.service';
 
-@Module({ imports: [AuthModule, PricingModule], controllers: [HoldTtlController, HoldController, BranchHoldController, NoDepositPolicyController, DepositPolicyController, HoldExpiryStatusController, ConfirmationController, BookingReadController, BranchBookingController, ManualPaymentController], providers: [HoldTtlService, HoldService, NoDepositPolicyService, DepositPolicyService, ConfirmationService, ManualPaymentService, TenantGuard] })
+@Module({ imports: [AuthModule, PricingModule], controllers: [HoldTtlController, HoldController, BranchHoldController, NoDepositPolicyController, DepositPolicyController, HoldExpiryStatusController, ConfirmationController, BookingReadController, BranchBookingController, ManualPaymentController, PublicBookingController], providers: [HoldTtlService, HoldService, NoDepositPolicyService, DepositPolicyService, ConfirmationService, ManualPaymentService, PublicBookingService, TenantGuard] })
 export class BookingModule {}

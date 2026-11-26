@@ -22,3 +22,7 @@ export class ManualPaymentListDto {
   @ApiProperty() offset!: number;
   @ApiProperty() hasMore!: boolean;
 }
+export class ManualPaymentSummaryDto {
+  @ApiProperty({ description: 'Sum of recorded payments in VND; decimal string to preserve integer precision' }) totalRecordedVnd!: string;
+  @ApiProperty({ description: 'Number of recorded manual payment entries' }) paymentCount!: number;
+}

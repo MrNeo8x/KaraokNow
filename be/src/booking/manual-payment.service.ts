@@ -22,6 +22,11 @@ export class ManualPaymentService {
     const rows = (await this.db.query(`SELECT ${fields} FROM manual_payments WHERE tenant_id=$1 AND booking_id=$2 ORDER BY recorded_at,id LIMIT $3 OFFSET $4`, [actor.tenantId,bookingId,limit+1,offset])).rows;
     return { items: rows.slice(0,limit), limit, offset, hasMore: rows.length > limit };
   }
+  async summary(actor: Actor, bookingId: string) {
+    await this.booking(this.db, actor, bookingId);
+    const row = (await this.db.query(`SELECT COALESCE(SUM(amount_vnd),0)::text AS "totalRecordedVnd",COUNT(*)::int AS "paymentCount" FROM manual_payments WHERE tenant_id=$1 AND booking_id=$2`, [actor.tenantId, bookingId])).rows[0];
+    return row;
+  }
   async record(actor: Actor, bookingId: string, key: string, dto: RecordManualPaymentDto) {
     if (!key || !/^[\x21-\x7e]{1,100}$/.test(key)) throw new BadRequestException('Idempotency-Key must contain 1–100 visible ASCII characters');
     if (BigInt(dto.amountVnd) > 9223372036854775807n) throw new UnprocessableEntityException('Amount exceeds database limit');
