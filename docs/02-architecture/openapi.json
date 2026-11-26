@@ -3393,6 +3393,154 @@
         ]
       }
     },
+    "/v1/merchant/booking/bookings/{id}/check-in": {
+      "post": {
+        "operationId": "BookingLifecycleController_checkIn",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CONFIRMED -> CHECKED_IN, or replay when already checked in. No time window is enforced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Booking is not CONFIRMED"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/v1/merchant/booking/bookings/{id}/check-out": {
+      "post": {
+        "operationId": "BookingLifecycleController_checkOut",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CHECKED_IN -> COMPLETED with actual end time, or replay. Early check-out shortens the reservation to actual end + cleanup buffer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Booking is not CHECKED_IN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/v1/merchant/booking/bookings/{id}/outcome": {
+      "post": {
+        "operationId": "BookingLifecycleController_recordOutcome",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBookingOutcomeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CONFIRMED -> CANCELLED or NO_SHOW with the staff-reviewed outcome; room is released. Same body replays",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Booking not CONFIRMED, a different outcome already recorded, or refund above recorded deposits plus payments"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
     "/v1/merchant/catalog/publication": {
       "get": {
         "operationId": "CatalogPublicationController_get",
@@ -5413,7 +5561,9 @@
           "depositMode": {
             "type": "string",
             "enum": [
-              "NONE"
+              "NONE",
+              "FIXED",
+              "PERCENT"
             ]
           },
           "depositPolicyVersion": {
@@ -5422,12 +5572,19 @@
           },
           "noDepositAllowed": {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "description": "True for the no-deposit path; false when a deposit was required and covered"
           },
           "noDepositPolicyVersion": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
+          },
+          "requiredDepositVnd": {
+            "type": "string",
+            "description": "Deposit-required path only"
+          },
+          "depositRecordedVnd": {
+            "type": "string",
+            "description": "Deposit-required path only: hold deposits recorded at confirmation"
           }
         },
         "required": [
@@ -5435,6 +5592,41 @@
           "depositPolicyVersion",
           "noDepositAllowed",
           "noDepositPolicyVersion"
+        ]
+      },
+      "BookingOutcomeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER_CANCELLED",
+              "MERCHANT_CANCELLED",
+              "NO_SHOW"
+            ]
+          },
+          "note": {
+            "type": "string"
+          },
+          "refundAmountVnd": {
+            "type": "string",
+            "description": "CASH refund recorded by staff; \"0\" when none"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "type",
+          "note",
+          "refundAmountVnd",
+          "recordedBy",
+          "recordedAt"
         ]
       },
       "BookingResponseDto": {
@@ -5500,7 +5692,11 @@
           "status": {
             "type": "string",
             "enum": [
-              "CONFIRMED"
+              "CONFIRMED",
+              "CHECKED_IN",
+              "COMPLETED",
+              "CANCELLED",
+              "NO_SHOW"
             ]
           },
           "confirmedBy": {
@@ -5510,6 +5706,37 @@
           "confirmedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "checkedInAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "checkedInBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "checkedOutAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Actual end of use; may be before or after the scheduled end"
+          },
+          "checkedOutBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "outcome": {
+            "nullable": true,
+            "description": "Staff-recorded cancellation/no-show outcome",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BookingOutcomeDto"
+              }
+            ]
           }
         },
         "required": [
@@ -5531,7 +5758,12 @@
           "confirmationPolicySnapshot",
           "status",
           "confirmedBy",
-          "confirmedAt"
+          "confirmedAt",
+          "checkedInAt",
+          "checkedInBy",
+          "checkedOutAt",
+          "checkedOutBy",
+          "outcome"
         ]
       },
       "BookingListResponseDto": {
@@ -5815,6 +6047,18 @@
             "nullable": true,
             "format": "uuid"
           },
+          "bookingStatus": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CONFIRMED",
+              "CHECKED_IN",
+              "COMPLETED",
+              "CANCELLED",
+              "NO_SHOW"
+            ],
+            "description": "Booking status once staff confirmed the hold"
+          },
           "branchId": {
             "type": "string",
             "format": "uuid"
@@ -5856,6 +6100,7 @@
         "required": [
           "holdId",
           "bookingId",
+          "bookingStatus",
           "branchId",
           "roomId",
           "startAt",
@@ -5993,6 +6238,33 @@
         "required": [
           "method",
           "amountVnd"
+        ]
+      },
+      "RecordBookingOutcomeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "CUSTOMER_CANCELLED",
+              "MERCHANT_CANCELLED",
+              "NO_SHOW"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Staff review note, required (PD-015)"
+          },
+          "refundAmountVnd": {
+            "type": "string",
+            "description": "CASH refund already handed back, decimal VND; must not exceed recorded deposits plus payments. Staff decides; never computed",
+            "example": "0"
+          }
+        },
+        "required": [
+          "type",
+          "note"
         ]
       },
       "PublicationResponseDto": {

@@ -7,6 +7,7 @@ import { ConfirmHoldDto } from './confirmation.dto';
 import { ListHoldsDto } from './hold.dto';
 import type { DepositPolicySnapshot } from './deposit-snapshot';
 import { HoldDepositService } from './hold-deposit.service';
+import { BOOKING_SELECT, toBooking } from './booking-read';
 
 @Injectable()
 export class ConfirmationService {
@@ -20,26 +21,16 @@ export class ConfirmationService {
     if (!(await this.db.query('SELECT id FROM branches WHERE tenant_id=$1 AND id=$2', [actor.tenantId, branchId])).rowCount) throw new NotFoundException('Branch not found');
     if (!actor.roles.includes('OWNER') && !actor.branchIds.includes(branchId)) throw new ForbiddenException('Branch access denied');
     const limit = query.limit ?? 50, offset = query.offset ?? 0;
-    const rows = (await this.db.query(`SELECT b.id,b.hold_id AS "holdId",b.branch_id AS "branchId",b.room_id AS "roomId",b.channel,b.start_at AS "startAt",
-      b.duration_minutes AS "durationMinutes",b.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",
-      b.customer_phone AS "customerPhone",b.customer_email AS "customerEmail",b.phone_verified_at AS "phoneVerifiedAt",b.phone_verified_by AS "phoneVerifiedBy",
-      b.price_snapshot AS "priceSnapshot",b.cancellation_terms AS "cancellationTerms",b.confirmation_policy_snapshot AS "confirmationPolicySnapshot",
-      b.status,b.confirmed_by AS "confirmedBy",b.confirmed_at AS "confirmedAt"
-      FROM bookings b JOIN room_occupancy o ON o.id=b.occupancy_id WHERE b.tenant_id=$1 AND b.branch_id=$2
+    const rows = (await this.db.query(`${BOOKING_SELECT} WHERE b.tenant_id=$1 AND b.branch_id=$2
       AND b.start_at<$4::timestamptz AND b.start_at+(b.duration_minutes*interval '1 minute')>$3::timestamptz
       ORDER BY b.start_at,b.id LIMIT $5 OFFSET $6`, [actor.tenantId, branchId, from.toISOString(), to.toISOString(), limit + 1, offset])).rows;
-    return { items: rows.slice(0, limit), limit, offset, hasMore: rows.length > limit };
+    return { items: rows.slice(0, limit).map(toBooking), limit, offset, hasMore: rows.length > limit };
   }
   async get(actor: Actor, id: string) {
-    const row = (await this.db.query(`SELECT b.id,b.hold_id AS "holdId",b.branch_id AS "branchId",b.room_id AS "roomId",b.channel,b.start_at AS "startAt",
-      b.duration_minutes AS "durationMinutes",b.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",
-      b.customer_phone AS "customerPhone",b.customer_email AS "customerEmail",b.phone_verified_at AS "phoneVerifiedAt",b.phone_verified_by AS "phoneVerifiedBy",
-      b.price_snapshot AS "priceSnapshot",b.cancellation_terms AS "cancellationTerms",b.confirmation_policy_snapshot AS "confirmationPolicySnapshot",
-      b.status,b.confirmed_by AS "confirmedBy",b.confirmed_at AS "confirmedAt"
-      FROM bookings b JOIN room_occupancy o ON o.id=b.occupancy_id WHERE b.tenant_id=$1 AND b.id=$2`, [actor.tenantId, id])).rows[0];
+    const row = (await this.db.query(`${BOOKING_SELECT} WHERE b.tenant_id=$1 AND b.id=$2`, [actor.tenantId, id])).rows[0];
     if (!row) throw new NotFoundException('Booking not found');
     if (!actor.roles.includes('OWNER') && !actor.branchIds.includes(row.branchId)) throw new ForbiddenException('Branch access denied');
-    return row;
+    return toBooking(row);
   }
   async confirm(actor: Actor, holdId: string, dto: ConfirmHoldDto) {
     const client = await this.db.connect();
@@ -101,11 +92,6 @@ export class ConfirmationService {
     finally { client.release(); }
   }
   private async findByHold(client: PoolClient, tenant: string, holdId: string) {
-    return (await client.query(`SELECT b.id,b.hold_id AS "holdId",b.branch_id AS "branchId",b.room_id AS "roomId",b.channel,b.start_at AS "startAt",
-      b.duration_minutes AS "durationMinutes",b.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",
-      b.customer_phone AS "customerPhone",b.customer_email AS "customerEmail",b.phone_verified_at AS "phoneVerifiedAt",b.phone_verified_by AS "phoneVerifiedBy",
-      b.price_snapshot AS "priceSnapshot",b.cancellation_terms AS "cancellationTerms",b.confirmation_policy_snapshot AS "confirmationPolicySnapshot",
-      b.status,b.confirmed_by AS "confirmedBy",b.confirmed_at AS "confirmedAt"
-      FROM bookings b JOIN room_occupancy o ON o.id=b.occupancy_id WHERE b.tenant_id=$1 AND b.hold_id=$2`, [tenant, holdId])).rows[0];
+    return (await client.query(`${BOOKING_SELECT} WHERE b.tenant_id=$1 AND b.hold_id=$2`, [tenant, holdId])).rows.map(toBooking)[0];
   }
 }

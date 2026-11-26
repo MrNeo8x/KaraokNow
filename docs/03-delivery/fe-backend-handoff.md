@@ -40,6 +40,16 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 35/35:
 - Public hold và lookup có thêm `depositRequiredVnd`; lookup có `depositRecordedVnd`. FE khách hiển thị số cọc cần đóng tại quầy, không có thanh toán online.
 - Giả định chờ PO xác nhận: FIXED lớn hơn tổng tiền thì cọc bằng tổng tiền; PERCENT làm tròn lên đến đồng; không cho ghi cọc vượt số còn thiếu. Hoàn cọc khi hold hết hạn chưa có API — xử lý ngoài hệ thống.
 
+## FE READY — check-in, check-out và hủy/no-show (FR-009/010, CAN-002, 2026-11-26)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 36/36. Quyết định PO: PD-025…PD-028.
+
+- Booking response có thêm `checkedInAt`, `checkedInBy`, `checkedOutAt`, `checkedOutBy`, `outcome: {type,note,refundAmountVnd,recordedBy,recordedAt}|null`; `status` ∈ `CONFIRMED|CHECKED_IN|COMPLETED|CANCELLED|NO_SHOW`. Lịch chi nhánh trả mọi trạng thái — FE tự lọc/hiển thị.
+- `POST /v1/merchant/booking/bookings/{id}/check-in` (Owner, Branch Manager, Receptionist): CONFIRMED → CHECKED_IN, không giới hạn giờ. Gọi lại khi đã CHECKED_IN trả 200 như cũ; trạng thái khác 409.
+- `POST .../check-out` (cùng quyền): CHECKED_IN → COMPLETED, ghi giờ thực tế. Về sớm: `reservedEndAt` rút về giờ check-out + buffer, phòng mở lại. Về muộn: chỉ ghi giờ, không tính overtime.
+- `POST .../outcome` (Owner, Branch Manager), body `{type:"CUSTOMER_CANCELLED"|"MERCHANT_CANCELLED"|"NO_SHOW", note, refundAmountVnd?}`: chỉ từ CONFIRMED; phòng được giải phóng ngay. Mỗi booking một kết quả; gửi lại đúng body trả 200, body khác 409. `refundAmountVnd` là số tiền mặt nhân viên đã hoàn, không vượt tổng cọc trên hold + CASH đã ghi; hệ thống không tự tính.
+- Public lookup có thêm `bookingStatus` để khách thấy booking đã check-in, hoàn tất, bị hủy hay no-show.
+
 ## FE READY — Platform Admin duyệt listing (PLT-001, 2026-11-26)
 
 - Platform Admin là quyền toàn hệ thống, **không gửi `X-Tenant-ID`**. Chỉ cấp qua dữ liệu (`platform_admins`), không có API cấp quyền. UAT seed tạo `uat.platform@karaokenow.local`.
@@ -59,7 +69,7 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 35/35:
 
 - Staff API hiện có quote/availability, tạo và đọc hold, danh sách hold theo chi nhánh, gắn số điện thoại/email cùng snapshot giá, và ghi nhận nhân viên gọi xác minh. API danh sách chỉ trả hold; nó không phải lịch booking đầy đủ. `holds:expire` cần chạy riêng.
 - Đã có `POST /v1/merchant/booking/holds/{id}/confirm` cho nhân viên xác nhận **không cọc** khi hold còn hiệu lực, có liên hệ, snapshot giá và xác minh điện thoại, chính sách cọc là NONE và merchant đã cho phép xác nhận không cọc theo kênh. Body có `cancellationTerms` là điều khoản đã hiển thị cho khách; response 200 trả booking. Replay cùng điều khoản trả cùng booking; điều khoản khác hoặc không đủ điều kiện trả 409. `GET /v1/merchant/booking/bookings/{id}` đọc booking trong phạm vi tenant/chi nhánh.
-- Đã có `GET /v1/merchant/branches/{branchId}/booking/bookings` lọc theo `from`/`to` có múi giờ và phân trang. Đây là danh sách booking; khi ghép với danh sách hold, loại hold `CONFIRMED` để tránh trùng. Các trạng thái check-in/check-out chưa có.
+- Đã có `GET /v1/merchant/branches/{branchId}/booking/bookings` lọc theo `from`/`to` có múi giờ và phân trang. Đây là danh sách booking; khi ghép với danh sách hold, loại hold `CONFIRMED` để tránh trùng. Trạng thái check-in/check-out/hủy/no-show đã có (xem marker FE READY phía trên).
 - Đã có GET/POST `/v1/merchant/booking/bookings/{id}/manual-payments` cho Owner, Branch Manager và Cashier; hiện chỉ ghi từng khoản `CASH` của booking đã xác nhận, dùng idempotency key. `GET .../summary` trả tổng khoản đã ghi và số giao dịch chính xác. Đây chưa phải đối soát sổ quỹ: chưa có hoàn/void, điều chỉnh hay trạng thái phải thu/đã thu; chưa xác nhận booking có cọc.
 - Catalog công khai chỉ trả merchant đã `published=true` và được duyệt riêng `platformApproved=true`. FE khách dùng public branches/rooms, availability và quote như mô tả trong OpenAPI. Public hold và lookup đã sẵn sàng ở marker FE READY phía trên; hold không tự xác nhận. API Platform Admin approval và xác nhận booking có cọc đã sẵn sàng ở các marker FE READY phía trên.
 - Owner cấu hình một nội dung điều khoản UAT tại `GET/PATCH /v1/merchant/catalog/public-booking-terms`; khách đọc `GET /v1/public/branches/{branchId}/booking-terms`. Response `{configured,terms,version,updatedAt}`; FE phải giữ `version` cùng nội dung khách đã tick đồng ý để gửi vào public hold sau khi contract đó được cấp. Không tự dùng nội dung mới nếu version khách đã xem thay đổi.
@@ -67,7 +77,7 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 35/35:
 
 ## Ưu tiên tiếp theo
 
-1. FE: màn ghi cọc tiền mặt trên hold, hiển thị số cọc còn thiếu trước khi xác nhận; màn Platform Admin duyệt/thu hồi listing. BE: check-in/check-out và hủy booking (CAN-002).
+1. FE: màn ghi cọc tiền mặt trên hold, hiển thị số cọc còn thiếu trước khi xác nhận; màn Platform Admin duyệt/thu hồi listing. BE: overtime và đối soát sổ quỹ khi PO chốt.
 2. FE có thể tích hợp lịch booking, hiển thị tổng tiền mặt đã ghi nhận và ghi tiền mặt cơ bản; BE tiếp tục trạng thái check-in/check-out và xác nhận có cọc sau quyết định chính sách.
 3. FE có thể nối public catalog → availability → quote → terms → hold → lookup theo OpenAPI. Hiển thị `depositRequiredVnd` cho khách sau khi tạo hold.
 4. FE: kiểm thử refresh/logout, mất mạng, reload, quyền từng vai trò và tenant/chi nhánh với backend thật khi môi trường trình duyệt sẵn sàng.

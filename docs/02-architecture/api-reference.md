@@ -1769,6 +1769,70 @@ Response được khai báo:
 | 200 | Recorded deposit or matching replay | {"$ref":"#/components/schemas/HoldDepositEntryDto"} |
 | 409 | Hold inactive, no snapshot, no deposit required, amount above remaining, or idempotency conflict | Chưa khai báo schema |
 
+### POST /v1/merchant/booking/bookings/{id}/check-in
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | CONFIRMED -> CHECKED_IN, or replay when already checked in. No time window is enforced | {"$ref":"#/components/schemas/BookingResponseDto"} |
+| 409 | Booking is not CONFIRMED | Chưa khai báo schema |
+
+### POST /v1/merchant/booking/bookings/{id}/check-out
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | CHECKED_IN -> COMPLETED with actual end time, or replay. Early check-out shortens the reservation to actual end + cleanup buffer | {"$ref":"#/components/schemas/BookingResponseDto"} |
+| 409 | Booking is not CHECKED_IN | Chưa khai báo schema |
+
+### POST /v1/merchant/booking/bookings/{id}/outcome
+
+Nhóm: bookings
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/RecordBookingOutcomeDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | CONFIRMED -> CANCELLED or NO_SHOW with the staff-reviewed outcome; room is released. Same body replays | {"$ref":"#/components/schemas/BookingResponseDto"} |
+| 409 | Booking not CONFIRMED, a different outcome already recorded, or refund above recorded deposits plus payments | Chưa khai báo schema |
+
 ### GET /v1/merchant/catalog/publication
 
 Nhóm: merchant catalog
@@ -3737,7 +3801,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "depositMode": {
       "type": "string",
       "enum": [
-        "NONE"
+        "NONE",
+        "FIXED",
+        "PERCENT"
       ]
     },
     "depositPolicyVersion": {
@@ -3746,12 +3812,19 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "noDepositAllowed": {
       "type": "boolean",
-      "enum": [
-        true
-      ]
+      "description": "True for the no-deposit path; false when a deposit was required and covered"
     },
     "noDepositPolicyVersion": {
-      "type": "string"
+      "type": "string",
+      "nullable": true
+    },
+    "requiredDepositVnd": {
+      "type": "string",
+      "description": "Deposit-required path only"
+    },
+    "depositRecordedVnd": {
+      "type": "string",
+      "description": "Deposit-required path only: hold deposits recorded at confirmation"
     }
   },
   "required": [
@@ -3759,6 +3832,46 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "depositPolicyVersion",
     "noDepositAllowed",
     "noDepositPolicyVersion"
+  ]
+}
+```
+
+### BookingOutcomeDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER_CANCELLED",
+        "MERCHANT_CANCELLED",
+        "NO_SHOW"
+      ]
+    },
+    "note": {
+      "type": "string"
+    },
+    "refundAmountVnd": {
+      "type": "string",
+      "description": "CASH refund recorded by staff; \"0\" when none"
+    },
+    "recordedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "type",
+    "note",
+    "refundAmountVnd",
+    "recordedBy",
+    "recordedAt"
   ]
 }
 ```
@@ -3829,7 +3942,11 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "status": {
       "type": "string",
       "enum": [
-        "CONFIRMED"
+        "CONFIRMED",
+        "CHECKED_IN",
+        "COMPLETED",
+        "CANCELLED",
+        "NO_SHOW"
       ]
     },
     "confirmedBy": {
@@ -3839,6 +3956,37 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "confirmedAt": {
       "type": "string",
       "format": "date-time"
+    },
+    "checkedInAt": {
+      "type": "string",
+      "nullable": true,
+      "format": "date-time"
+    },
+    "checkedInBy": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
+    },
+    "checkedOutAt": {
+      "type": "string",
+      "nullable": true,
+      "format": "date-time",
+      "description": "Actual end of use; may be before or after the scheduled end"
+    },
+    "checkedOutBy": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
+    },
+    "outcome": {
+      "nullable": true,
+      "description": "Staff-recorded cancellation/no-show outcome",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/BookingOutcomeDto"
+        }
+      ]
     }
   },
   "required": [
@@ -3860,7 +4008,12 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "confirmationPolicySnapshot",
     "status",
     "confirmedBy",
-    "confirmedAt"
+    "confirmedAt",
+    "checkedInAt",
+    "checkedInBy",
+    "checkedOutAt",
+    "checkedOutBy",
+    "outcome"
   ]
 }
 ```
@@ -4189,6 +4342,18 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "nullable": true,
       "format": "uuid"
     },
+    "bookingStatus": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "CONFIRMED",
+        "CHECKED_IN",
+        "COMPLETED",
+        "CANCELLED",
+        "NO_SHOW"
+      ],
+      "description": "Booking status once staff confirmed the hold"
+    },
     "branchId": {
       "type": "string",
       "format": "uuid"
@@ -4230,6 +4395,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "holdId",
     "bookingId",
+    "bookingStatus",
     "branchId",
     "roomId",
     "startAt",
@@ -4382,6 +4548,38 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "method",
     "amountVnd"
+  ]
+}
+```
+
+### RecordBookingOutcomeDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": [
+        "CUSTOMER_CANCELLED",
+        "MERCHANT_CANCELLED",
+        "NO_SHOW"
+      ]
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Staff review note, required (PD-015)"
+    },
+    "refundAmountVnd": {
+      "type": "string",
+      "description": "CASH refund already handed back, decimal VND; must not exceed recorded deposits plus payments. Staff decides; never computed",
+      "example": "0"
+    }
+  },
+  "required": [
+    "type",
+    "note"
   ]
 }
 ```

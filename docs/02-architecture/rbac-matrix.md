@@ -15,6 +15,8 @@ This is the conservative authorization baseline implemented for the current venu
 | Publish merchant catalog (does not approve listing for marketplace) | Yes | No | No | No |
 | Read hold deposit status in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | Assigned only |
 | Record CASH deposit on an active hold | Yes, all tenant branches | Assigned only | No | Assigned only |
+| Check in / check out a booking | Yes, all tenant branches | Assigned only | Assigned only | No |
+| Record cancellation / no-show outcome and CASH refund | Yes, all tenant branches | Assigned only | No | No |
 
 Platform listing approval is outside the merchant matrix. `GET /v1/platform/catalog/listings` and approve/revoke require a global, non-revoked `platform_admins` grant (no `X-Tenant-ID`), provisioned only through data. A Platform Admin who has an active membership in the target tenant is rejected, so merchant users cannot approve their own listing.
 

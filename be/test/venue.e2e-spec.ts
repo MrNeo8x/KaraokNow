@@ -1197,6 +1197,98 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(audit.rows[1].after_data).toMatchObject({ platformApproved: false, note: 'Thông tin chi nhánh chưa đúng' });
   });
 
+  it('checks in, checks out (shortening early departures) and records staff-reviewed cancellation and no-show outcomes', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'LIFECYCLE', name: 'Lifecycle branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'LIFE-R', name: 'Lifecycle room', capacity: 8 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'LIFE-PLAN', name: 'Lifecycle plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Lifecycle plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'LIFE-RULE', name: 'Price', priority: 997, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/LIFE_TEST').send({ allowed: true }).expect(200);
+    const minuteIso = (offsetMinutes: number) => new Date(Math.floor(Date.now() / 60000) * 60000 + offsetMinutes * 60000).toISOString();
+    const createHold = (key: string, startAt: string) => authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', key)
+      .send({ roomId: room.id, channel: 'LIFE_TEST', startAt, durationMinutes: 90 });
+    const confirmBooking = async (key: string, startAt: string) => {
+      const hold = (await createHold(key, startAt).expect(201)).body;
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '100000' }).expect(200);
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+      return (await authorized('post', `/v1/merchant/booking/holds/${hold.id}/confirm`).send({ cancellationTerms: 'Liên hệ cơ sở để hủy.' }).expect(200)).body;
+    };
+    const path = (id: string, action: string) => `/v1/merchant/booking/bookings/${id}/${action}`;
+    const occupancy = async (bookingId: string) => (await pool.query(`SELECT o.status,upper(o.occupied_range) AS upper FROM bookings b JOIN room_occupancy o ON o.id=b.occupancy_id WHERE b.id=$1`, [bookingId])).rows[0];
+
+    // Early departure: in use now, leaves before the scheduled end.
+    const current = await confirmBooking('life-current', minuteIso(-10));
+    expect(current).toMatchObject({ status: 'CONFIRMED', checkedInAt: null, checkedOutAt: null, outcome: null });
+    await authorized('post', path(current.id, 'check-out')).expect(409);
+    const checkIns = await Promise.all(Array.from({ length: 4 }, () => authorized('post', path(current.id, 'check-in')).expect(200)));
+    expect(new Set(checkIns.map(response => response.body.checkedInAt)).size).toBe(1);
+    expect(checkIns[0].body).toMatchObject({ status: 'CHECKED_IN', checkedInBy: OWNER_ID });
+    expect((await occupancy(current.id)).status).toBe('IN_USE');
+    await authorized('post', path(current.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED', note: 'Khách đổi ý' }).expect(409);
+    const before = Date.now();
+    const checkedOut = (await authorized('post', path(current.id, 'check-out')).expect(200)).body;
+    expect(checkedOut).toMatchObject({ status: 'COMPLETED', checkedOutBy: OWNER_ID });
+    const newEnd = new Date(checkedOut.reservedEndAt).getTime();
+    expect(newEnd).toBeLessThan(new Date(current.reservedEndAt).getTime());
+    expect(newEnd - before).toBeGreaterThanOrEqual(current.bufferMinutes * 60000 - 1000);
+    expect(newEnd - before).toBeLessThan(current.bufferMinutes * 60000 + 10000);
+    await authorized('post', path(current.id, 'check-out')).expect(200).expect(({ body }) => expect(body.checkedOutAt).toBe(checkedOut.checkedOutAt));
+    await authorized('post', path(current.id, 'check-in')).expect(409);
+    // PostgreSQL keeps microseconds; start one minute after the new end, still well before the original end.
+    const reopened = newEnd + 60000;
+    expect(reopened).toBeLessThan(new Date(current.reservedEndAt).getTime());
+    await createHold('life-after-early', new Date(reopened).toISOString()).expect(201);
+
+    // Late departure: scheduled window already over, occupancy is not extended or shortened.
+    const late = await confirmBooking('life-late', minuteIso(-300));
+    await authorized('post', path(late.id, 'check-in')).expect(200);
+    const lateOut = (await authorized('post', path(late.id, 'check-out')).expect(200)).body;
+    expect(lateOut.reservedEndAt).toEqual(late.reservedEndAt);
+    expect(new Date(lateOut.checkedOutAt).getTime()).toBeGreaterThan(new Date(late.startAt).getTime() + 90 * 60000);
+    expect((await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CHECKED_OUT' AND entity_id=$1`, [late.id])).rows[0].after_data).toEqual({ status: 'COMPLETED', occupancyShortened: false });
+
+    // No check-in time window (PD-026): a far-future booking can be checked in.
+    const future = await confirmBooking('life-future', '2043-01-01T18:00:00+07:00');
+    await authorized('post', path(future.id, 'check-in')).expect(200).expect(({ body }) => expect(body.status).toBe('CHECKED_IN'));
+
+    // Cancellation with a staff-recorded refund, capped by recorded money.
+    const cancel = await confirmBooking('life-cancel', '2043-01-02T18:00:00+07:00');
+    await authorized('post', `/v1/merchant/booking/bookings/${cancel.id}/manual-payments`).set('Idempotency-Key', 'life-pay').send({ method: 'CASH', amountVnd: '30000' }).expect(200);
+    await authorized('post', path(cancel.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED' }).expect(400);
+    await authorized('post', path(cancel.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED', note: '   ' }).expect(400);
+    await authorized('post', path(cancel.id, 'outcome')).send({ type: 'REFUNDED', note: 'x' }).expect(400);
+    await authorized('post', path(cancel.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED', note: 'x', refundAmountVnd: '-1' }).expect(400);
+    await authorized('post', path(cancel.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED', note: 'Khách báo hủy qua điện thoại', refundAmountVnd: '30001' }).expect(409);
+    const receptionist = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'life-reception@example.com',$1,'Reception','ACTIVE') RETURNING id`, [await hash('Reception-password-123', 4)])).rows[0];
+    const member = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, receptionist.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'RECEPTIONIST')`, [member.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [member.id, TENANT_A, branch.id]);
+    const receptionToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'life-reception@example.com', password: 'Reception-password-123' }).expect(200)).body.accessToken;
+    const asReception = (p: string) => request(app.getHttpServer()).post(p).set('Authorization', `Bearer ${receptionToken}`).set('X-Tenant-ID', TENANT_A);
+    await asReception(path(cancel.id, 'outcome')).send({ type: 'CUSTOMER_CANCELLED', note: 'Lễ tân thử hủy' }).expect(403);
+    await request(app.getHttpServer()).post(path(cancel.id, 'check-in')).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(403);
+    const outcomeBody = { type: 'CUSTOMER_CANCELLED', note: 'Khách báo hủy qua điện thoại, hoàn một phần', refundAmountVnd: '20000' };
+    const outcomes = await Promise.all(Array.from({ length: 3 }, () => authorized('post', path(cancel.id, 'outcome')).send(outcomeBody).expect(200)));
+    expect(outcomes[0].body).toMatchObject({ status: 'CANCELLED', outcome: { type: 'CUSTOMER_CANCELLED', note: outcomeBody.note, refundAmountVnd: '20000', recordedBy: OWNER_ID } });
+    expect(new Set(outcomes.map(response => response.body.outcome.recordedAt)).size).toBe(1);
+    await authorized('post', path(cancel.id, 'outcome')).send({ ...outcomeBody, refundAmountVnd: '0' }).expect(409);
+    await authorized('post', path(cancel.id, 'check-in')).expect(409);
+    expect((await occupancy(cancel.id)).status).toBe('RELEASED');
+    await createHold('life-rebook', '2043-01-02T18:00:00+07:00').expect(201);
+    const cancelAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CANCELLED' AND entity_id=$1`, [cancel.id]);
+    expect(cancelAudit.rows).toEqual([{ after_data: { status: 'CANCELLED', outcomeType: 'CUSTOMER_CANCELLED', refundAmountVnd: '20000', collectedVnd: '30000' } }]);
+    expect(JSON.stringify(cancelAudit.rows)).not.toContain('hoàn một phần');
+
+    // No-show without refund; receptionist may still check in other bookings.
+    const noShow = await confirmBooking('life-no-show', '2043-01-03T18:00:00+07:00');
+    await authorized('post', path(noShow.id, 'outcome')).send({ type: 'NO_SHOW', note: 'Khách không đến, gọi không nghe máy' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ status: 'NO_SHOW', outcome: { type: 'NO_SHOW', refundAmountVnd: '0' } }));
+    const receptionBooking = await confirmBooking('life-reception', '2043-01-04T18:00:00+07:00');
+    await asReception(path(receptionBooking.id, 'check-in')).expect(200).expect(({ body }) => expect(body.checkedInBy).toBe(receptionist.id));
+    await authorized('get', `/v1/merchant/booking/bookings/${cancel.id}`).expect(200).expect(({ body }) => expect(body.outcome.type).toBe('CUSTOMER_CANCELLED'));
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Lifecycle plan', status: 'INACTIVE' }).expect(200);
+  }, 30000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

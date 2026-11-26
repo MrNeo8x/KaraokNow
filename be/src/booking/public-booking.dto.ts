@@ -34,6 +34,7 @@ export class PublicBookingLookupDto {
 export class PublicBookingStatusDto {
   @ApiProperty({ format: 'uuid' }) holdId!: string;
   @ApiProperty({ nullable: true, format: 'uuid', type: String }) bookingId!: string | null;
+  @ApiProperty({ nullable: true, type: String, enum: ['CONFIRMED', 'CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'], description: 'Booking status once staff confirmed the hold' }) bookingStatus!: string | null;
   @ApiProperty({ format: 'uuid' }) branchId!: string;
   @ApiProperty({ format: 'uuid' }) roomId!: string;
   @ApiProperty({ format: 'date-time' }) startAt!: string;

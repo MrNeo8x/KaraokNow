@@ -106,7 +106,7 @@ export class PublicBookingService {
         AND booking_code_hash=$2 FOR UPDATE`, [phoneHash, this.codeHash(dto.bookingCode)])).rows[0];
       if (!hold) throw new NotFoundException('Booking lookup details are invalid');
       await this.expireIfNeeded(client, hold.id);
-      const row = (await client.query(`SELECT h.id AS "holdId",b.id AS "bookingId",h.branch_id AS "branchId",h.room_id AS "roomId",
+      const row = (await client.query(`SELECT h.id AS "holdId",b.id AS "bookingId",b.status AS "bookingStatus",h.branch_id AS "branchId",h.room_id AS "roomId",
         h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.status,h.price_snapshot->>'totalAmountVnd' AS "totalAmountVnd",
         h.public_accepted_terms_version::text AS "termsVersion",COALESCE(h.deposit_policy_snapshot->>'requiredAmountVnd','0') AS "depositRequiredVnd",
         (SELECT COALESCE(SUM(d.amount_vnd),0)::text FROM hold_deposits d WHERE d.tenant_id=h.tenant_id AND d.hold_id=h.id) AS "depositRecordedVnd" FROM booking_holds h LEFT JOIN bookings b ON b.hold_id=h.id AND b.tenant_id=h.tenant_id
