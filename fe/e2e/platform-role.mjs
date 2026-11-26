@@ -1,6 +1,6 @@
 // Platform Admin onboarding plus role separation: Owner blocked on /platform; Owner creates a Receptionist who must change
 // the temporary password and then cannot see Owner-only sections.
-import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter } from './lib.mjs';
+import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter, goSection } from './lib.mjs';
 const { log, finish } = reporter();
 const browser = await launch();
 async function session(label) {
@@ -21,6 +21,7 @@ async function login(page, path, email, password) { await page.goto(BASE + path)
   const merchants = page.locator('section[aria-labelledby="platform-merchants-title"]');
   const code = 'UI_' + Date.now().toString(36).toUpperCase();
   await step('tạo merchant qua form (mã chữ thường tự viết hoa)', async () => {
+    await goSection(page, 'Merchant');
     await merchants.getByLabel('Mã merchant').fill(code.toLowerCase()); await merchants.getByLabel('Tên merchant').fill('Karaoke UI test');
     await merchants.getByLabel('Email Owner').fill(`ui.owner.${Date.now()}@karaokenow.local`); await merchants.getByLabel('Tên hiển thị Owner').fill('UI Owner');
     await merchants.getByRole('button', { name: 'Tạo ngẫu nhiên' }).click(); await merchants.getByRole('button', { name: 'Tạo merchant' }).click();
@@ -54,7 +55,8 @@ const staffEmail = `ui.reception.${Date.now()}@karaokenow.local`; const temp = '
   const { ctx, page, step } = await session('owner');
   await step('tạo Lễ tân qua màn Nhân viên', async () => {
     await login(page, '/merchant', OWNER.email, OWNER.password);
-    await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click();
+    await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 });
+    await goSection(page, 'Người dùng');
     const sec = page.locator('section[aria-labelledby="memberships-title"]'); await sec.locator('table').waitFor({ timeout: 15000 });
     await sec.locator('summary', { hasText: 'Thêm nhân viên' }).click();
     await sec.getByLabel('Email').fill(staffEmail); await sec.getByLabel('Tên hiển thị').fill('UI Lễ tân'); await sec.getByLabel(/Mật khẩu tạm/).fill(temp);
@@ -75,9 +77,15 @@ const staffEmail = `ui.reception.${Date.now()}@karaokenow.local`; const temp = '
   });
   await step('Lễ tân thấy màn giữ phòng, không thấy màn Owner', async () => {
     await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click();
-    await page.getByRole('heading', { name: 'Danh sách giữ phòng tạm thời' }).waitFor({ timeout: 15000 }); await page.waitForTimeout(1500);
-    const visible = []; for (const id of ['publication-title', 'memberships-title', 'ops-title', 'audit-title', 'public-terms-title']) if (await page.locator('#' + id).count()) visible.push(id);
-    if (visible.length) throw new Error('vẫn hiện: ' + visible.join(',')); return 'ẩn publication/nhân viên/vận hành/audit';
+    await page.locator('.kpi').first().waitFor({ timeout: 15000 }); await page.waitForTimeout(1500);
+    const visible = [];
+    const sidebar = page.locator('.admin-sidebar');
+    for (const label of ['Người dùng', 'Marketplace']) if (await sidebar.getByRole('button', { name: label, exact: true }).count()) visible.push('menu ' + label);
+    for (const id of ['publication-title', 'ops-title']) if (await page.locator('#' + id).count()) visible.push(id);
+    await goSection(page, 'Cài đặt hệ thống'); await page.waitForTimeout(1500);
+    for (const id of ['audit-title', 'ops-title']) if (await page.locator('#' + id).count()) visible.push(id);
+    await goSection(page, 'Lịch & Đặt phòng'); await page.getByRole('heading', { name: 'Danh sách giữ phòng tạm thời' }).waitFor();
+    if (visible.length) throw new Error('vẫn hiện: ' + visible.join(',')); return 'ẩn menu Người dùng/Marketplace, publication, vận hành, audit';
   });
   await page.screenshot({ path: SHOTS + '/reception.png', fullPage: true });
   log(errors.filter(e => !/status of (403|404)/.test(e)).length === 0, 'reception: không lỗi console ngoài 403 dự kiến', errors.filter(e => !/status of (403|404)/.test(e)).slice(0, 3).join(' | '));

@@ -42,8 +42,8 @@ export default function MySessions({ token, onCurrentRevoked }: { token: string;
       {error && <div className="error" role="alert">{error}</div>}{notice && <div className="notice" role="status">{notice}</div>}
       <label className="check-row"><input type="checkbox" checked={showHistory} onChange={event => setShowHistory(event.target.checked)} /> Hiện cả phiên đã thu hồi/hết hạn (gồm lịch sử xoay token)</label>
       {!items ? !error && <p role="status">Đang tải phiên…</p> : visible.length === 0 ? <div className="empty">Không có phiên.</div> : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Phiên</th><th>Tạo lúc</th><th>Dùng gần nhất</th><th>Hết hạn</th><th></th></tr></thead><tbody>{visible.map(item => <tr key={item.id} className={active(item) ? '' : 'muted'}>
-        <td><small>{item.id}</small>{item.id === current && <> <span className="tag">Phiên này</span></>}</td><td>{when(item.createdAt)}</td><td>{when(item.lastUsedAt)}</td><td>{item.revoked ? 'Đã thu hồi' : when(item.expiresAt)}</td>
-        <td>{active(item) && <button type="button" className="secondary danger" disabled={busy === item.id} onClick={() => void revoke(item)}>{item.id === current ? 'Đăng xuất phiên này' : 'Thu hồi'}</button>}</td>
+        <td data-label="Phiên"><small>{item.id}</small>{item.id === current && <> <span className="tag">Phiên này</span></>}</td><td data-label="Tạo lúc">{when(item.createdAt)}</td><td data-label="Dùng gần nhất">{when(item.lastUsedAt)}</td><td data-label="Hết hạn">{item.revoked ? 'Đã thu hồi' : when(item.expiresAt)}</td>
+        <td data-label="">{active(item) && <button type="button" className="secondary danger" disabled={busy === item.id} onClick={() => void revoke(item)}>{item.id === current ? 'Đăng xuất phiên này' : 'Thu hồi'}</button>}</td>
       </tr>)}</tbody></table></div>}
     </details>
   </section>;

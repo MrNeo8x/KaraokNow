@@ -9,14 +9,15 @@ for (const vp of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop'
   page.on('console', m => { if (m.type() === 'error' && !expected404) errors.push(m.text()); }); page.on('pageerror', e => errors.push(String(e))); page.on('response', r => { if (r.status() >= 400) console.log('   ↳', r.status(), r.request().method(), r.url().replace(BASE, '')); });
   try {
     await page.goto(BASE + '/booking'); await page.getByRole('button', { name: 'Tìm phòng trống' }).waitFor();
-    await page.waitForFunction(() => document.querySelectorAll('select option').length > 0);
+    await page.locator('.branch-option').first().waitFor();
     const day = new Date(Date.now() + (30 + Math.floor(Math.random() * 300)) * 86400000).toISOString().slice(0, 10);
-    await page.getByLabel('Ngày').fill(day); await page.getByLabel('Giờ bắt đầu').fill(vp.name === 'mobile' ? '19:00' : '21:00');
-    await page.getByLabel('Số khách').fill('4');
+    await page.getByLabel('Ngày', { exact: true }).fill(day); await page.getByRole('group', { name: 'Giờ bắt đầu' }).getByRole('button', { name: vp.name === 'mobile' ? '19:00' : '21:00' }).click();
+    await page.getByRole('button', { name: 'Tăng số khách' }).click();
     await page.getByRole('button', { name: 'Tìm phòng trống' }).click();
     await page.getByRole('heading', { name: 'Phòng còn trống' }).waitFor(); log(true, `${vp.name}: tìm phòng trống`);
-    await page.getByRole('button', { name: 'Xem giá phòng này' }).click();
-    await page.locator('.customer-quote').waitFor(); log(true, `${vp.name}: báo giá`, await page.locator('.customer-quote strong').innerText());
+    await page.locator('.room-option:not([disabled]) .room-price', { hasText: '₫' }).first().waitFor(); log(true, `${vp.name}: giá hiện trên danh sách phòng`, await page.locator('.room-price').first().innerText());
+    await page.locator('.room-option:not([disabled])').first().click();
+    await page.locator('.summary.customer-quote').waitFor(); log(true, `${vp.name}: tóm tắt đặt phòng`, await page.locator('.summary .total strong').innerText());
     await page.getByText('Đọc điều khoản đặt phòng').click();
     await page.getByLabel(/Tôi đã đọc và đồng ý/).check();
     const phone = '09' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');

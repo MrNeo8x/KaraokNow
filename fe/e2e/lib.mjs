@@ -42,3 +42,9 @@ export async function loginToken({ email, password }) {
 
 export const readArtifact = name => JSON.parse(fs.readFileSync(path.join(ARTIFACTS, name), 'utf8'));
 export const writeArtifact = (name, value) => fs.writeFileSync(path.join(ARTIFACTS, name), JSON.stringify(value, null, 2));
+
+/** Opens an admin section from the sidebar (desktop viewport). */
+export async function goSection(page, label) {
+  await page.locator('.admin-sidebar').getByRole('button', { name: label, exact: true }).click();
+  await page.locator('.admin-topbar h1').waitFor();
+}

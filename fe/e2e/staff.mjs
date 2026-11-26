@@ -1,5 +1,5 @@
 // Reception/Owner flow on holds created by customer.mjs: deposit → verification → confirm → calendar → check-in/out → cash → cancel/refund → audit → sessions.
-import { BASE, TENANT, OWNER, SHOTS, launch, reporter, readArtifact } from './lib.mjs';
+import { BASE, TENANT, OWNER, SHOTS, launch, reporter, readArtifact, goSection } from './lib.mjs';
 const holds = readArtifact('customer-holds.json'); const { desktop } = holds;
 const { log, finish } = reporter();
 const lookup = await (await fetch(BASE + '/v1/public/booking/lookup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: desktop.phone, bookingCode: desktop.code }) })).json();
@@ -11,10 +11,14 @@ page.on('dialog', d => { console.log('   ⚑ confirm:', d.message().slice(0, 90)
 const step = async (name, fn) => { try { const extra = await fn(); log(true, name, extra ?? ''); } catch (e) { log(false, name, e.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/staff-error-${results.length}.png`, fullPage: true }); } };
 try {
   await step('Owner đăng nhập', async () => { await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(OWNER.email); await page.getByLabel('Mật khẩu').fill(OWNER.password); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.getByLabel('Tenant ID').waitFor(); });
-  await step('Nhập tenant, tải chi nhánh', async () => { await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.getByRole('heading', { name: 'Danh sách giữ phòng tạm thời' }).waitFor({ timeout: 15000 }); });
+  await step('Nhập tenant, tải chi nhánh', async () => { await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); });
   await step('Màn Owner hiển thị (publication, nhân viên, vận hành, audit)', async () => {
-    for (const h of ['Hiển thị catalog công khai', 'Nhân viên & phân quyền', 'Theo dõi vận hành', 'Nhật ký audit', 'Phiên đăng nhập của tôi']) await page.getByRole('heading', { name: h }).waitFor({ timeout: 10000 });
-    return await page.locator('#publication-title').locator('..').locator('.tag').first().innerText();
+    for (const h of ['Hiển thị catalog công khai', 'Theo dõi vận hành']) await page.getByRole('heading', { name: h }).waitFor({ timeout: 10000 });
+    const tag = await page.locator('#publication-title').locator('..').locator('.tag').first().innerText();
+    await goSection(page, 'Người dùng'); await page.getByRole('heading', { name: 'Nhân viên & phân quyền' }).waitFor();
+    await goSection(page, 'Cài đặt hệ thống'); for (const h of ['Nhật ký audit', 'Phiên đăng nhập của tôi']) await page.getByRole('heading', { name: h }).waitFor();
+    await goSection(page, 'Lịch & Đặt phòng'); await page.getByRole('heading', { name: 'Danh sách giữ phòng tạm thời' }).waitFor();
+    return tag;
   });
   const holdCard = page.locator('section[aria-labelledby="hold-lookup-title"]');
   await step('Tra hold của khách', async () => { await holdCard.getByLabel('Mã giữ phòng', { exact: true }).fill(lookup.holdId); await holdCard.getByRole('button', { name: 'Tra cứu trạng thái' }).click(); await holdCard.locator('.deposit-panel').waitFor({ timeout: 10000 }); return await holdCard.locator('.deposit-panel p').first().innerText(); });
@@ -57,7 +61,7 @@ try {
     await r2.getByLabel(/Tiền mặt đã hoàn/).fill(lk.depositRequiredVnd); await r2.getByRole('button', { name: 'Ghi nhận kết quả' }).click();
     await r2.locator('.tag', { hasText: 'Đã hủy' }).waitFor(); return await r2.locator('p.outcome').innerText();
   });
-  await step('Audit hiện thao tác mới', async () => { await page.getByText('Nhật ký audit').click(); await page.locator('table.admin-table code').first().waitFor({ timeout: 10000 }); return await page.locator('table.admin-table code').first().innerText(); });
+  await step('Audit hiện thao tác mới', async () => { await goSection(page, 'Cài đặt hệ thống'); await page.getByText('Nhật ký audit').click(); await page.locator('table.admin-table code').first().waitFor({ timeout: 10000 }); return await page.locator('table.admin-table code').first().innerText(); });
   await step('Phiên đăng nhập: đánh dấu phiên này', async () => { await page.getByText('Phiên đăng nhập của tôi').click(); await page.locator('.tag', { hasText: 'Phiên này' }).waitFor({ timeout: 10000 }); });
   await page.screenshot({ path: SHOTS + '/staff-admin.png', fullPage: true });
 } finally {
