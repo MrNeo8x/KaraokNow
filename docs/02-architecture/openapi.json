@@ -4079,6 +4079,112 @@
           "platform listing approval"
         ]
       }
+    },
+    "/v1/platform/merchants": {
+      "get": {
+        "operationId": "MerchantOnboardingController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE",
+                "ALL"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a Platform Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      },
+      "post": {
+        "operationId": "MerchantOnboardingController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMerchantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Active merchant with its first Owner. Catalog starts unpublished and unapproved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedMerchantDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a Platform Admin"
+          },
+          "409": {
+            "description": "Merchant code already in use"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      }
     }
   },
   "info": {
@@ -6696,6 +6802,206 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "MerchantSummaryDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ownerCount": {
+            "type": "number",
+            "description": "Active memberships holding the OWNER role"
+          },
+          "activeBranchCount": {
+            "type": "number"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "platformApproved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tenantId",
+          "code",
+          "name",
+          "status",
+          "createdAt",
+          "ownerCount",
+          "activeBranchCount",
+          "published",
+          "platformApproved"
+        ]
+      },
+      "MerchantListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MerchantSummaryDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "MerchantOwnerInputDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "minLength": 12,
+            "description": "Used only when the email has no account yet; the owner must change it at first login. Share it out of band"
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "temporaryPassword"
+        ]
+      },
+      "CreateMerchantDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "KARAOKE_HCM",
+            "description": "Unique merchant code: uppercase letters, digits, \"_\" or \"-\""
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "owner": {
+            "$ref": "#/components/schemas/MerchantOwnerInputDto"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "owner"
+        ]
+      },
+      "MerchantOwnerDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "membershipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountCreated": {
+            "type": "boolean",
+            "description": "False when the email already had an account; the supplied temporary password was not applied"
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "membershipId",
+          "accountCreated"
+        ]
+      },
+      "CreatedMerchantDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ownerCount": {
+            "type": "number",
+            "description": "Active memberships holding the OWNER role"
+          },
+          "activeBranchCount": {
+            "type": "number"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "platformApproved": {
+            "type": "boolean"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/MerchantOwnerDto"
+          }
+        },
+        "required": [
+          "tenantId",
+          "code",
+          "name",
+          "status",
+          "createdAt",
+          "ownerCount",
+          "activeBranchCount",
+          "published",
+          "platformApproved",
+          "owner"
         ]
       }
     }

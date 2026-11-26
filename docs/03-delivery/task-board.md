@@ -16,7 +16,7 @@ A task moves to `DONE` only when code review, build, relevant tests, migration/A
 
 ## Current delivery snapshot
 
-Backend package, migrations and tests run from `be/`. On 2026-11-26, `npm run verify` passed with Node 26: build, 10/10 unit suites (40/40 tests, including TRUST_PROXY_HOPS/public rate-limit env validation, phone normalization and deposit calculation), OpenAPI and generated Markdown drift checks. PostgreSQL Docker E2E passed 36/36, including check-in/out and cancellation/no-show outcomes, including confirmed-booking calendar, public catalog, manual CASH idempotency/summary, hold deposits with deposit-required confirmation, Platform Admin listing approval and role/tenant scope. Browser FE–BE verification remains unavailable and unclaimed.
+Backend package, migrations and tests run from `be/`. On 2026-11-26, `npm run verify` passed with Node 26: build, 10/10 unit suites (40/40 tests, including TRUST_PROXY_HOPS/public rate-limit env validation, phone normalization and deposit calculation), OpenAPI and generated Markdown drift checks. PostgreSQL Docker E2E passed 37/37, including Platform Admin merchant onboarding, check-in/out and cancellation/no-show outcomes, including confirmed-booking calendar, public catalog, manual CASH idempotency/summary, hold deposits with deposit-required confirmation, Platform Admin listing approval and role/tenant scope. Browser FE–BE verification remains unavailable and unclaimed.
 
 ### Frontend workstream — delivered increment and next work
 
@@ -103,6 +103,7 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 | UAT-001 | Multi-merchant customer UAT workflow and checklist | Quality/Ops | 8 | P0 | IN_PROGRESS | REC-002, WEB-001, PAY-005 | Scope frozen in `UAT-PD-001`–`012`: staff phone confirmation, optional manual deposit before confirmation, guest phone/email, public terms snapshot, phone+booking-code lookup, web result, audited Platform Admin approval, multiple merchants, explicit conflict, and public rate limiting/idempotency/strong booking code without CAPTCHA/OTP. Implementation and browser/UAT execution remain |
 | ZAL-001 | Verify Zalo Mini App permissions and current SDK compatibility | Channel | Pilot | P1 | BLOCKED | External platform approval | Written verification; no integration claim before approval |
 | META-001 | Verify Meta permissions and web/deep-link approach | Channel | Pilot | P1 | BLOCKED | External platform approval | Written verification; no integration claim before approval |
+| PLT-002 | Platform Admin manual merchant onboarding | Platform | 5 | P0 | IN_PROGRESS | PLT-001, PD-029 | BE done: `GET/POST /v1/platform/merchants` creates an ACTIVE tenant plus first Owner (new account: admin-supplied temporary password, forced change; existing account: password untouched), code uniqueness under advisory lock, audited `MERCHANT_CREATED`. PostgreSQL E2E covers 401/403, validation, duplicate/racing codes, first-login password change, existing-account owner, listing filters. Remaining: FE screen in `/platform` and UAT. Suspension and owner password reset are out of scope |
 
 ## Recommended execution queue
 

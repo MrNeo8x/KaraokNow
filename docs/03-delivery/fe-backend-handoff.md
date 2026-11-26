@@ -75,6 +75,33 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 36/36. Qu
 - Owner cấu hình một nội dung điều khoản UAT tại `GET/PATCH /v1/merchant/catalog/public-booking-terms`; khách đọc `GET /v1/public/branches/{branchId}/booking-terms`. Response `{configured,terms,version,updatedAt}`; FE phải giữ `version` cùng nội dung khách đã tick đồng ý để gửi vào public hold sau khi contract đó được cấp. Không tự dùng nội dung mới nếu version khách đã xem thay đổi.
 - Cấu hình cọc và quyền xác nhận không cọc theo kênh đã có API; số cọc được tính khi snapshot giá và áp dụng khi xác nhận (xem PAY-006).
 
+## FE READY — Platform Admin tạo merchant (PLT-002, 2026-11-26)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 37/37. Quyết định PO: PD-029.
+
+- Không gửi `X-Tenant-ID`; cùng quyền Platform Admin như duyệt listing.
+- `GET /v1/platform/merchants?status=ACTIVE|INACTIVE|ALL&limit&offset` (mặc định ALL, mới nhất trước). Item: `{tenantId,code,name,status,createdAt,ownerCount,activeBranchCount,published,platformApproved}`.
+- `POST /v1/platform/merchants` body `{code,name,owner:{email,displayName,temporaryPassword}}`; `code` dạng `^[A-Z0-9][A-Z0-9_-]{0,49}$`, mật khẩu tạm ≥ 12 ký tự. 201 trả summary + `owner:{userId,email,membershipId,accountCreated}`. 409 khi trùng `code`.
+- `accountCreated=false` nghĩa là email đã có tài khoản: mật khẩu tạm **không** được áp dụng, Owner đăng nhập bằng mật khẩu hiện có. FE phải hiển thị rõ điều này thay vì đưa mật khẩu tạm cho Owner.
+- Tài khoản mới đăng nhập lần đầu nhận `mustChangePassword=true` và phải đổi mật khẩu trước khi dùng API merchant (luồng đổi mật khẩu FE đã có). Merchant mới chưa publish, chưa được duyệt.
+
+## Màn FE còn thiếu cho quản trị (bàn giao 2026-11-26)
+
+Backend đã có API cho tất cả mục dưới đây; FE chưa có màn. Đã loại trừ những phần FE đã nối (duyệt listing `/platform`, cọc trên hold, check-in/out, hủy/no-show).
+
+| # | Màn | Ai dùng | API | Lưu ý |
+|---:|---|---|---|---|
+| 1 | Tạo và danh sách merchant | Platform Admin | `GET/POST /v1/platform/merchants` | Đặt trong `/platform` cạnh duyệt listing; xem marker PLT-002 phía trên. |
+| 2 | Bật/tắt publish catalog | Owner | `GET/PATCH /v1/merchant/catalog/publication` body `{published}` | Hiển thị `platformApproved`: publish nhưng chưa duyệt thì khách chưa thấy — ghi rõ "đang chờ Platform duyệt". |
+| 3 | Quản lý nhân viên | Owner | `GET/POST /v1/merchant/memberships`, `PATCH /v1/merchant/memberships/{id}` | POST `{email,displayName,temporaryPassword(≥12),roles[],branchIds[]}`; vai trò khác OWNER cần ít nhất 1 chi nhánh. PATCH `{status?,roles?,branchIds?}`; vô hiệu hoá bằng `status:"INACTIVE"`. 409 khi user đã là thành viên. Email đã có tài khoản thì mật khẩu tạm bị bỏ qua. |
+| 4 | Nhật ký audit | Owner | `GET /v1/merchant/audit-logs?limit(≤200)&offset` | Trả **mảng** (không có `hasMore`): coi còn trang khi số phần tử = `limit`. Hiển thị `action`, `actorUserId`, `entityType/entityId`, `occurredAt`; `beforeData/afterData` là JSON tuỳ loại. |
+| 5 | Phiên đăng nhập của tôi | Mọi user | `GET /v1/auth/sessions`, `DELETE /v1/auth/sessions/{id}` | Thu hồi phiên hiện tại tương đương đăng xuất trên thiết bị đó. |
+| 6 | Theo dõi vận hành | Owner | `GET /v1/merchant/booking/hold-expiry/backlog`, `GET /v1/merchant/notifications/outbox/backlog` | Số hold quá hạn chưa xử lý và hàng đợi thông báo; giá trị lớn nghĩa là worker không chạy. |
+
+Chưa có API (không làm màn): quên/reset mật khẩu (IAM-004 chờ ZBS), sửa hồ sơ merchant, khoá merchant, cấp quyền Platform Admin (cố ý chỉ cấp bằng dữ liệu). FE nhận biết Platform Admin bằng cách gọi `GET /v1/platform/catalog/listings?limit=1` — 403 nghĩa là không có quyền.
+
+**Smoke test:** container backend không tự chạy migration. Trong `be/`: `npm run db:migrate` (dùng `DATABASE_URL` tới Postgres compose ở cổng 5433), `npm run db:seed:uat` để có tài khoản Owner và `uat.platform@karaokenow.local`, rồi `docker compose up -d --build backend`. Bỏ qua bước nào thì API mới trả 404 hoặc 500.
+
 ## Ưu tiên tiếp theo
 
 1. FE: màn ghi cọc tiền mặt trên hold, hiển thị số cọc còn thiếu trước khi xác nhận; màn Platform Admin duyệt/thu hồi listing. BE: overtime và đối soát sổ quỹ khi PO chốt.

@@ -1289,6 +1289,57 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Lifecycle plan', status: 'INACTIVE' }).expect(200);
   }, 30000);
 
+  it('lets a Platform Admin onboard a merchant with its first Owner who must change the temporary password', async () => {
+    const adminId = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'onboard-admin@example.com',$1,'Onboarding Admin','ACTIVE') RETURNING id`, [await hash('Onboard-password-123', 4)])).rows[0].id;
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const adminToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'onboard-admin@example.com', password: 'Onboard-password-123' }).expect(200)).body.accessToken;
+    const asAdmin = (method: 'get' | 'post', p: string) => request(app.getHttpServer())[method](p).set('Authorization', `Bearer ${adminToken}`);
+    const input = { code: 'NEW_MERCHANT', name: 'Karaoke Mới', owner: { email: 'New.Owner@Example.com', displayName: 'Chủ mới', temporaryPassword: 'Temp-password-123' } };
+
+    await request(app.getHttpServer()).post('/v1/platform/merchants').send(input).expect(401);
+    await request(app.getHttpServer()).post('/v1/platform/merchants').set('Authorization', `Bearer ${ownerToken}`).send(input).expect(403);
+    await asAdmin('post', '/v1/platform/merchants').send({ ...input, code: 'lower' }).expect(400);
+    await asAdmin('post', '/v1/platform/merchants').send({ ...input, name: '  ' }).expect(400);
+    await asAdmin('post', '/v1/platform/merchants').send({ ...input, owner: { ...input.owner, temporaryPassword: 'short' } }).expect(400);
+    await asAdmin('post', '/v1/platform/merchants').send({ code: 'NO_OWNER', name: 'No owner' }).expect(400);
+
+    const created = (await asAdmin('post', '/v1/platform/merchants').send(input).expect(201)).body;
+    expect(created).toMatchObject({ code: 'NEW_MERCHANT', name: 'Karaoke Mới', status: 'ACTIVE', ownerCount: 1, activeBranchCount: 0, published: false, platformApproved: false,
+      owner: { email: 'new.owner@example.com', accountCreated: true } });
+    await asAdmin('post', '/v1/platform/merchants').send({ ...input, owner: { ...input.owner, email: 'other@example.com' } }).expect(409);
+    const racing = await Promise.all(['race-a@example.com', 'race-b@example.com'].map(email =>
+      asAdmin('post', '/v1/platform/merchants').send({ code: 'RACE_MERCHANT', name: 'Race', owner: { ...input.owner, email } })));
+    expect(racing.map(response => response.status).sort()).toEqual([201, 409]);
+
+    const firstLogin = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'new.owner@example.com', password: 'Temp-password-123' }).expect(200)).body;
+    expect(firstLogin.mustChangePassword).toBe(true);
+    await request(app.getHttpServer()).get('/v1/merchant/branches').set('Authorization', `Bearer ${firstLogin.accessToken}`).set('X-Tenant-ID', created.tenantId).expect(403);
+    await request(app.getHttpServer()).post('/v1/auth/password/change').set('Authorization', `Bearer ${firstLogin.accessToken}`)
+      .send({ currentPassword: 'Temp-password-123', newPassword: 'New-owner-password-456' }).expect(204);
+    const newOwnerToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'new.owner@example.com', password: 'New-owner-password-456' }).expect(200)).body.accessToken;
+    await request(app.getHttpServer()).post('/v1/merchant/branches').set('Authorization', `Bearer ${newOwnerToken}`).set('X-Tenant-ID', created.tenantId)
+      .send({ code: 'NEW-HQ', name: 'Chi nhánh đầu tiên', timezone: 'Asia/Ho_Chi_Minh' }).expect(201);
+    await request(app.getHttpServer()).get('/v1/merchant/branches').set('Authorization', `Bearer ${newOwnerToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+
+    // An existing account becomes Owner of a second merchant without its password being replaced.
+    const second = (await asAdmin('post', '/v1/platform/merchants').send({ code: 'SECOND_MERCHANT', name: 'Second', owner: { email: 'owner@example.com', displayName: 'Ignored', temporaryPassword: 'Ignored-password-123' } }).expect(201)).body;
+    expect(second.owner).toMatchObject({ userId: OWNER_ID, accountCreated: false });
+    await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'owner@example.com', password: 'Ignored-password-123' }).expect(401);
+    await request(app.getHttpServer()).get('/v1/merchant/branches').set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', second.tenantId).expect(200);
+
+    await asAdmin('get', '/v1/platform/merchants').query({ status: 'ACTIVE', limit: 100 }).expect(200).expect(({ body }) => {
+      const codes = body.items.map((item: { code: string }) => item.code);
+      expect(codes).toEqual(expect.arrayContaining(['NEW_MERCHANT', 'SECOND_MERCHANT', 'RACE_MERCHANT', 'A', 'B']));
+      expect(body.items.find((item: { code: string }) => item.code === 'NEW_MERCHANT')).toMatchObject({ activeBranchCount: 1, ownerCount: 1 });
+    });
+    await asAdmin('get', '/v1/platform/merchants').query({ status: 'INACTIVE' }).expect(200).expect(({ body }) => expect(body.items).toEqual([]));
+    await asAdmin('get', '/v1/platform/merchants').query({ limit: 101 }).expect(400);
+    const audit = await pool.query(`SELECT actor_user_id,after_data FROM audit_logs WHERE tenant_id=$1 AND action='MERCHANT_CREATED'`, [created.tenantId]);
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0]).toMatchObject({ actor_user_id: adminId, after_data: { code: 'NEW_MERCHANT', ownerAccountCreated: true } });
+    expect(JSON.stringify(audit.rows)).not.toContain('Temp-password-123');
+  }, 30000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);
