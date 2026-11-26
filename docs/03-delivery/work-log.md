@@ -2,27 +2,35 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-26, 23:00)
+## Trạng thái hiện tại (cập nhật 2026-11-26, 23:15)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE overtime + khoá merchant (commit của phiên này), FE `c6663d7` thiết kế tím/admin shell/booking kiểu app, BE `7796a6d` benchmark + sửa deadlock + UAT, FE `221c6d8` cọc/check-in/out/`/platform`/Playwright.
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031), FE `c6663d7` thiết kế tím/admin shell/booking kiểu app, BE `7796a6d` benchmark + sửa deadlock + UAT, FE `221c6d8` cọc/check-in/out/`/platform`/Playwright.
 
 **Kiểm chứng gần nhất:** BE `npm run verify` 42/42 unit, `npm run test:e2e` 40/40, migration mới up → down → up; benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (theo task board): unit và Playwright đạt.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`, đã seed UAT. **Chưa** áp migration `20261124030000_overtime_recording` và chưa rebuild backend với code overtime/khoá merchant — chạy `npm run db:migrate` rồi `docker compose up -d --build backend` trong `be/` trước khi thử. Worker `holds:expire`/`outbox:work` không chạy trong compose.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration (mới nhất `20261124030000_overtime_recording`) và backend chạy code `da2eb69` (smoke: overtime-policy mặc định 10 phút, publication có `tenantStatus`, khoá thiếu lý do → 400). Frontend container là bản build lúc 22:17, chưa có màn FE-013. Worker `holds:expire`/`outbox:work` không chạy trong compose.
 
-**Đang dở (working tree, chưa commit):** Luồng FE viết lại `README.md` (tiếng Việt, mục triển khai) và mục "Yêu cầu BE — triển khai" trong handoff. Luồng BE không có việc dở.
+**Đang dở (working tree, chưa commit):** Luồng FE làm FE-013 (`fe/src/components/overtime-settings.tsx` mới; sửa `platform-merchants.tsx`, `catalog-publication.tsx`, `booking-operations.tsx`, `experience.tsx`, `lib/api.ts`, `fe/e2e/*`), viết lại `README.md` (tiếng Việt, mục triển khai) và mục "Yêu cầu BE — triển khai" trong handoff (đã ghi nhận thành OPS-005). Luồng BE không có việc dở.
 
 **Trạng thái task:** `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 3 (REC-003, QA-003, FE-013) · `BLOCKED` 9 · `BACKLOG` 6 · `DONE` 46. Chi tiết ở `task-board.md`.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
-- *Luồng FE:* FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README.
+- *Luồng FE:* hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
 - *Luồng BE:* OPS-005 (image migration/worker, tắt Swagger theo môi trường — yêu cầu từ FE); chờ PO cho PAY-007/BKG-008; OPS-004 (pool/timeout) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-26 (23:15) — Luồng BE: rebuild backend local sau overtime/khoá merchant
+
+- `npm run db:migrate` áp `20261124030000_overtime_recording`; `docker compose up -d --build backend` tạo lại container (healthy); frontend và PostgreSQL giữ nguyên.
+- Smoke trên container: `GET /merchant/booking/overtime-policy` → `{configured:false, graceMinutes:10}`; `GET /merchant/catalog/publication` có `tenantStatus: ACTIVE`; `POST /platform/merchants/{UAT2}/suspend` không lý do → 400. Không khoá thật để giữ nguyên dữ liệu UAT (UAT2 vẫn ACTIVE).
+- Các ca UAT A8–A9, E3/E5 chạy được qua API/Swagger; màn FE tương ứng (FE-013) đang được Luồng FE làm.
 
 ---
 
