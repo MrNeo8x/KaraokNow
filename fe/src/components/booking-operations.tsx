@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { request } from '@/lib/api';
+import { ApiError, request } from '@/lib/api';
+import { useCan } from './permissions-context';
 import { allowedActions, bookingStatusLabel, outcomeLabel, parseVnd, type BookingStatus, type OutcomeType } from '@/lib/booking-lifecycle';
 
-type Booking = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; customerPhone: string; status: BookingStatus; priceSnapshot: { totalAmountVnd?: string; currency?: string }; reservedEndAt?: string; confirmationPolicySnapshot?: { depositMode?: string; requiredDepositVnd?: string; depositRecordedVnd?: string } | null; checkedInAt?: string | null; checkedOutAt?: string | null; outcome?: { type: OutcomeType; note: string; refundAmountVnd: string; recordedAt: string } | null };
+type Booking = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; customerPhone: string; status: BookingStatus; priceSnapshot: { totalAmountVnd?: string; currency?: string }; reservedEndAt?: string; confirmationPolicySnapshot?: { depositMode?: string; requiredDepositVnd?: string; depositRecordedVnd?: string } | null; checkedInAt?: string | null; checkedOutAt?: string | null; lateMinutes?: number | null; overtimeMinutes?: number | null; overtimeGraceMinutes?: number | null; outcome?: { type: OutcomeType; note: string; refundAmountVnd: string; recordedAt: string } | null };
 type OutcomeDraft = { type: OutcomeType; note: string; refund: string };
 type Page = { items: Booking[]; limit: number; offset: number; hasMore: boolean };
 type Payment = { id: string; method: string; amountVnd: string; note: string | null; recordedAt: string };
@@ -13,8 +14,9 @@ type PaymentSummary = { totalRecordedVnd: string; paymentCount: number };
 export default function BookingOperations({ token, tenant, branchId, timezone, rooms }: { token: string; tenant: string; branchId: string; timezone: string; rooms: { id: string; name: string }[] }) {
   const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [utcOffset, setUtcOffset] = useState('+07:00');
   const [range, setRange] = useState<{ from: string; to: string } | null>(null); const [pageOffset, setPageOffset] = useState(0);
-  const [page, setPage] = useState<Page | null>(null); const [payments, setPayments] = useState<Record<string, Payment[]>>({}); const [summaries, setSummaries] = useState<Record<string, PaymentSummary>>({}); const [paymentLoadErrors, setPaymentLoadErrors] = useState<string[]>([]);
+  const [page, setPage] = useState<Page | null>(null); const [payments, setPayments] = useState<Record<string, Payment[]>>({}); const [summaries, setSummaries] = useState<Record<string, PaymentSummary>>({}); const [paymentLoadErrors, setPaymentLoadErrors] = useState<string[]>([]); const [cashForbidden, setCashForbidden] = useState(false);
   const [amounts, setAmounts] = useState<Record<string, string>>({}); const [notes, setNotes] = useState<Record<string, string>>({});
+  const allowed = useCan(); const cashAllowed = allowed('cash.access');
   const [outcomes, setOutcomes] = useState<Record<string, OutcomeDraft>>({}); const [acting, setActing] = useState('');
   const [paymentKeys, setPaymentKeys] = useState<Record<string, string>>({}); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [loading, setLoading] = useState(false);
 
@@ -26,20 +28,22 @@ export default function BookingOperations({ token, tenant, branchId, timezone, r
       .then(async result => {
         setPage(result);
         const rows = await Promise.all(result.items.map(async booking => {
+          if (!cashAllowed) return { id: booking.id, items: [], summary: null, error: '', forbidden: true };
           try {
             const [data, summary] = await Promise.all([
               request<{ items: Payment[] }>(`/merchant/booking/bookings/${encodeURIComponent(booking.id)}/manual-payments?limit=100`, { signal: controller.signal }, token, tenant),
               request<PaymentSummary>(`/merchant/booking/bookings/${encodeURIComponent(booking.id)}/manual-payments/summary`, { signal: controller.signal }, token, tenant),
             ]);
-            return { id: booking.id, items: data.items, summary, error: '' };
+            return { id: booking.id, items: data.items, summary, error: '', forbidden: false };
           }
-          catch (err) { return { id: booking.id, items: [], summary: null, error: (err as Error).message }; }
+          // 403 means this role does not handle cash (e.g. Receptionist); it is not a load failure.
+          catch (err) { const forbidden = err instanceof ApiError && err.status === 403; return { id: booking.id, items: [], summary: null, error: forbidden ? '' : (err as Error).message, forbidden }; }
         }));
-        if (!controller.signal.aborted) { setPayments(Object.fromEntries(rows.map(row => [row.id, row.items]))); setSummaries(Object.fromEntries(rows.flatMap(row => row.summary ? [[row.id, row.summary] as const] : []))); setPaymentLoadErrors(rows.filter(row => row.error).map(row => row.error)); }
+        if (!controller.signal.aborted) { setPayments(Object.fromEntries(rows.map(row => [row.id, row.items]))); setSummaries(Object.fromEntries(rows.flatMap(row => row.summary ? [[row.id, row.summary] as const] : []))); setPaymentLoadErrors(rows.filter(row => row.error).map(row => row.error)); setCashForbidden(rows.some(row => row.forbidden)); }
       }).catch(err => { if (!controller.signal.aborted) setError((err as Error).message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [range, pageOffset, branchId, token, tenant]);
+  }, [range, pageOffset, branchId, token, tenant, cashAllowed]);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,7 +87,7 @@ export default function BookingOperations({ token, tenant, branchId, timezone, r
     try {
       replaceBooking(await request<Booking>(`/merchant/booking/bookings/${encodeURIComponent(booking.id)}/outcome`, { method: 'POST', body: JSON.stringify({ type: draft.type, note: draft.note.trim(), ...(refund > 0n ? { refundAmountVnd: refund.toString() } : {}) }) }, token, tenant));
       setOutcomes(current => { const next = { ...current }; delete next[booking.id]; return next; }); setNotice(`Đã ghi nhận ${outcomeLabel[draft.type].toLowerCase()}.`);
-    } catch (err) { setError(`${(err as Error).message} · Số tiền hoàn không được vượt tổng cọc và tiền mặt đã ghi.`); }
+    } catch (err) { const status = err instanceof ApiError ? err.status : undefined; setError(status === 403 ? 'Chỉ Owner hoặc Quản lý chi nhánh được ghi hủy/no-show.' : status === 409 ? `${(err as Error).message} · Số tiền hoàn không được vượt tổng cọc và tiền mặt đã ghi.` : (err as Error).message); }
     finally { setActing(''); }
   }
 
@@ -102,13 +106,13 @@ export default function BookingOperations({ token, tenant, branchId, timezone, r
     {loading && <p aria-live="polite">Đang tải booking…</p>}
     {page && (page.items.length === 0 ? <p role="status">Không có booking trong khoảng thời gian đã chọn.</p> : <div className="booking-list">{page.items.map(booking => {
       const summary = summaries[booking.id];
-      return <article className="booking-row" key={booking.id}><div><strong>{rooms.find(room => room.id === booking.roomId)?.name ?? `Phòng ${booking.roomId}`}</strong><span className={`tag booking-${booking.status.toLowerCase()}`}>{bookingStatusLabel[booking.status] ?? booking.status}</span><p>{date(booking.startAt)} · {booking.durationMinutes} phút · {booking.channel}<br />Khách: {booking.customerPhone}<br />Booking: {booking.id}<br />Giá snapshot: {booking.priceSnapshot?.totalAmountVnd ? money(booking.priceSnapshot.totalAmountVnd) : 'Chưa có'}{booking.confirmationPolicySnapshot?.requiredDepositVnd ? <><br />Cọc khi xác nhận: {money(booking.confirmationPolicySnapshot.depositRecordedVnd ?? '0')} / yêu cầu {money(booking.confirmationPolicySnapshot.requiredDepositVnd)}</> : null}{booking.checkedInAt ? <><br />Check-in: {date(booking.checkedInAt)}</> : null}{booking.checkedOutAt ? <><br />Check-out: {date(booking.checkedOutAt)}</> : null}</p>{booking.outcome && <p className="outcome">Kết quả: {outcomeLabel[booking.outcome.type]} · {date(booking.outcome.recordedAt)}<br />Ghi chú: {booking.outcome.note}<br />Đã hoàn tiền mặt: {money(booking.outcome.refundAmountVnd)}</p>}<p>Đã ghi nhận tiền mặt: {summary ? `${money(summary.totalRecordedVnd)} qua ${summary.paymentCount} giao dịch` : 'Chưa tải được dữ liệu giao dịch'}</p>{(payments[booking.id] ?? []).map(payment => <small key={payment.id}>{money(payment.amountVnd)} · {date(payment.recordedAt)}{payment.note ? ` · ${payment.note}` : ''}<br /></small>)}</div>
-        <div className="booking-side"><div className="payment-form">{(() => { const actions = allowedActions(booking.status); const draft = outcomes[booking.id] ?? { type: 'CUSTOMER_CANCELLED' as OutcomeType, note: '', refund: '' }; const setDraft = (patch: Partial<OutcomeDraft>) => setOutcomes(current => ({ ...current, [booking.id]: { ...draft, ...patch } })); return <>
+      return <article className="booking-row" key={booking.id}><div><strong>{rooms.find(room => room.id === booking.roomId)?.name ?? `Phòng ${booking.roomId}`}</strong><span className={`tag booking-${booking.status.toLowerCase()}`}>{bookingStatusLabel[booking.status] ?? booking.status}</span><p>{date(booking.startAt)} · {booking.durationMinutes} phút · {booking.channel}<br />Khách: {booking.customerPhone}<br />Booking: {booking.id}<br />Giá snapshot: {booking.priceSnapshot?.totalAmountVnd ? money(booking.priceSnapshot.totalAmountVnd) : 'Chưa có'}{booking.confirmationPolicySnapshot?.requiredDepositVnd ? <><br />Cọc khi xác nhận: {money(booking.confirmationPolicySnapshot.depositRecordedVnd ?? '0')} / yêu cầu {money(booking.confirmationPolicySnapshot.requiredDepositVnd)}</> : null}{booking.checkedInAt ? <><br />Check-in: {date(booking.checkedInAt)}</> : null}{booking.checkedOutAt ? <><br />Check-out: {date(booking.checkedOutAt)}</> : null}{booking.checkedOutAt && booking.lateMinutes != null ? <><br />{booking.lateMinutes === 0 ? 'Trả phòng đúng hoặc trước giờ' : `Trễ ${booking.lateMinutes} phút`}{booking.overtimeGraceMinutes != null ? ` · ân hạn ${booking.overtimeGraceMinutes} phút` : ''} {booking.overtimeMinutes ? <span className="pill amber">Quá giờ {booking.overtimeMinutes} phút</span> : booking.lateMinutes ? <span className="pill green">Trong ân hạn</span> : null}</> : null}</p>{booking.outcome && <p className="outcome">Kết quả: {outcomeLabel[booking.outcome.type]} · {date(booking.outcome.recordedAt)}<br />Ghi chú: {booking.outcome.note}<br />Đã hoàn tiền mặt: {money(booking.outcome.refundAmountVnd)}</p>}{cashForbidden || !allowed('cash.access') ? <p><small>Thu tiền mặt do Owner, Quản lý chi nhánh hoặc Thu ngân thực hiện.</small></p> : <p>Đã ghi nhận tiền mặt: {summary ? `${money(summary.totalRecordedVnd)} qua ${summary.paymentCount} giao dịch` : 'Chưa tải được dữ liệu giao dịch'}</p>}{(payments[booking.id] ?? []).map(payment => <small key={payment.id}>{money(payment.amountVnd)} · {date(payment.recordedAt)}{payment.note ? ` · ${payment.note}` : ''}<br /></small>)}</div>
+        <div className="booking-side"><div className="payment-form">{(() => { const byStatus = allowedActions(booking.status); const actions = { checkIn: byStatus.checkIn && allowed('booking.checkInOut'), checkOut: byStatus.checkOut && allowed('booking.checkInOut'), outcome: byStatus.outcome && allowed('booking.outcome') }; const draft = outcomes[booking.id] ?? { type: 'CUSTOMER_CANCELLED' as OutcomeType, note: '', refund: '' }; const setDraft = (patch: Partial<OutcomeDraft>) => setOutcomes(current => ({ ...current, [booking.id]: { ...draft, ...patch } })); return <>
           {actions.checkIn && <button type="button" className="primary" disabled={acting === booking.id} onClick={() => void transition(booking, 'check-in')}>Check-in</button>}
           {actions.checkOut && <button type="button" className="primary" disabled={acting === booking.id} onClick={() => void transition(booking, 'check-out')}>Check-out</button>}
           {actions.outcome && <details className="outcome-form"><summary>Hủy / khách không đến</summary><form onSubmit={event => void recordOutcome(event, booking)}><label>Kết quả<select value={draft.type} onChange={event => setDraft({ type: event.target.value as OutcomeType })}>{(Object.keys(outcomeLabel) as OutcomeType[]).map(type => <option key={type} value={type}>{outcomeLabel[type]}</option>)}</select></label><label>Ghi chú xem xét (bắt buộc)<textarea value={draft.note} onChange={event => setDraft({ note: event.target.value })} maxLength={1000} rows={2} required /></label><label>Tiền mặt đã hoàn (VND, không bắt buộc)<input inputMode="numeric" value={draft.refund} onChange={event => setDraft({ refund: event.target.value })} placeholder="0" /></label><button className="primary" disabled={acting === booking.id}>Ghi nhận kết quả</button><small>Chỉ Owner/Branch Manager. Hệ thống không tự tính tiền hoàn.</small></form></details>}
         </>; })()}</div>
-        <form className="payment-form" onSubmit={event => void recordPayment(event, booking.id)}><label>Khoản thu tiền mặt (VND)<input inputMode="numeric" pattern="[1-9][0-9]{0,18}" value={amounts[booking.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [booking.id]: event.target.value }))} required /></label><label>Ghi chú<input maxLength={500} value={notes[booking.id] ?? ''} onChange={event => setNotes(current => ({ ...current, [booking.id]: event.target.value }))} /></label><button className="primary">Ghi nhận tiền mặt</button></form></div>
+        {!cashForbidden && allowed('cash.access') && <form className="payment-form" onSubmit={event => void recordPayment(event, booking.id)}><label>Khoản thu tiền mặt (VND)<input inputMode="numeric" pattern="[1-9][0-9]{0,18}" value={amounts[booking.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [booking.id]: event.target.value }))} required /></label><label>Ghi chú<input maxLength={500} value={notes[booking.id] ?? ''} onChange={event => setNotes(current => ({ ...current, [booking.id]: event.target.value }))} /></label><button className="primary">Ghi nhận tiền mặt</button></form>}</div>
       </article>;
     })}</div>)}
     {page && <div className="amenity-buttons"><button type="button" disabled={loading || pageOffset === 0} onClick={() => setPageOffset(value => Math.max(0, value - 20))}>← Trang trước</button><span>Trang {Math.floor(pageOffset / 20) + 1}</span><button type="button" disabled={loading || !page.hasMore || pageOffset >= 10000} onClick={() => setPageOffset(value => value + 20)}>Trang sau →</button></div>}

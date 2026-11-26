@@ -67,3 +67,10 @@ test('lỗi API mang theo HTTP status để phân biệt 409/429', async () => {
     return true;
   });
 });
+
+test('dịch thông báo tranh chấp đồng thời và merchant bị khoá', async () => {
+  globalThis.fetch = async () => Response.json({ error: { code: 'CONFLICT', message: 'The resource was changed concurrently; retry the request' } }, { status: 409 });
+  await assert.rejects(request('/merchant/booking/holds', { method: 'POST', body: '{}' }), error => { assert.match(error.message, /thay đổi đồng thời/); assert.equal(error.status, 409); return true; });
+  globalThis.fetch = async () => Response.json({ error: { code: 'CONFLICT', message: 'Merchant is suspended; new holds are not accepted' } }, { status: 409 });
+  await assert.rejects(request('/merchant/booking/holds', { method: 'POST', body: '{}' }), /bị Platform khoá/);
+});

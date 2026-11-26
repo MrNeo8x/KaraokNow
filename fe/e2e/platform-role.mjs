@@ -38,6 +38,17 @@ async function login(page, path, email, password) { await page.goto(BASE + path)
     await merchants.getByRole('button', { name: 'Tạo ngẫu nhiên' }).click(); await merchants.getByRole('button', { name: 'Tạo merchant' }).click();
     await merchants.locator('.deposit-callout', { hasText: 'không' }).waitFor();
   });
+  await step('khoá merchant: thiếu lý do bị chặn, có lý do thì khoá', async () => {
+    const row = merchants.locator('tr', { hasText: `${code} ·` });
+    await row.getByRole('button', { name: 'Khoá' }).click(); await merchants.locator('.error', { hasText: 'lý do' }).waitFor();
+    await row.getByPlaceholder('Lý do (bắt buộc)').fill('Kiểm thử khoá'); await row.getByRole('button', { name: 'Khoá' }).click();
+    await row.locator('.pill', { hasText: 'Đang bị khoá' }).waitFor();
+  });
+  await step('mở khoá merchant', async () => {
+    const row = merchants.locator('tr', { hasText: `${code} ·` });
+    await row.getByPlaceholder('Lý do (bắt buộc)').fill('Kiểm thử mở khoá'); await row.getByRole('button', { name: 'Mở khoá' }).click();
+    await row.locator('.pill', { hasText: 'Hoạt động' }).waitFor();
+  });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); log(overflow <= 0, 'platform: không cuộn ngang', `overflow=${overflow}`);
   await page.screenshot({ path: SHOTS + '/platform.png', fullPage: true });
   log(errors.filter(e => !/status of (409|403)/.test(e)).length === 0, 'platform: không lỗi console ngoài 409', errors.slice(0, 3).join(' | '));

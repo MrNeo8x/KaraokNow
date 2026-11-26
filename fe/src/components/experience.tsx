@@ -19,9 +19,13 @@ import CatalogPublication from './catalog-publication';
 import Memberships from './memberships';
 import AuditLog from './audit-log';
 import OpsBacklog from './ops-backlog';
+import OvertimeSettings from './overtime-settings';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
+import { RolesProvider } from './permissions-context';
+import { can } from '@/lib/permissions';
+import { roleLabel, type Role } from '@/lib/admin';
 import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wrench } from 'lucide-react';
 import { parseSession, refreshDelay, type Session } from '@/lib/session';
 
@@ -29,7 +33,8 @@ type Branch = { id: string; name: string; code: string; timezone: string; status
 type Room = { id: string; name: string; code: string; capacity: number; status: string };
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
   const page = initialPage;
-  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
+  const [me, setMe] = useState<Me | null>(null);
   const [merchantSection, selectMerchant] = useSection(MERCHANT_IDS, 'overview');
   const [platformSection, selectPlatform] = useSection(PLATFORM_IDS, 'listings');
   const [session, setSession] = useState<Session | null>(null);
@@ -60,12 +65,12 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   async function changePassword(e: React.FormEvent) { e.preventDefault(); if (!session) return; setError(''); try { await request('/auth/password/change',{method:'POST',body:JSON.stringify({currentPassword:password,newPassword})},session.accessToken); setSession(null); setPassword(''); setNewPassword(''); setError('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'); } catch(err) { setError((err as Error).message); } }
   useEffect(() => { if (!session || !activeTenant || session.mustChangePassword) return; let live=true; setLoading(true); setError(''); request<Branch[]>('/merchant/branches',{},session.accessToken,activeTenant).then(data=>{ if(live){setBranches(data);setBranch(previous=>data.some(item=>item.id===previous)?previous:data[0]?.id || '');} }).catch(err=>{if(live){setError(err.message);setBranches([]);setBranch('');}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,revision]);
   useEffect(() => { if(!session || !activeTenant || !branch) {setRooms([]);return;} let live=true; setLoading(true); request<Room[]>(`/merchant/branches/${branch}/rooms`,{},session.accessToken,activeTenant).then(data=>{if(live)setRooms(data);}).catch(err=>{if(live){setRooms([]);setError(err.message);}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,branch,revision]);
-  // Owner-only navigation is hidden for other roles; the backend still enforces every permission.
+  // Roles drive what the UI offers; the backend still enforces every permission. Unknown roles (null) hide nothing.
   useEffect(() => {
-    if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setIsOwner(null); return; }
+    if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setMe(null); return; }
     const controller = new AbortController();
-    request('/merchant/memberships', { signal: controller.signal }, session.accessToken, activeTenant)
-      .then(() => setIsOwner(true)).catch(err => { if (!controller.signal.aborted) setIsOwner(err instanceof ApiError && err.status === 403 ? false : null); });
+    request<Me>('/merchant/me', { signal: controller.signal }, session.accessToken, activeTenant)
+      .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError('Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
     return () => controller.abort();
   }, [session, activeTenant, page]);
 
@@ -99,6 +104,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     </AdminShell>;
   }
 
+  const roles = me?.roles ?? null; const isOwner = roles === null ? null : can(roles, 'owner.admin');
   const currentBranch = branches.find(item => item.id === branch);
   const nav: NavItem[] = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
@@ -119,8 +125,10 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   return <AdminShell product="Business" nav={activeTenant ? nav : []} active={section} onSelect={selectMerchant}
     title={activeTenant ? titles[section] : 'Chọn merchant'} subtitle={activeTenant ? (currentBranch ? `${currentBranch.name} · ${currentBranch.timezone}` : 'Chưa chọn chi nhánh') : 'Nhập Tenant ID được cấp để mở dữ liệu'}
     actions={activeTenant && branches.length > 0 ? <label className="sr-label"><span className="visually-hidden">Chi nhánh</span><select aria-label="Chi nhánh" value={branch} onChange={e => { setRooms([]); setBranch(e.target.value); }}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label> : undefined}
-    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && <button type="button" onClick={() => { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); }}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
+    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && <button type="button" onClick={() => { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); }}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
     {error && <div role="alert" className="error">{error}</div>}
+    {me?.tenantStatus === 'INACTIVE' && <div role="alert" className="error suspended-banner"><strong>Merchant đang bị Platform khoá.</strong> Khách không thấy chi nhánh và không giữ chỗ mới được; giữ chỗ và booking hiện có vẫn xử lý bình thường.</div>}
+    <RolesProvider value={roles}>
     {!activeTenant ? <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><Store size={18} aria-hidden /></span>Chọn Merchant</div><p>Nhập mã Tenant ID được cấp để mở dữ liệu chi nhánh, phòng và lịch đặt.</p>{tenantForm}</section> : <>
       {section === 'overview' && <>
         <div className="kpi-grid">
@@ -135,7 +143,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
             <ul className="legend"><li><span><i style={{ background: '#22c55e' }} />Hoạt động</span><strong>{counts.active}</strong></li><li><span><i style={{ background: '#f59e0b' }} />Bảo trì</span><strong>{counts.maintenance}</strong></li><li><span><i style={{ background: '#cbd5e1' }} />Ngừng hoạt động</span><strong>{counts.inactive}</strong></li></ul>
             <div className="hold-actions"><button type="button" className="secondary" onClick={() => selectMerchant('bookings')}><ClipboardList size={14} aria-hidden /> Xem lịch & đặt phòng</button></div>
           </section>
-          <div style={{ display: 'grid', gap: 20 }}><CatalogPublication key={`publication:${activeTenant}`} token={session.accessToken} tenant={activeTenant} /><OpsBacklog key={`ops:${activeTenant}`} token={session.accessToken} tenant={activeTenant} /></div>
+          {isOwner !== false && <div style={{ display: 'grid', gap: 20 }}><CatalogPublication key={`publication:${activeTenant}`} token={session.accessToken} tenant={activeTenant} /><OpsBacklog key={`ops:${activeTenant}`} token={session.accessToken} tenant={activeTenant} /></div>}
         </div>
       </>}
       {section === 'bookings' && <>
@@ -156,10 +164,11 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
       {section === 'pricing' && <>
         <PricingSettings key={`pricing-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} branches={branches} currentBranch={branch} />
         <HoldTtlSettings key={`hold-ttl-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
+        <OvertimeSettings key={`overtime:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <DepositSettings key={`deposit-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <NoDepositSettings key={`no-deposit-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
       </>}
-      {section === 'users' && <Memberships key={`members:${activeTenant}`} token={session.accessToken} tenant={activeTenant} branches={branches} />}
+      {section === 'users' && isOwner !== false && <Memberships key={`members:${activeTenant}`} token={session.accessToken} tenant={activeTenant} branches={branches} />}
       {section === 'marketplace' && <>
         <CatalogPublication key={`publication:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <PublicBookingTerms key={`terms:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
@@ -168,9 +177,10 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><ShieldCheck size={18} aria-hidden /></span>Merchant đang mở</div><p>Tenant {activeTenant}. Đổi sang merchant khác bằng Tenant ID.</p>{tenantForm}</section>
         {sessionsCard}
         {isOwner !== false && <OpsBacklog key={`ops-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />}
-        <AuditLog key={`audit:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
+        {isOwner !== false && <AuditLog key={`audit:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />}
       </>}
     </>}
+    </RolesProvider>
   </AdminShell>;
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { CalendarDays, Check, CheckCircle2, ClipboardList, Copy, Home, MapPin, Mic2, Minus, Plus, Search } from 'lucide-react';
 import { ApiError, request } from '@/lib/api';
 import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle';
+import { SLOTS, firstSlot, initialChoice, slotOpen, upcomingDates } from '@/lib/booking-time';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
 type Branch = { id: string; merchantId: string; merchantName: string; name: string; timezone: string };
@@ -23,26 +24,6 @@ function fetchTerms(branchId: string, signal?: AbortSignal): Promise<Terms> {
   return request<Terms>(`/public/branches/${encodeURIComponent(branchId)}/booking-terms`, { signal })
     .catch(err => { if (err instanceof ApiError && err.status === 404) return { configured: false, terms: null, version: null }; throw err; });
 }
-const SLOTS = Array.from({ length: 15 }, (_, index) => `${String(9 + index).padStart(2, '0')}:00`);
-const WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-/** Calendar dates in Vietnam time (UTC+7), today first. */
-function upcomingDates(count: number): { value: string; weekday: string; label: string }[] {
-  const now = new Date(Date.now() + 7 * 3600_000);
-  return Array.from({ length: count }, (_, offset) => {
-    const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset));
-    return { value: day.toISOString().slice(0, 10), weekday: offset === 0 ? 'Hôm nay' : offset === 1 ? 'Ngày mai' : WEEKDAYS[day.getUTCDay()], label: `${String(day.getUTCDate()).padStart(2, '0')}/${String(day.getUTCMonth() + 1).padStart(2, '0')}` };
-  });
-}
-/** First bookable hourly slot for a date: future hours only when the date is today (Vietnam time). */
-function firstSlot(date: string, preferred = '20:00'): string | null {
-  const now = new Date(Date.now() + 7 * 3600_000); const today = now.toISOString().slice(0, 10);
-  const open = date === today ? SLOTS.filter(slot => Number(slot.slice(0, 2)) > now.getUTCHours()) : SLOTS;
-  return open.includes(preferred) ? preferred : open.find(slot => slot >= preferred) ?? open[0] ?? null;
-}
-function initialChoice(): { date: string; time: string } {
-  const [today, tomorrow] = upcomingDates(2);
-  const time = firstSlot(today.value); return time ? { date: today.value, time } : { date: tomorrow.value, time: '20:00' };
-}
 function durationLabel(minutes: number) { return minutes % 60 === 0 ? `${minutes / 60} giờ` : `${(minutes / 60).toLocaleString('vi-VN')} giờ`; }
 function money(value: string) { return `${BigInt(value).toLocaleString('vi-VN')} ₫`; }
 function when(value: string, timezone?: string) { return new Date(value).toLocaleString('vi-VN', { timeZone: timezone ?? 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }); }
@@ -50,8 +31,14 @@ function when(value: string, timezone?: string) { return new Date(value).toLocal
 export default function CustomerBooking() {
   const [branches, setBranches] = useState<Branch[]>([]); const [branchId, setBranchId] = useState('');
   const [catalogRooms, setCatalogRooms] = useState<Room[]>([]); const [roomId, setRoomId] = useState('');
-  const dates = useMemo(() => upcomingDates(7), []);
-  const [date, setDate] = useState(() => initialChoice().date); const [time, setTime] = useState(() => initialChoice().time); const [duration, setDuration] = useState(120); const [guests, setGuests] = useState(4);
+  // Time-dependent UI is computed only in the browser: this page is prerendered at build time, and React does not
+  // repair server-rendered attributes (disabled, aria-pressed) on hydration, so build-time dates would stay on screen.
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => { setClock(Date.now()); const timer = window.setInterval(() => setClock(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  const dayKey = clock === null ? null : upcomingDates(1, clock)[0].value;
+  const dates = useMemo(() => dayKey === null ? [] : upcomingDates(7, Date.now()), [dayKey]);
+  const [date, setDate] = useState(''); const [time, setTime] = useState('20:00');
+  useEffect(() => { if (clock !== null && !date) { const choice = initialChoice(clock); setDate(choice.date); setTime(choice.time); } }, [clock, date]); const [duration, setDuration] = useState(120); const [guests, setGuests] = useState(4);
   const [availability, setAvailability] = useState<Availability | null>(null); const [quotes, setQuotes] = useState<Record<string, Quote | 'unavailable'>>({});
   const quoteValue = quotes[roomId]; const quote = quoteValue && quoteValue !== 'unavailable' ? quoteValue : null;
   const setQuote = (value: Quote | null) => setQuotes(current => { if (value) return { ...current, [value.roomId]: value }; const next = { ...current }; delete next[roomId]; return next; });
@@ -175,7 +162,7 @@ export default function CustomerBooking() {
 
   const branch = branches.find(item => item.id === branchId); const rooms = availability?.rooms ?? []; const selectedRoom = rooms.find(item => item.id === roomId);
   const roomImage = (id: string) => fixedRoomImages[Math.max(0, catalogRooms.findIndex(item => item.id === id)) % fixedRoomImages.length];
-  const today = dates[0].value; const nowHour = new Date(Date.now() + 7 * 3600_000).getUTCHours();
+  const today = dates[0]?.value ?? '';
   const lookupStatus = lookup ? (lookup.bookingStatus ?? lookup.status) : null;
   const pillTone = (value: string | null) => value === 'CANCELLED' || value === 'NO_SHOW' || value === 'EXPIRED' ? 'rose' : value === 'COMPLETED' ? 'gray' : value === 'HELD' ? 'amber' : 'green';
   return <div className="app">
@@ -201,14 +188,14 @@ export default function CustomerBooking() {
       <form className="app-card" onSubmit={findAvailability} aria-labelledby="customer-time-title">
         <h2 id="customer-time-title"><span className="step-no">2</span>Chọn ngày &amp; giờ</h2>
         <span className="app-label">Chọn ngày</span>
-        <div className="chip-row" role="group" aria-label="Chọn ngày">{dates.map(item => <button type="button" key={item.value} className="date-chip" aria-pressed={date === item.value} onClick={() => { setDate(item.value); setTime(current => firstSlot(item.value, current) ?? current); resetSearch(); }}>{item.weekday}<strong>{item.label}</strong></button>)}<label className="date-other"><span className="visually-hidden">Ngày</span><input aria-label="Ngày" type="date" min={today} value={date} onChange={event => { const value = event.target.value; setDate(value); setTime(current => firstSlot(value, current) ?? current); resetSearch(); }} required /></label></div>
+        <div className="chip-row" role="group" aria-label="Chọn ngày">{dates.map(item => <button type="button" key={item.value} className="date-chip" aria-pressed={date === item.value} onClick={() => { setDate(item.value); setTime(current => firstSlot(item.value, current, Date.now()) ?? current); resetSearch(); }}>{item.weekday}<strong>{item.label}</strong></button>)}<label className="date-other"><span className="visually-hidden">Ngày</span><input aria-label="Ngày" type="date" min={today || undefined} value={date} onChange={event => { const value = event.target.value; setDate(value); setTime(current => firstSlot(value, current, Date.now()) ?? current); resetSearch(); }} required /></label></div>
         <span className="app-label">Chọn khung giờ</span>
-        <div className="slot-grid" role="group" aria-label="Giờ bắt đầu">{SLOTS.map(slot => <button type="button" key={slot} className="slot" aria-pressed={time === slot} disabled={date === today && Number(slot.slice(0, 2)) <= nowHour} onClick={() => { setTime(slot); resetSearch(); }}>{slot}</button>)}</div>
+        <div className="slot-grid" role="group" aria-label="Giờ bắt đầu">{SLOTS.map(slot => <button type="button" key={slot} className="slot" aria-pressed={time === slot} disabled={clock === null || !slotOpen(date, slot, clock)} onClick={() => { setTime(slot); resetSearch(); }}>{slot}</button>)}</div>
         <div className="stepper-row">
           <div><span className="app-label">Thời lượng</span><div className="stepper"><button type="button" aria-label="Giảm thời lượng" disabled={duration <= 60} onClick={() => { setDuration(value => value - 30); resetSearch(); }}><Minus size={16} /></button><output aria-live="polite" aria-label="Thời lượng">{durationLabel(duration)}</output><button type="button" aria-label="Tăng thời lượng" disabled={duration >= 480} onClick={() => { setDuration(value => value + 30); resetSearch(); }}><Plus size={16} /></button></div></div>
           <div><span className="app-label">Số khách</span><div className="stepper"><button type="button" aria-label="Giảm số khách" disabled={guests <= 1} onClick={() => { setGuests(value => value - 1); resetSearch(); }}><Minus size={16} /></button><output aria-live="polite" aria-label="Số khách">{guests} người</output><button type="button" aria-label="Tăng số khách" disabled={guests >= 100} onClick={() => { setGuests(value => value + 1); resetSearch(); }}><Plus size={16} /></button></div></div>
         </div>
-        <button className="primary app-cta" disabled={loading || searching || !branchId}><Search size={16} aria-hidden /> {searching ? 'Đang tìm…' : 'Tìm phòng trống'}</button>
+        <button className="primary app-cta" disabled={loading || searching || !branchId || !date}><Search size={16} aria-hidden /> {searching ? 'Đang tìm…' : 'Tìm phòng trống'}</button>
       </form>
       {availability && <section className="app-card" aria-labelledby="customer-rooms-title">
         <h2 id="customer-rooms-title"><span className="step-no">3</span>Phòng còn trống</h2>

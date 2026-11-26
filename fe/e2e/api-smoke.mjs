@@ -15,6 +15,12 @@ r = await call('GET', '/platform/merchants?status=ALL&limit=20&offset=0', { toke
 const code = 'SMOKE_' + Date.now().toString(36).toUpperCase();
 r = await call('POST', '/platform/merchants', { token: pt, body: { code, name: 'Smoke merchant', owner: { email: `smoke.${Date.now()}@karaokenow.local`, displayName: 'Smoke Owner', temporaryPassword: 'Smoke-password-2026' } } });
 check('create merchant 201 accountCreated', r.status === 201 && r.json.owner?.accountCreated === true, r);
+const smokeTenant = r.json.tenantId;
+r = await call('POST', `/platform/merchants/${smokeTenant}/suspend`, { token: pt, body: {} }); check('suspend without reason 400', r.status === 400, r);
+r = await call('POST', `/platform/merchants/${smokeTenant}/suspend`, { token: pt, body: { reason: 'smoke' } }); check('suspend merchant → INACTIVE', r.status === 200 && r.json.status === 'INACTIVE', r);
+r = await call('POST', `/platform/merchants/${smokeTenant}/suspend`, { token: pt, body: { reason: 'smoke' } }); check('suspend replay 200', r.status === 200 && r.json.status === 'INACTIVE', r);
+r = await call('GET', '/platform/merchants?status=INACTIVE&limit=100', { token: pt }); check('INACTIVE filter lists suspended', r.status === 200 && r.json.items.some(item => item.tenantId === smokeTenant), r);
+r = await call('POST', `/platform/merchants/${smokeTenant}/reactivate`, { token: pt, body: { reason: 'smoke' } }); check('reactivate → ACTIVE', r.status === 200 && r.json.status === 'ACTIVE', r);
 r = await call('POST', '/platform/merchants', { token: pt, body: { code, name: 'dup', owner: { email: 'x@karaokenow.local', displayName: 'x', temporaryPassword: 'Smoke-password-2026' } } });
 check('duplicate merchant code 409', r.status === 409, r);
 r = await call('POST', '/platform/merchants', { token: pt, body: { code: code + 'B', name: 'Existing owner', owner: { email: OWNER.email, displayName: 'x', temporaryPassword: 'Smoke-password-2026' } } });
@@ -42,6 +48,11 @@ r = await call('GET', '/merchant/audit-logs?limit=5&offset=0', { token: ot, tena
 r = await call('GET', '/merchant/booking/hold-expiry/backlog', { token: ot, tenant: T }); check('hold backlog', r.status === 200 && typeof r.json.overdueCount === 'string', r);
 r = await call('GET', '/merchant/notifications/outbox/backlog', { token: ot, tenant: T }); check('outbox backlog', r.status === 200 && typeof r.json.pendingCount === 'string', r);
 r = await call('GET', '/auth/sessions', { token: ot }); check('owner sessions', r.status === 200, r);
+r = await call('GET', '/merchant/booking/overtime-policy', { token: ot, tenant: T }); check('overtime policy get', r.status === 200 && Number.isInteger(r.json.graceMinutes), r);
+const grace = r.json.graceMinutes;
+r = await call('PATCH', '/merchant/booking/overtime-policy', { token: ot, tenant: T, body: { graceMinutes: 61 } }); check('overtime grace 61 → 400', r.status === 400, r);
+r = await call('PATCH', '/merchant/booking/overtime-policy', { token: ot, tenant: T, body: { graceMinutes: grace } }); check('overtime policy patch (giữ nguyên giá trị)', r.status === 200 && r.json.graceMinutes === grace && r.json.configured === true, r);
+r = await call('GET', '/merchant/catalog/publication', { token: ot, tenant: T }); check('publication có tenantStatus ACTIVE', r.json.tenantStatus === 'ACTIVE', r);
 
 // public booking flow
 const pb = await call('GET', '/public/branches?limit=100'); check('public branches', pb.status === 200, pb);
@@ -84,6 +95,7 @@ if (branch) {
       const ci = await call('POST', `/merchant/booking/bookings/${bid}/check-in`, { token: ot, tenant: T }); check('check-in', ci.status === 200 && ci.json.status === 'CHECKED_IN', ci);
       const oc = await call('POST', `/merchant/booking/bookings/${bid}/outcome`, { token: ot, tenant: T, body: { type: 'NO_SHOW', note: 'smoke' } }); check('outcome after check-in 409', oc.status === 409, oc);
       const co2 = await call('POST', `/merchant/booking/bookings/${bid}/check-out`, { token: ot, tenant: T }); check('check-out', co2.status === 200 && co2.json.status === 'COMPLETED', co2);
+      check('check-out ghi lateMinutes/overtimeMinutes', Number.isInteger(co2.json.lateMinutes) && Number.isInteger(co2.json.overtimeMinutes), co2.json);
       const lk2 = await call('POST', '/public/booking/lookup', { body: { phone, bookingCode: h.json.bookingCode } }); check('lookup bookingStatus COMPLETED', lk2.json.bookingStatus === 'COMPLETED', lk2);
     }
   } else console.log('… no room or terms not configured; public flow skipped', { room: !!room, terms });

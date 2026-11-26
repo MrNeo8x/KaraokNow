@@ -19,6 +19,7 @@ export default function PlatformMerchants({ token }: { token: string }) {
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL'); const [offset, setOffset] = useState(0); const [revision, setRevision] = useState(0);
   const [page, setPage] = useState<Page | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [forbidden, setForbidden] = useState(false);
   const [code, setCode] = useState(''); const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [displayName, setDisplayName] = useState(''); const [password, setPassword] = useState('');
+  const [reasons, setReasons] = useState<Record<string, string>>({}); const [acting, setActing] = useState(''); const [notice, setNotice] = useState('');
   const [creating, setCreating] = useState(false); const [createError, setCreateError] = useState(''); const [created, setCreated] = useState<{ value: Created; password: string } | null>(null);
 
   useEffect(() => {
@@ -45,6 +46,22 @@ export default function PlatformMerchants({ token }: { token: string }) {
     } finally { setCreating(false); }
   }
 
+  async function changeStatus(item: Merchant, action: 'suspend' | 'reactivate') {
+    setError(''); setNotice('');
+    const reason = (reasons[item.tenantId] ?? '').trim();
+    if (!reason) { setError(`Cần nhập lý do ${action === 'suspend' ? 'khoá' : 'mở khoá'} cho ${item.name}.`); return; }
+    if (action === 'suspend' && !window.confirm(`Khoá ${item.name}? Merchant biến khỏi trang khách và không nhận giữ chỗ mới; giữ chỗ và booking hiện có vẫn xử lý được.`)) return;
+    setActing(item.tenantId);
+    try {
+      const next = await request<Merchant>(`/platform/merchants/${encodeURIComponent(item.tenantId)}/${action}`, { method: 'POST', body: JSON.stringify({ reason }) }, token);
+      setPage(current => current ? { ...current, items: current.items.map(entry => entry.tenantId === next.tenantId ? { ...entry, ...next } : entry) } : current);
+      setReasons(current => ({ ...current, [item.tenantId]: '' })); setNotice(`${action === 'suspend' ? 'Đã khoá' : 'Đã mở khoá'} ${next.name}.`);
+    } catch (err) {
+      const code = err instanceof ApiError ? err.status : undefined;
+      setError(code === 403 ? 'Không được thao tác: bạn không phải Platform Admin hoặc là thành viên của merchant này.' : code === 404 ? 'Không tìm thấy merchant.' : (err as Error).message);
+    } finally { setActing(''); }
+  }
+
   if (forbidden) return null; // PlatformListings already explains the missing Platform Admin grant.
   return <section className="card amenities" aria-labelledby="platform-merchants-title">
     <div className="heading"><div><div className="eyebrow">PLATFORM ADMIN</div><h2 id="platform-merchants-title">Merchant</h2><p>Tạo merchant thủ công cùng Owner đầu tiên. Merchant mới chưa publish và chưa được duyệt.</p></div></div>
@@ -60,9 +77,9 @@ export default function PlatformMerchants({ token }: { token: string }) {
     {created && <div className="customer-receipt" role="status"><span className="eyebrow">ĐÃ TẠO MERCHANT</span><h3>{created.value.name} ({created.value.code})</h3><p>Tenant ID (Owner nhập khi đăng nhập): <code>{created.value.tenantId}</code><br />Owner: {created.value.owner.email}</p>
       {created.value.owner.accountCreated ? <p>Tài khoản Owner mới. Gửi mật khẩu tạm <code>{created.password}</code> cho Owner qua kênh riêng; Owner phải đổi mật khẩu ở lần đăng nhập đầu. Mật khẩu chỉ hiển thị tại đây.</p> : <p className="deposit-callout">Email này đã có tài khoản: mật khẩu tạm <strong>không</strong> được áp dụng. Owner đăng nhập bằng mật khẩu hiện có.</p>}
       <button type="button" className="secondary" onClick={() => setCreated(null)}>Đóng</button></div>}
-    <div className="section-title"><div><h3>Danh sách merchant</h3></div><label className="select-label">Trạng thái<select value={status} onChange={event => { setStatus(event.target.value as typeof status); setOffset(0); }}><option value="ALL">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Ngừng hoạt động</option></select></label></div>
-    {error && <div className="error" role="alert">{error}</div>}
-    {loading ? <p role="status">Đang tải merchant…</p> : page && (page.items.length === 0 ? <div className="empty">Chưa có merchant.</div> : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Merchant</th><th>Trạng thái</th><th>Owner</th><th>Chi nhánh</th><th>Catalog</th><th>Tạo lúc</th></tr></thead><tbody>{page.items.map(item => <tr key={item.tenantId}><td data-label="Merchant"><strong>{item.name}</strong><br /><small>{item.code} · {item.tenantId}</small></td><td data-label="Trạng thái">{item.status === 'ACTIVE' ? 'Hoạt động' : 'Ngừng'}</td><td data-label="Owner">{item.ownerCount}</td><td data-label="Chi nhánh">{item.activeBranchCount}</td><td data-label="Catalog">{item.platformApproved ? 'Đã duyệt' : item.published ? 'Chờ duyệt' : 'Chưa publish'}</td><td data-label="Tạo lúc">{new Date(item.createdAt).toLocaleString('vi-VN')}</td></tr>)}</tbody></table></div>)}
+    <div className="section-title"><div><h3>Danh sách merchant</h3></div><label className="select-label">Trạng thái<select value={status} onChange={event => { setStatus(event.target.value as typeof status); setOffset(0); }}><option value="ALL">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Đang bị khoá</option></select></label></div>
+    {error && <div className="error" role="alert">{error}</div>}{notice && <div className="notice" role="status">{notice}</div>}
+    {loading ? <p role="status">Đang tải merchant…</p> : page && (page.items.length === 0 ? <div className="empty">Chưa có merchant.</div> : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Merchant</th><th>Trạng thái</th><th>Owner</th><th>Chi nhánh</th><th>Catalog</th><th>Tạo lúc</th><th>Khoá / mở khoá</th></tr></thead><tbody>{page.items.map(item => <tr key={item.tenantId}><td data-label="Merchant"><strong>{item.name}</strong><br /><small>{item.code} · {item.tenantId}</small></td><td data-label="Trạng thái">{item.status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : <span className="pill rose">Đang bị khoá</span>}</td><td data-label="Owner">{item.ownerCount}</td><td data-label="Chi nhánh">{item.activeBranchCount}</td><td data-label="Catalog">{item.platformApproved ? 'Đã duyệt' : item.published ? 'Chờ duyệt' : 'Chưa publish'}</td><td data-label="Tạo lúc">{new Date(item.createdAt).toLocaleString('vi-VN')}</td><td data-label="" className="status-action"><input aria-label={`Lý do ${item.status === 'ACTIVE' ? 'khoá' : 'mở khoá'} ${item.name}`} placeholder="Lý do (bắt buộc)" maxLength={500} value={reasons[item.tenantId] ?? ''} onChange={event => setReasons(current => ({ ...current, [item.tenantId]: event.target.value }))} />{item.status === 'ACTIVE' ? <button type="button" className="secondary danger" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'suspend')}>Khoá</button> : <button type="button" className="secondary" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'reactivate')}>Mở khoá</button>}</td></tr>)}</tbody></table></div>)}
     {page && <div className="amenity-buttons"><button type="button" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - LIMIT))}>← Trang trước</button><span>Trang {Math.floor(offset / LIMIT) + 1}</span><button type="button" disabled={loading || !page.hasMore} onClick={() => setOffset(value => value + LIMIT)}>Trang sau →</button></div>}
   </section>;
 }

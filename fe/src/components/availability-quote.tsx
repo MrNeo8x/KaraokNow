@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { request } from '@/lib/api';
+import { useCan } from './permissions-context';
 import { clearHoldAttempt, holdStorageKey, readHoldAttempt, writeHoldAttempt, type HoldAttempt } from '@/lib/hold-attempt';
 
 type Room = { id: string; name: string; code: string; capacity: number };
@@ -11,6 +12,7 @@ type Hold = { id: string; roomId: string; channel: string; startAt: string; dura
 type Props = { token: string; tenant: string; branchId: string; timezone: string };
 
 export default function AvailabilityQuote({ token, tenant, branchId, timezone }: Props) {
+  const canHold = useCan()('hold.create');
   const [start, setStart] = useState('');
   const [offset, setOffset] = useState('+07:00');
   const [minutes, setMinutes] = useState('120');
@@ -109,7 +111,7 @@ export default function AvailabilityQuote({ token, tenant, branchId, timezone }:
     </form>
     {error && <div className="error" role="alert">{error}</div>}
     {result && <div aria-live="polite"><p>Thời gian đã tra: {new Date(result.startAt).toLocaleString('vi-VN', { timeZone: timezone })} – {new Date(result.requestedEndAt).toLocaleString('vi-VN', { timeZone: timezone })} ({timezone}). Buffer sau lượt: {result.appliedBufferMinutes} phút.</p>
-      {result.rooms.length === 0 ? <p>Không có phòng phù hợp trong khoảng thời gian này.</p> : <ul className="availability-list">{result.rooms.map(room => <li key={room.id}><span><strong>{room.name}</strong> · {room.code} · tối đa {room.capacity} khách</span><div className="amenity-buttons"><button type="button" disabled={busy || holdBusy} onClick={() => void getQuote(room)}>Xem báo giá</button><button type="button" disabled={busy || holdBusy || !!attempt || !recoveryReady} onClick={() => startHold(room)}>Giữ phòng walk-in</button></div></li>)}</ul>}
+      {result.rooms.length === 0 ? <p>Không có phòng phù hợp trong khoảng thời gian này.</p> : <ul className="availability-list">{result.rooms.map(room => <li key={room.id}><span><strong>{room.name}</strong> · {room.code} · tối đa {room.capacity} khách</span><div className="amenity-buttons"><button type="button" disabled={busy || holdBusy} onClick={() => void getQuote(room)}>Xem báo giá</button>{canHold && <button type="button" disabled={busy || holdBusy || !!attempt || !recoveryReady} onClick={() => startHold(room)}>Giữ phòng walk-in</button>}</div></li>)}</ul>}
     </div>}
     {quote && <div className="notice" role="status"><strong>{quote.roomName}: {new Intl.NumberFormat('vi-VN').format(BigInt(quote.data.priceSnapshot.totalAmountVnd))} ₫</strong><br />Quy tắc {quote.data.priceSnapshot.calculation.priceRuleCode} · {quote.data.priceSnapshot.calculation.amountUnit === 'PER_HOUR' ? 'theo giờ' : 'theo lượt'}. Báo giá chỉ mang tính tra cứu, chưa tạo booking.</div>}
     {!attempt && holdError && <div className="error" role="alert">{holdError}</div>}

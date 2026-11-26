@@ -41,6 +41,7 @@ try {
   await step('Check-in', async () => { await row.getByRole('button', { name: 'Check-in' }).click(); await row.locator('.tag', { hasText: 'Đang sử dụng' }).waitFor(); });
   await step('Ẩn hủy/no-show sau check-in', async () => { if (await row.getByText('Hủy / khách không đến').count()) throw new Error('vẫn hiện form hủy'); });
   await step('Check-out (có hộp xác nhận)', async () => { await row.getByRole('button', { name: 'Check-out' }).click(); await row.locator('.tag', { hasText: 'Hoàn tất' }).waitFor(); return await row.getByText(/Check-out:/).innerText(); });
+  await step('Hiển thị trễ/quá giờ sau check-out', async () => row.getByText(/Trả phòng đúng hoặc trước giờ|Trễ \d+ phút/).innerText());
   await step('Ghi tiền mặt cho booking', async () => { await row.getByLabel('Khoản thu tiền mặt (VND)').fill('210000'); await row.getByRole('button', { name: 'Ghi nhận tiền mặt' }).click(); await row.getByText(/210\.000 ₫ qua 1 giao dịch/).waitFor({ timeout: 10000 }); });
   await page.screenshot({ path: SHOTS + '/staff-booking-completed.png', fullPage: true });
   // second hold (mobile one) → cancel path
@@ -61,6 +62,7 @@ try {
     await r2.getByLabel(/Tiền mặt đã hoàn/).fill(lk.depositRequiredVnd); await r2.getByRole('button', { name: 'Ghi nhận kết quả' }).click();
     await r2.locator('.tag', { hasText: 'Đã hủy' }).waitFor(); return await r2.locator('p.outcome').innerText();
   });
+  await step('Màn ân hạn quá giờ trong Giá & chính sách', async () => { await goSection(page, 'Giá & chính sách'); await page.getByRole('heading', { name: 'Ân hạn quá giờ' }).waitFor(); return await page.locator('section[aria-labelledby="overtime-title"] .pill').innerText(); });
   await step('Audit hiện thao tác mới', async () => { await goSection(page, 'Cài đặt hệ thống'); await page.getByText('Nhật ký audit').click(); await page.locator('table.admin-table code').first().waitFor({ timeout: 10000 }); return await page.locator('table.admin-table code').first().innerText(); });
   await step('Phiên đăng nhập: đánh dấu phiên này', async () => { await page.getByText('Phiên đăng nhập của tôi').click(); await page.locator('.tag', { hasText: 'Phiên này' }).waitFor({ timeout: 10000 }); });
   await page.screenshot({ path: SHOTS + '/staff-admin.png', fullPage: true });

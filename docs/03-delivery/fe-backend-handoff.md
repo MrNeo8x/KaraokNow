@@ -140,6 +140,23 @@ Chrome headless (Playwright) với container backend/frontend đã rebuild: lu�
 
 **Yêu cầu BE (chặn lễ tân xác nhận hold online):** xác nhận hold kênh WEB yêu cầu `cancellationTerms` trùng khớp từng ký tự với `public_accepted_terms`, nhưng `GET /v1/merchant/booking/holds/{id}` không trả trường này. Lễ tân (không phải Owner) không đọc được điều khoản công khai, nên không thể xác nhận hold online. Đề xuất trả `publicAcceptedTerms` và `publicAcceptedTermsVersion` trong hold chi tiết. FE đã đọc sẵn `publicAcceptedTerms` nếu có. Hiện FE tạm điền điều khoản công khai hiện tại (chỉ Owner đọc được); cách này sai nếu Owner sửa điều khoản sau khi khách đặt.
 
+### FE INTEGRATED — overtime và khoá merchant (FE-013, 2026-11-26)
+
+- Ân hạn quá giờ ở mục Giá & chính sách; lịch booking hiển thị `lateMinutes`/`overtimeMinutes`/`overtimeGraceMinutes` sau check-out; `/platform` → Merchant khoá/mở khoá có lý do; Owner thấy cảnh báo khi `tenantStatus=INACTIVE`; 409 "merchant bị khoá" và "changed concurrently" được dịch sang tiếng Việt trong `fe/src/lib/api.ts`.
+- `npm run e2e` (container rebuild): API 54/54, khách 20/20, lễ tân 21/21, Platform 16/16. README đã cập nhật: seed UAT có sẵn bảng giá/điều khoản/cọc.
+
+### FE ROLE TEST — QA-003 (2026-11-26)
+
+`fe/e2e/roles.mjs` (Chrome headless, tài khoản seed UAT) đạt 21/23. Lỗi FE tìm ra và đã sửa: lỗi ghi cọc bị xoá ngay khi màn tải lại số cọc (kể cả 409 vượt số còn thiếu); lịch booking của Lễ tân hiện banner lỗi vì không có quyền đọc tiền mặt (nay ẩn phần thu tiền với vai trò này); lỗi `Insufficient role` hiện tiếng Anh (nay dịch); ghi hủy/no-show bị 403 hiện kèm câu sai ngữ cảnh về tiền hoàn.
+
+**Yêu cầu BE:**
+1. **Quyền Thu ngân không khớp nghiệp vụ.** Thu ngân được `POST .../holds/{id}/deposits` và `POST .../bookings/{id}/manual-payments`, nhưng không được `GET /v1/merchant/booking/holds/{id}`, `GET /v1/merchant/branches/{branchId}/booking/holds` và `GET /v1/merchant/branches/{branchId}/booking/bookings`, nên trên FE không có đường nào tới form ghi cọc/tiền mặt. Đề xuất cho CASHIER quyền đọc ba endpoint trên (hoặc endpoint đọc tối giản riêng). Hai bước đỏ trong `roles.mjs` sẽ xanh khi sửa.
+2. **API vai trò của người dùng hiện tại** (ví dụ `GET /v1/merchant/me` → `{roles, branchIds}`). FE hiện phải đoán quyền bằng cách thử gọi API và xử lý 403 sau khi người dùng bấm; có API này FE ẩn trước các nút không được phép (ghi cọc với Lễ tân, hủy/no-show với Lễ tân, lưu ân hạn với Lễ tân/Thu ngân).
+
+### Yêu cầu BE — triển khai (2026-11-26)
+
+Khi viết hướng dẫn triển khai trong `README.md`, phát hiện image runtime của backend (`be/Dockerfile`) chỉ chứa `dist/` và dependency production: thiếu `node-pg-migrate`, `ts-node`, `migrations/`, `scripts/`, nên không chạy được `db:migrate`, `holds:expire`, `outbox:work` từ image. Đề xuất thêm target/image cho migration và worker (hoặc biên dịch worker vào `dist/` và đưa `node-pg-migrate` + `migrations/` vào image). Ngoài ra Swagger `/docs` và `/v1/metrics` luôn bật; cân nhắc tắt `/docs` theo biến môi trường ở production.
+
 ## FE READY — phản hồi yêu cầu từ FE ROLE TEST và triển khai (2026-11-26)
 
 Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
@@ -148,6 +165,14 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
 2. **Quyền Thu ngân:** CASHIER được đọc `GET /v1/merchant/booking/holds/{id}`, `GET /v1/merchant/branches/{branchId}/booking/holds`, `GET /v1/merchant/booking/bookings/{id}` và `GET /v1/merchant/branches/{branchId}/booking/bookings`, chỉ trong chi nhánh được cấp (chi nhánh khác 403). Thu ngân vẫn không tạo/xác nhận hold, không check-in/out, không hủy.
 3. **`GET /v1/merchant/me`** (cần `X-Tenant-ID`, mọi vai trò) → `{userId,email,displayName,tenantId,tenantName,tenantStatus,membershipId,roles,branchIds,platformAdmin}`. Owner có `branchIds` rỗng nhưng thấy mọi chi nhánh. Chỉ để hiển thị; endpoint vẫn tự kiểm quyền. Không có membership trong tenant → 403.
 4. **OPS-005 (triển khai):** `be/Dockerfile` có target `tools` (migration + worker) bên cạnh `runtime` (API). Compose: `docker compose --profile tools run --rm migrate`, `docker compose --profile workers up -d` (hai worker). `SWAGGER_ENABLED=false` tắt `/docs`; `/v1/metrics` vẫn bật — chặn ở reverse proxy. Phần "Giới hạn hiện tại" trong README cần cập nhật theo các lệnh này.
+
+### FE INTEGRATED — API-003 và OPS-005 (2026-11-26)
+
+- `GET /v1/merchant/me` dùng cho menu và thao tác theo vai trò (`fe/src/lib/permissions.ts` ánh xạ `@RequireRoles` của BE; chưa biết vai trò thì không ẩn gì). Sidebar hiện tên merchant, người dùng, vai trò; banner khi `tenantStatus=INACTIVE` cho mọi vai trò.
+- Xác nhận hold WEB dùng `publicAcceptedTerms` (ô điều khoản khoá, đúng nguyên văn). Thu ngân tra hold/ghi cọc và xem lịch/thu tiền mặt được trên FE.
+- README gốc cập nhật target `tools`, profile `tools`/`workers`, `SWAGGER_ENABLED`; đã chạy thử `docker compose --profile tools run --rm migrate`.
+- **Lỗi FE tìm ra khi chạy lại sau 23:00 và đã sửa:** `/booking` được prerender lúc build nên ngày "Hôm nay", ngày/giờ mặc định và khung giờ bị khoá được tính theo giờ build; React không sửa thuộc tính `disabled`/`aria-pressed` khi hydrate nên UI giữ giá trị cũ (deploy hôm nay thì vài ngày sau vẫn hiện "Hôm nay" là ngày deploy). Nay chỉ tính trên trình duyệt sau khi mount, cập nhật mỗi phút (`fe/src/lib/booking-time.ts`, 3 unit test).
+- Kết quả: `npm run e2e` 138/138; FE unit 38/38. Mỗi lượt e2e tạo khoảng 6 giữ chỗ công khai, giới hạn mặc định 20/IP/15 phút nên chạy liên tiếp quá 3 lượt sẽ gặp 429 (ghi trong `fe/e2e/README.md`).
 
 ## Ưu tiên tiếp theo
 
