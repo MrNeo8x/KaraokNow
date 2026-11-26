@@ -1,6 +1,43 @@
 # Work log — KaraokeNow
 
-Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại toàn bộ lịch sử chat. Ghi mục mới **trên cùng**. Mỗi mục: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
+Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
+
+## Trạng thái hiện tại (cập nhật 2026-11-26, 22:20)
+
+Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
+
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả):
+
+| Commit | Luồng | Nội dung chính |
+|---|---|---|
+| `7796a6d` | BE | Benchmark QA-002, sửa deadlock giữ phòng, checklist + seed UAT-001 |
+| `154eeab` | Người dùng | Script `bench:booking`, ảnh thiết kế `docs/deg/*.png` |
+| `221c6d8` | FE | Màn cọc, check-in/out/hủy, `/platform`, quản trị merchant, Playwright `fe/e2e` |
+| `0c1b62d`, `20619e1` | BE | Task board tiếng Việt + trạng thái `VERIFY`, `AGENTS.md`, work log |
+
+**Kiểm chứng gần nhất:** BE `npm run verify` 42/42 unit, `npm run test:e2e` 38/38, benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (theo task board): unit 32/32, Playwright khách/lễ tân-Owner/Platform đạt.
+
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100` — đã migrate, seed UAT và chạy image mới nhất (đã kiểm: có khoá theo phòng, 100 request tranh một phòng → 1×201, 99×409 trong 470 ms). Worker `holds:expire`/`outbox:work` không chạy trong compose.
+
+**Đang dở (working tree, chưa commit):** Luồng FE làm lại giao diện theo ảnh thiết kế (`fe/src/components/admin-shell.tsx`, `fe/src/app/theme.css`, sửa `experience.tsx`, `customer-booking.tsx`, các màn quản trị và `fe/e2e/*`; ảnh review ở `docs/deg/fe-review/`). Luồng BE không có việc dở.
+
+**Trạng thái task:** `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 2 (REC-003, QA-003) · `BLOCKED` 10 · `BACKLOG` 5 · `DONE` 44. Chi tiết ở `task-board.md`.
+
+**Việc tiếp theo**
+
+- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` và ký nhận; trả lời các quyết định BKG-007 (overtime), PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); xác nhận giả định cọc (FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt), giữ duyệt khi publish lại, và quy mô bộ dữ liệu benchmark.
+- *Luồng FE:* hoàn tất và commit phần giao diện mới (chạy lại `npm test`, `next build`, `npm run e2e`); REC-003 lịch hợp nhất hold + booking; QA-003 thêm kịch bản Branch Manager/Cashier (tài khoản có trong seed), bàn phím, 429, mất mạng.
+- *Luồng BE:* chờ quyết định PO ở trên; OPS-004 (pool/timeout PostgreSQL) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: khoá merchant, reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
+
+**Không làm khi chưa có quyết định:** thanh toán online, tự động hoàn tiền/no-show, overtime, khoá merchant, kênh Zalo/Messenger.
+
+---
+
+## 2026-11-26 (22:15) — Luồng BE: rebuild backend local
+
+- `npm run db:migrate`: không có migration mới. `docker compose up -d --build backend`: image trùng bản đang chạy (container đã được tạo lại lúc 22:10, nhiều khả năng bởi Luồng FE) nên không tạo lại.
+- Kiểm trực tiếp container: có `dist/availability/occupancy-lock.js`, log khởi động không còn `LegacyRouteConverter`; 100 request giữ cùng phòng/khung giờ → 1×201, 99×409, 470 ms, không 5xx.
+- Bài kiểm để lại 1 hold WALK_IN ngày 2045-09-11 (phòng Gia Đình 01, merchant UAT), tự hết hạn sau 15 phút.
 
 ---
 
@@ -62,7 +99,7 @@ Migration mới: `20261124000000_hold_deposits`, `20261124010000_platform_listin
 - Merchant tự gỡ publish rồi publish lại vẫn giữ trạng thái đã duyệt.
 - No-show ghi được cả trước giờ bắt đầu (nhân viên tự quyết, theo PD-015).
 
-### Trạng thái luồng FE tại thời điểm ghi
+### Trạng thái luồng FE tại thời điểm ghi (đã cũ — xem "Trạng thái hiện tại")
 
 - Đã commit (`c56fea1`): guest hold/lookup ở `/booking`, `fe/src/lib/public-booking.ts`, test.
 - **Chưa commit** trong working tree (session FE đang làm): `/platform` (`platform-listings.tsx`, `platform-merchants.tsx`), cọc trên hold (`hold-details.tsx`), check-in/out/hủy (`booking-operations.tsx`, `lib/booking-lifecycle.ts`), và các màn quản trị merchant `catalog-publication.tsx`, `memberships.tsx`, `audit-log.tsx`, `my-sessions.tsx`, `ops-backlog.tsx`, `lib/admin.ts` cùng test. FE ghi nhận unit test 27/27 ở lượt trước; chưa có browser/FE–BE role test.

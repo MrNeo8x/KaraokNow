@@ -6,7 +6,7 @@
 
 1. `git status --short` và `git log --oneline -10`. Working tree có thể chứa thay đổi **chưa commit của session khác** (BE và FE chạy song song trên cùng thư mục) — không revert, không commit hộ.
 2. Đọc theo thứ tự:
-   - `docs/03-delivery/work-log.md` — nhật ký phiên gần nhất, việc dở dang và cảnh báo.
+   - `docs/03-delivery/work-log.md` — mục "Trạng thái hiện tại" ở đầu file (commit, môi trường, việc dở, việc tiếp theo), rồi nhật ký các phiên.
    - `docs/03-delivery/task-board.md` — nguồn sự thật về trạng thái task và hàng đợi tiếp theo.
    - `docs/03-delivery/fe-backend-handoff.md` — contract BE→FE (marker `FE READY` / `FE INTEGRATED`).
    - `docs/00-product/decision-log.md` — quyết định PO đã duyệt (PD-xxx, UAT-PD-xxx). **Không tự suy ra quyết định sản phẩm**; nếu thiếu, hỏi người dùng rồi ghi PD mới.
@@ -72,4 +72,4 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 
 ## Definition of Done
 
-Code + migration (có down) + unit/E2E phù hợp + `npm run verify` + `npm run test:e2e` pass; OpenAPI/Markdown sinh lại; quyền và audit đúng; task board, handoff (FE READY), traceability, Master Plan và `work-log.md` cập nhật; quyết định PO mới ghi vào decision log. Commit chỉ khi người dùng yêu cầu; không push nếu không được bảo.
+Code + migration (có down) + unit/E2E phù hợp + `npm run verify` + `npm run test:e2e` pass; OpenAPI/Markdown sinh lại; quyền và audit đúng; task board, handoff (FE READY), traceability, Master Plan cập nhật; `work-log.md` có mục nhật ký mới và mục "Trạng thái hiện tại" được viết lại; quyết định PO mới ghi vào decision log. Commit chỉ khi người dùng yêu cầu; không push nếu không được bảo.
