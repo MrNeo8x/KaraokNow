@@ -552,6 +552,11 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: '0911222334', bookingCode: publicHold.bookingCode }).expect(404);
     await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: publicHold.bookingCode }).expect(200)
       .expect(({ body }) => expect(body).toMatchObject({ holdId: publicHold.holdId, bookingId: null, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1' }));
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: '+84911222333', bookingCode: publicHold.bookingCode }).expect(200)
+      .expect(({ body }) => expect(body.holdId).toBe(publicHold.holdId));
+    await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1')
+      .send({ ...publicHoldBody, phone: '84911222333' }).expect(201)
+      .expect(({ body }) => expect(body).toEqual(publicHold));
     const publicAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE action='PUBLIC_HOLD_CREATED' AND entity_id=$1`, [publicHold.holdId]);
     expect(publicAudit.rows).toHaveLength(1);
     expect(JSON.stringify(publicAudit.rows)).not.toContain(publicHoldBody.phone);

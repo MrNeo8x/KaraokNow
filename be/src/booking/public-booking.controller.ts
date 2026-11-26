@@ -9,7 +9,7 @@ export class PublicBookingController {
   constructor(private readonly booking: PublicBookingService) {}
 
   @Post('holds')
-  @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'Visible ASCII 1–100 characters; scoped to published merchant and normalized phone' })
+  @ApiHeader({ name: 'Idempotency-Key', required: true, description: 'Visible ASCII 1–100 characters; scoped to published merchant and normalized phone (0…, 84…, +84… are the same number)' })
   @ApiResponse({ status: 201, type: PublicHoldResponseDto })
   @ApiResponse({ status: 409, description: 'Occupancy, price, terms version or idempotency conflict' })
   @ApiResponse({ status: 429, description: 'IP or phone rate limit exceeded' })

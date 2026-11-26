@@ -5,6 +5,7 @@ import type { Pool, PoolClient } from 'pg';
 import { PG_POOL } from '../platform/database/database.module';
 import type { Actor } from '../platform/auth/auth.types';
 import { PricingService } from '../pricing/pricing.service';
+import { normalizePhone } from './phone';
 import { CreatePublicHoldDto, PublicBookingLookupDto } from './public-booking.dto';
 
 @Injectable()
@@ -31,10 +32,11 @@ export class PublicBookingService {
     if (!Number.isFinite(start.getTime()) || !/[Tt].*(?:[Zz]|[+-]\d{2}:?\d{2})$/.test(dto.startAt)) {
       throw new UnprocessableEntityException('startAt must include an explicit timezone');
     }
-    const phoneHash = this.keyedHash('phone', dto.phone);
+    const phone = normalizePhone(dto.phone);
+    const phoneHash = this.keyedHash('phone', phone);
     await this.consumeLimit('PUBLIC_HOLD_IP', this.keyedHash('ip', ip), this.holdIpLimit);
     const requestHash = createHash('sha256').update(JSON.stringify([
-      dto.roomId, start.toISOString(), dto.durationMinutes, dto.phone, dto.email ?? null,
+      dto.roomId, start.toISOString(), dto.durationMinutes, phone, dto.email ?? null,
       dto.expectedTotalAmountVnd, dto.termsVersion
     ])).digest('hex');
     const client = await this.db.connect();
@@ -92,7 +94,7 @@ export class PublicBookingService {
   }
 
   async lookup(ip: string, dto: PublicBookingLookupDto) {
-    const phoneHash = this.keyedHash('phone', dto.phone);
+    const phoneHash = this.keyedHash('phone', normalizePhone(dto.phone));
     await this.consumeLimit('PUBLIC_LOOKUP_IP', this.keyedHash('ip', ip), this.lookupIpLimit);
     await this.consumeLimit('PUBLIC_LOOKUP_PHONE', phoneHash, this.lookupPhoneLimit);
     const client = await this.db.connect();

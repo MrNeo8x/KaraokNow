@@ -1680,7 +1680,7 @@ Nhóm: public booking
 | Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
 |---|---|---|---|
 | header | `idempotency-key` | Có | string |
-| header | `Idempotency-Key` | Có | string — Visible ASCII 1–100 characters; scoped to published merchant and normalized phone |
+| header | `Idempotency-Key` | Có | string — Visible ASCII 1–100 characters; scoped to published merchant and normalized phone (0…, 84…, +84… are the same number) |
 
 Body bắt buộc:
 

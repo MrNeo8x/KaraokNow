@@ -16,6 +16,25 @@ describe('environment validation', () => {
     );
   });
 
+  it('defaults TRUST_PROXY_HOPS to 0 and parses a configured value', () => {
+    expect(validateEnvironment(validConfig)).toEqual(expect.objectContaining({ TRUST_PROXY_HOPS: 0 }));
+    expect(validateEnvironment({ ...validConfig, TRUST_PROXY_HOPS: '2' })).toEqual(expect.objectContaining({ TRUST_PROXY_HOPS: 2 }));
+  });
+
+  it.each(['-1', '11', '1.5', 'abc'])('rejects TRUST_PROXY_HOPS=%s', (value) => {
+    expect(() => validateEnvironment({ ...validConfig, TRUST_PROXY_HOPS: value }))
+      .toThrow('TRUST_PROXY_HOPS must be an integer between 0 and 10');
+  });
+
+  it('accepts unset or empty public rate-limit settings and valid overrides', () => {
+    expect(() => validateEnvironment({ ...validConfig, PUBLIC_HOLD_IP_LIMIT: '', PUBLIC_LOOKUP_PHONE_LIMIT: '10000' })).not.toThrow();
+  });
+
+  it.each(['0', '10001', '2.5', 'many'])('rejects public rate-limit value %s', (value) => {
+    expect(() => validateEnvironment({ ...validConfig, PUBLIC_HOLD_PHONE_LIMIT: value }))
+      .toThrow('PUBLIC_HOLD_PHONE_LIMIT must be an integer between 1 and 10000');
+  });
+
   it('rejects a non-PostgreSQL database URL', () => {
     expect(() => validateEnvironment({ ...validConfig, DATABASE_URL: 'mysql://localhost/karaokenow' }))
       .toThrow('DATABASE_URL must use the postgres:// or postgresql:// protocol');

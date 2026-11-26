@@ -3202,7 +3202,7 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Visible ASCII 1–100 characters; scoped to published merchant and normalized phone",
+            "description": "Visible ASCII 1–100 characters; scoped to published merchant and normalized phone (0…, 84…, +84… are the same number)",
             "required": true,
             "schema": {
               "type": "string"
