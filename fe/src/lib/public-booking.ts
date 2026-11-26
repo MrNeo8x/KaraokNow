@@ -1,6 +1,6 @@
 export type PublicHoldBody = { roomId: string; startAt: string; durationMinutes: number; phone: string; email?: string; expectedTotalAmountVnd: string; termsVersion: string };
 export type PublicHoldAttempt = { key: string; body: PublicHoldBody };
-export type PublicHoldReceipt = { holdId: string; branchId: string; roomId: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; totalAmountVnd: string; termsVersion: string; bookingCode: string; phone: string };
+export type PublicHoldReceipt = { holdId: string; branchId: string; roomId: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; totalAmountVnd: string; termsVersion: string; depositRequiredVnd?: string; bookingCode: string; phone: string };
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export const PUBLIC_HOLD_ATTEMPT_KEY = 'karaokenow:public-hold-attempt:v1';

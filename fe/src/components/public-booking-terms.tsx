@@ -1,19 +1,19 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { request } from '@/lib/api';
+import { ApiError, request } from '@/lib/api';
 
 type Terms = { configured: boolean; terms: string | null; version: string | null; updatedAt?: string | null };
 
 export default function PublicBookingTerms({ token, tenant }: { token: string; tenant: string }) {
   const [current, setCurrent] = useState<Terms | null>(null); const [draft, setDraft] = useState('');
-  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError('');
     request<Terms>('/merchant/catalog/public-booking-terms', { signal: controller.signal }, token, tenant)
       .then(value => { setCurrent(value); setDraft(value.terms ?? ''); })
-      .catch(err => { if (!controller.signal.aborted) setError((err as Error).message); })
+      .catch(err => { if (controller.signal.aborted) return; if (err instanceof ApiError && err.status === 403) setHidden(true); else setError((err as Error).message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [token, tenant]);
@@ -27,6 +27,8 @@ export default function PublicBookingTerms({ token, tenant }: { token: string; t
     finally { setSaving(false); }
   }
 
+  // Owner-only. Other roles receive 403 and the section is hidden.
+  if (hidden) return null;
   return <section className="card amenities" aria-labelledby="public-terms-title">
     <h2 id="public-terms-title">Điều khoản đặt phòng công khai</h2>
     <p>Owner cấu hình nội dung khách phải đọc và đồng ý. Mỗi lần lưu tạo version mới; booking công khai sau này sẽ gửi đúng version khách đã xem.</p>

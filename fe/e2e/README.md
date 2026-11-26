@@ -1,0 +1,31 @@
+# FE end-to-end scripts
+
+Kiểm thử trình duyệt (Chrome headless qua `playwright-core`) và smoke test API, chạy với frontend + backend thật. Không chạy trong CI.
+
+## Chuẩn bị
+
+1. Trong `be/`: `npm run db:migrate`, `npm run db:seed:uat`, rồi `docker compose up -d --build backend frontend`.
+2. Máy có Google Chrome (mặc định). Dùng trình duyệt khác: `E2E_BROWSER_CHANNEL=msedge` hoặc `E2E_BROWSER_PATH=/đường/dẫn/chrome`.
+3. Trong `fe/`: `npm ci`.
+
+## Chạy
+
+```bash
+npm run e2e                 # setup UAT → API smoke → khách → lễ tân/Owner → Platform + phân quyền
+node e2e/customer.mjs       # chạy riêng từng bộ
+```
+
+`staff.mjs` dùng hold do `customer.mjs` vừa tạo (`e2e/.artifacts/customer-holds.json`); hold hết hạn sau TTL kênh WEB (mặc định 15 phút), nên chạy hai bộ liền nhau. Ảnh chụp màn hình và artifact nằm trong `e2e/.artifacts/` (không commit).
+
+## Biến môi trường
+
+| Biến | Mặc định |
+|---|---|
+| `E2E_BASE_URL` | `http://localhost:3100` (API đi qua rewrite `/v1` của FE) |
+| `E2E_TENANT_ID` | Tenant UAT từ `seed-uat.ts` |
+| `E2E_OWNER_EMAIL` / `E2E_OWNER_PASSWORD` | Owner UAT |
+| `E2E_PLATFORM_EMAIL` / `E2E_PLATFORM_PASSWORD` | Platform Admin UAT |
+
+## Lưu ý về dữ liệu
+
+Các script **ghi dữ liệu thật** vào database đang chạy: `setup-uat.mjs` tạo điều khoản công khai, bảng giá luôn áp dụng (nếu chưa có bảng giá ACTIVE) và cọc WEB 30%; các bộ test tạo merchant `SMOKE_…`/`UI_…`, nhân viên, hold, booking và giao dịch tiền mặt. Chỉ chạy trên môi trường local/UAT.

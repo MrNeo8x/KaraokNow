@@ -103,7 +103,7 @@ export default function AvailabilityQuote({ token, tenant, branchId, timezone }:
     <p>Chi nhánh dùng múi giờ {timezone}. Chọn độ lệch múi giờ tương ứng với thời gian nhập; kết quả tìm kiếm không giữ phòng.</p>
     <form className="availability-form" onSubmit={search}>
       <label>Thời gian bắt đầu<input type="datetime-local" value={start} onChange={e => setStart(e.target.value)} required /></label>
-      <label>Độ lệch UTC<input value={offset} onChange={e => setOffset(e.target.value)} placeholder="+07:00" required pattern="[+-][0-9]{2}:[0-9]{2}" /></label>
+      <label>Độ lệch UTC<input value={offset} onChange={e => setOffset(e.target.value)} placeholder="+07:00" required pattern="[+\-][0-9]{2}:[0-9]{2}" /></label>
       <label>Thời lượng (phút)<input type="number" min={1} max={1440} step={1} value={minutes} onChange={e => setMinutes(e.target.value)} required /></label>
       <button className="primary" disabled={busy || holdBusy || !!attempt}>{busy ? 'Đang xử lý…' : 'Tìm phòng'}</button>
     </form>

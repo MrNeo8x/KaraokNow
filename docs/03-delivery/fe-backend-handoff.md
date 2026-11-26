@@ -57,6 +57,11 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 36/36. Qu
 - `POST /v1/platform/catalog/listings/{tenantId}/approve` body `{note?}`; `POST .../revoke` body `{reason}` bắt buộc. Gọi lại khi đã ở trạng thái đích trả 200 không đổi. 403 nếu không phải Platform Admin hoặc reviewer là thành viên của merchant đó; 409 nếu merchant chưa publish hoặc không active; 404 nếu merchant chưa có listing.
 - Merchant Owner xem lịch sử duyệt qua audit log của tenant (`PLATFORM_LISTING_APPROVED`/`REVOKED`).
 
+### FE INTEGRATED — PAY-006, check-in/out/outcome, PLT-001 (2026-11-26)
+
+- `hold-details.tsx`: đọc/ghi cọc CASH trên hold, xác nhận theo snapshot cọc. `booking-operations.tsx`: check-in, check-out, kết quả hủy/no-show. `/platform`: duyệt/thu hồi listing. Khách thấy `depositRequiredVnd`, `bookingStatus` và cọc đã ghi.
+- `tsc`, `next build` và FE unit test 27/27 qua. **Chưa smoke test với backend thật**: container `karaokenow-backend-1` local vẫn là bản cũ, trả 404 cho `/v1/public/booking/lookup` và `/v1/platform/catalog/listings`.
+
 ## Phiên đăng nhập
 
 - `POST /v1/auth/login` và `POST /v1/auth/refresh` trả `accessToken`, `expiresIn`, `refreshToken`, `refreshExpiresIn`, `mustChangePassword`; thời gian tính theo giây.
@@ -101,6 +106,22 @@ Backend đã có API cho tất cả mục dưới đây; FE chưa có màn. Đã
 Chưa có API (không làm màn): quên/reset mật khẩu (IAM-004 chờ ZBS), sửa hồ sơ merchant, khoá merchant, cấp quyền Platform Admin (cố ý chỉ cấp bằng dữ liệu). FE nhận biết Platform Admin bằng cách gọi `GET /v1/platform/catalog/listings?limit=1` — 403 nghĩa là không có quyền.
 
 **Smoke test:** container backend không tự chạy migration. Trong `be/`: `npm run db:migrate` (dùng `DATABASE_URL` tới Postgres compose ở cổng 5433), `npm run db:seed:uat` để có tài khoản Owner và `uat.platform@karaokenow.local`, rồi `docker compose up -d --build backend`. Bỏ qua bước nào thì API mới trả 404 hoặc 500.
+
+### FE INTEGRATED — màn quản trị (2026-11-26)
+
+- Cả 6 màn trong bảng trên đã có: `/platform` (merchant + duyệt listing + phiên), Owner (publication, nhân viên, audit, vận hành), phiên đăng nhập cho mọi user.
+- Smoke test qua proxy FE 44/44 sau khi migrate, seed UAT và rebuild container (xem task board). Để luồng khách chạy được, đã tạo trên DB local: điều khoản công khai phiên bản 1, bảng giá `UAT_SMOKE` (150.000 ₫/giờ, mọi ngày) và cọc kênh WEB 30%. Seed UAT chưa có bảng giá nên khách không báo giá được nếu thiếu bước này.
+- **Cần BE xem:** `GET /v1/public/branches/{id}/booking-terms` trả 404 khi chưa cấu hình, trong khi handoff/OpenAPI mô tả `{configured:false}` (endpoint Owner trả đúng `configured:false`). FE đã xử lý cả hai; nên thống nhất contract.
+
+### FE BROWSER TEST — 2026-11-26
+
+Chrome headless (Playwright) với container backend/frontend đã rebuild: luồng khách (mobile/desktop), lễ tân/Owner 19/19, Platform và phân quyền 14/14. Lỗi FE tìm ra và đã sửa:
+- key React trùng trong `experience.tsx` làm khối tra cứu hold render hai lần;
+- `pattern` độ lệch UTC không hợp lệ với cờ `v` của Chrome, nên validation bị bỏ qua;
+- thiếu favicon;
+- màn điều khoản công khai và audit vẫn hiện với vai trò không phải Owner.
+
+**Yêu cầu BE (chặn lễ tân xác nhận hold online):** xác nhận hold kênh WEB yêu cầu `cancellationTerms` trùng khớp từng ký tự với `public_accepted_terms`, nhưng `GET /v1/merchant/booking/holds/{id}` không trả trường này. Lễ tân (không phải Owner) không đọc được điều khoản công khai, nên không thể xác nhận hold online. Đề xuất trả `publicAcceptedTerms` và `publicAcceptedTermsVersion` trong hold chi tiết. FE đã đọc sẵn `publicAcceptedTerms` nếu có. Hiện FE tạm điền điều khoản công khai hiện tại (chỉ Owner đọc được); cách này sai nếu Owner sửa điều khoản sau khi khách đặt.
 
 ## Ưu tiên tiếp theo
 

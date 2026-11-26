@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
+import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
 type Branch = { id: string; merchantId: string; merchantName: string; name: string; timezone: string };
@@ -10,12 +11,17 @@ type Page<T> = { items: T[]; hasMore: boolean };
 type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
 type Quote = { branchId: string; roomId: string; timezone: string; startAt: string; endAt: string; durationMinutes: number; currency: 'VND'; totalAmountVnd: string; bookingDurationPolicy: { durationStepMinutes: number; minDurationMinutes: number; maxDurationMinutes: number } };
 type Terms = { configured: boolean; terms: string | null; version: string | null; updatedAt?: string | null };
-type Lookup = { holdId: string; bookingId: string | null; branchId: string; roomId: string; startAt: string; durationMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; totalAmountVnd: string; termsVersion: string };
+type Lookup = { holdId: string; bookingId: string | null; branchId: string; roomId: string; startAt: string; durationMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; bookingStatus?: BookingStatus | null; totalAmountVnd: string; termsVersion: string; depositRequiredVnd?: string; depositRecordedVnd?: string };
 const statusLabel = { HELD: 'Đang giữ chỗ · chờ nhân viên gọi xác minh', CONFIRMED: 'Đã xác nhận đặt phòng', EXPIRED: 'Đã hết hạn giữ chỗ' } as const;
 const RETRY_COOLDOWN_MS = 60_000;
 function session(): Storage | null { try { return window.sessionStorage; } catch { return null; } }
 const fixedRoomImages = ['/rooms/room-violet.svg', '/rooms/room-rose.svg', '/rooms/room-blue.svg'];
 
+// The public terms endpoint answers 404 when the merchant has not configured terms; that is a normal state, not a failure.
+function fetchTerms(branchId: string, signal?: AbortSignal): Promise<Terms> {
+  return request<Terms>(`/public/branches/${encodeURIComponent(branchId)}/booking-terms`, { signal })
+    .catch(err => { if (err instanceof ApiError && err.status === 404) return { configured: false, terms: null, version: null }; throw err; });
+}
 function money(value: string) { return `${BigInt(value).toLocaleString('vi-VN')} ₫`; }
 function when(value: string, timezone?: string) { return new Date(value).toLocaleString('vi-VN', { timeZone: timezone ?? 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }); }
 
@@ -56,7 +62,7 @@ export default function CustomerBooking() {
     const controller = new AbortController(); setLoading(true); setError('');
     Promise.all([
       request<Page<Room>>(`/public/branches/${encodeURIComponent(branchId)}/rooms?limit=100`, { signal: controller.signal }),
-      request<Terms>(`/public/branches/${encodeURIComponent(branchId)}/booking-terms`, { signal: controller.signal }),
+      fetchTerms(branchId, controller.signal),
     ]).then(([roomPage, termsValue]) => {
       setCatalogRooms(roomPage.items); setRoomId(current => roomPage.items.some(item => item.id === current) ? current : roomPage.items[0]?.id ?? ''); setTerms(termsValue);
     }).catch(err => { if (!controller.signal.aborted) { setCatalogRooms([]); setRoomId(''); setTerms(null); setError((err as Error).message); } })
@@ -85,7 +91,7 @@ export default function CustomerBooking() {
   async function explainConflict(attempt: PublicHoldAttempt, message: string) {
     const body = attempt.body;
     const [latestTerms, latestQuote] = await Promise.all([
-      branchId ? request<Terms>(`/public/branches/${encodeURIComponent(branchId)}/booking-terms`).catch(() => null) : Promise.resolve(null),
+      branchId ? fetchTerms(branchId).catch(() => null) : Promise.resolve(null),
       request<Quote>(`/public/rooms/${encodeURIComponent(body.roomId)}/quote`, { method: 'POST', body: JSON.stringify({ startAt: body.startAt, durationMinutes: body.durationMinutes }) }).catch(() => null),
     ]);
     if (latestTerms && latestTerms.version !== body.termsVersion) { setTerms(latestTerms); setAcceptedTerms(null); setHoldError(`Điều khoản đặt phòng đã được cập nhật lên phiên bản ${latestTerms.version ?? 'mới'}. Vui lòng đọc lại và đồng ý trước khi gửi.`); return; }
@@ -159,13 +165,13 @@ export default function CustomerBooking() {
       {terms?.configured && terms.terms && terms.version ? <div className="customer-terms"><details><summary>Đọc điều khoản đặt phòng</summary><p>{terms.terms}</p><small>Phiên bản {terms.version}{terms.updatedAt ? ` · cập nhật ${new Date(terms.updatedAt).toLocaleString('vi-VN')}` : ''}</small></details><label className="check-row"><input type="checkbox" checked={acceptedTerms?.version === terms.version} onChange={event => setAcceptedTerms(event.target.checked ? { ...terms } : null)} /> Tôi đã đọc và đồng ý điều khoản phiên bản {terms.version}.</label></div> : <div className="notice">Merchant chưa cấu hình điều khoản đặt phòng công khai.</div>}
       {holdError && <div className="error" role="alert">{holdError}</div>}
       {pending && !receipt && <div className="notice" role="status">Có một yêu cầu giữ phòng chưa xác định kết quả ({when(pending.body.startAt, branch?.timezone)} · {pending.body.durationMinutes} phút · {money(pending.body.expectedTotalAmountVnd)}). <div className="hold-actions"><button type="button" className="primary" disabled={holding || retryAt > Date.now()} onClick={() => void send(pending)}>{holding ? 'Đang gửi…' : 'Gửi lại yêu cầu'}</button><button type="button" className="secondary" disabled={holding} onClick={discardPending}>Bỏ yêu cầu này</button></div></div>}
-      {receipt ? <div className="customer-receipt" role="status" aria-live="polite"><span className="eyebrow">ĐÃ GIỮ CHỖ</span><h3>{statusLabel[receipt.status] ?? receipt.status}</h3><p>{when(receipt.startAt, branch?.timezone)} · {receipt.durationMinutes} phút · {money(receipt.totalAmountVnd)} · điều khoản phiên bản {receipt.termsVersion}</p><p>Giữ chỗ đến {when(receipt.expiresAt, branch?.timezone)}. Nhân viên sẽ gọi số {receipt.phone} để xác minh; giữ chỗ chưa phải đặt phòng đã xác nhận.</p><label>Mã đặt phòng — hãy lưu lại để tra cứu<code className="booking-code">{receipt.bookingCode}</code></label><div className="hold-actions"><button type="button" className="primary" onClick={() => void copyCode(receipt.bookingCode)}>{copied ? 'Đã sao chép' : 'Sao chép mã'}</button><button type="button" className="secondary" onClick={newBooking}>Đặt phòng khác</button></div><small>Mã chỉ hiển thị một lần và được lưu tạm trong tab này. Đóng tab sẽ mất; dùng số điện thoại và mã để tra cứu.</small></div>
+      {receipt ? <div className="customer-receipt" role="status" aria-live="polite"><span className="eyebrow">ĐÃ GIỮ CHỖ</span><h3>{statusLabel[receipt.status] ?? receipt.status}</h3><p>{when(receipt.startAt, branch?.timezone)} · {receipt.durationMinutes} phút · {money(receipt.totalAmountVnd)} · điều khoản phiên bản {receipt.termsVersion}</p><p>Giữ chỗ đến {when(receipt.expiresAt, branch?.timezone)}. Nhân viên sẽ gọi số {receipt.phone} để xác minh; giữ chỗ chưa phải đặt phòng đã xác nhận.</p>{receipt.depositRequiredVnd && receipt.depositRequiredVnd !== '0' ? <p className="deposit-callout">Cần đặt cọc <strong>{money(receipt.depositRequiredVnd)}</strong> bằng tiền mặt tại quầy trước khi nhân viên xác nhận. Không có thanh toán online.</p> : receipt.depositRequiredVnd === '0' ? <p>Không yêu cầu đặt cọc.</p> : null}<label>Mã đặt phòng — hãy lưu lại để tra cứu<code className="booking-code">{receipt.bookingCode}</code></label><div className="hold-actions"><button type="button" className="primary" onClick={() => void copyCode(receipt.bookingCode)}>{copied ? 'Đã sao chép' : 'Sao chép mã'}</button><button type="button" className="secondary" onClick={newBooking}>Đặt phòng khác</button></div><small>Mã chỉ hiển thị một lần và được lưu tạm trong tab này. Đóng tab sẽ mất; dùng số điện thoại và mã để tra cứu.</small></div>
       : quote && acceptedTerms && acceptedTerms.version === terms?.version && !pending && <form className="customer-contact" onSubmit={submitHold}><h3>Thông tin liên hệ</h3><p>Nhân viên sẽ gọi số này để xác minh trước khi xác nhận. Không cần đặt cọc online.</p><div className="fields contact-fields"><label>Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="0912 345 678" required maxLength={24} /></label><label>Email (không bắt buộc)<input type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} maxLength={254} /></label><button className="primary" disabled={holding || retryAt > Date.now()}>{holding ? 'Đang giữ phòng…' : `Giữ phòng · ${money(quote.totalAmountVnd)}`}</button></div></form>}
     </section>
     <section className="booking card customer-lookup" aria-labelledby="customer-lookup-title"><h2 id="customer-lookup-title">Tra cứu đặt phòng</h2><p>Nhập số điện thoại đã dùng và mã đặt phòng 32 ký tự.</p>
       <form className="fields contact-fields" onSubmit={lookupBooking}><label>Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} required maxLength={24} /></label><label>Mã đặt phòng<input value={lookupCode} onChange={event => setLookupCode(event.target.value)} required maxLength={40} autoComplete="off" spellCheck={false} /></label><button className="primary" disabled={lookingUp || lookupRetryAt > Date.now()}>{lookingUp ? 'Đang tra cứu…' : 'Tra cứu'}</button></form>
       {lookupError && <div className="error" role="alert">{lookupError}</div>}
-      {lookup && <div className="customer-receipt" role="status"><span className="eyebrow">KẾT QUẢ TRA CỨU</span><h3>{statusLabel[lookup.status] ?? lookup.status}</h3><p>{branches.find(item => item.id === lookup.branchId)?.name ?? 'Địa điểm'} · {catalogRooms.find(item => item.id === lookup.roomId)?.name ?? 'Phòng đã chọn'}</p><p>{when(lookup.startAt, branches.find(item => item.id === lookup.branchId)?.timezone)} · {lookup.durationMinutes} phút · {money(lookup.totalAmountVnd)} · điều khoản phiên bản {lookup.termsVersion}</p>{lookup.bookingId && <small>Mã booking: {lookup.bookingId}</small>}</div>}
+      {lookup && <div className="customer-receipt" role="status"><span className="eyebrow">KẾT QUẢ TRA CỨU</span><h3>{lookup.bookingStatus ? bookingStatusLabel[lookup.bookingStatus] ?? lookup.bookingStatus : statusLabel[lookup.status] ?? lookup.status}</h3><p>{branches.find(item => item.id === lookup.branchId)?.name ?? 'Địa điểm'} · {catalogRooms.find(item => item.id === lookup.roomId)?.name ?? 'Phòng đã chọn'}</p><p>{when(lookup.startAt, branches.find(item => item.id === lookup.branchId)?.timezone)} · {lookup.durationMinutes} phút · {money(lookup.totalAmountVnd)} · điều khoản phiên bản {lookup.termsVersion}</p>{lookup.depositRequiredVnd && lookup.depositRequiredVnd !== '0' && <p>Cọc yêu cầu: {money(lookup.depositRequiredVnd)} · đã ghi nhận: {money(lookup.depositRecordedVnd ?? '0')}{lookup.status === 'HELD' && BigInt(lookup.depositRecordedVnd ?? '0') < BigInt(lookup.depositRequiredVnd) ? ' · vui lòng đặt cọc tiền mặt tại quầy' : ''}</p>}{lookup.bookingId && <small>Mã booking: {lookup.bookingId}</small>}</div>}
     </section>
   </main>;
 }

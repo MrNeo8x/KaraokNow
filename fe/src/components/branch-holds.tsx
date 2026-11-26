@@ -46,7 +46,7 @@ export default function BranchHolds({ token, tenant, branchId, timezone, rooms }
     <form className="availability-form" onSubmit={search}>
       <label>Từ thời gian<input type="datetime-local" value={from} onChange={e => setFrom(e.target.value)} required /></label>
       <label>Đến thời gian<input type="datetime-local" value={to} onChange={e => setTo(e.target.value)} required /></label>
-      <label>Độ lệch UTC<input value={offsetZone} onChange={e => setOffsetZone(e.target.value)} pattern="[+-][0-9]{2}:[0-9]{2}" required /></label>
+      <label>Độ lệch UTC<input value={offsetZone} onChange={e => setOffsetZone(e.target.value)} pattern="[+\-][0-9]{2}:[0-9]{2}" required /></label>
       <button className="primary" disabled={loading}>{loading ? 'Đang tải…' : 'Xem danh sách'}</button>
     </form>
     {error && <div className="error" role="alert">{error}</div>}
