@@ -11,6 +11,10 @@ const ROOM_IDS = [
 ];
 const EMAIL = 'uat.owner@karaokenow.local';
 const PASSWORD = 'Uat-owner-password-2026!';
+// Platform Admin has no tenant membership so it can approve the UAT merchant (self-review is rejected).
+const PLATFORM_ADMIN_ID = '10000000-0000-4000-8000-000000000007';
+const PLATFORM_ADMIN_EMAIL = 'uat.platform@karaokenow.local';
+const PLATFORM_ADMIN_PASSWORD = 'Uat-platform-password-2026!';
 
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
@@ -64,8 +68,20 @@ async function main(): Promise<void> {
          updated_at=clock_timestamp(),version=tenant_public_catalog.version+1`,
       [TENANT_ID, USER_ID]
     );
+    await client.query(
+      `INSERT INTO users(id,email,password_hash,display_name,status,must_change_password)
+       VALUES($1,$2,$3,'UAT Platform Admin','ACTIVE',false)
+       ON CONFLICT(id) DO UPDATE SET email=EXCLUDED.email,password_hash=EXCLUDED.password_hash,
+         display_name=EXCLUDED.display_name,status='ACTIVE',must_change_password=false`,
+      [PLATFORM_ADMIN_ID, PLATFORM_ADMIN_EMAIL, await hash(PLATFORM_ADMIN_PASSWORD, 12)]
+    );
+    await client.query(
+      `INSERT INTO platform_admins(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET revoked_at=NULL`,
+      [PLATFORM_ADMIN_ID]
+    );
     await client.query('COMMIT');
     console.log(JSON.stringify({
+      platformAdmin: { email: PLATFORM_ADMIN_EMAIL, password: PLATFORM_ADMIN_PASSWORD },
       email: EMAIL,
       password: PASSWORD,
       tenantId: TENANT_ID,

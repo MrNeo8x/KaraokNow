@@ -8,6 +8,7 @@ import { TenantGuard } from '../platform/tenant/tenant.guard';
 import { AttachHoldDetailsDto, CreateHoldDto, ListHoldsDto } from './hold.dto';
 import { HoldService } from './hold.service';
 import { PriceSnapshotDto } from '../pricing/quote-response.dto';
+import { DepositPolicySnapshotDto } from './hold-deposit.dto';
 
 export class HoldResponseDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -25,6 +26,7 @@ export class HoldResponseDto {
   @ApiPropertyOptional({ nullable: true, type: PriceSnapshotDto, description: 'Immutable server-calculated quote snapshot, only present in individual hold responses' }) priceSnapshot?: PriceSnapshotDto | null;
   @ApiPropertyOptional({ nullable: true, format: 'date-time', description: 'Time staff recorded a successful verification call; individual responses only' }) phoneVerifiedAt?: string | null;
   @ApiPropertyOptional({ nullable: true, format: 'uuid', description: 'Staff user who recorded the verification call; individual responses only' }) phoneVerifiedBy?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: DepositPolicySnapshotDto, description: 'Deposit policy frozen with the price snapshot; individual responses only' }) depositPolicySnapshot?: DepositPolicySnapshotDto | null;
 }
 
 class HoldListResponseDto {

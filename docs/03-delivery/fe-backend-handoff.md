@@ -29,6 +29,24 @@ Session Luồng FE có thể nối tiếp luồng khách từ quote sang hold v�
 - Customer FE đã nối catalog → availability → quote → đọc/chấp nhận điều khoản; snapshot `terms` và `version` được giữ nguyên trong state khi khách tick đồng ý.
 - Build Next.js/TypeScript Node 26 đã qua. FE chưa gọi public hold/lookup vì các endpoint WEB-004 chưa xuất hiện trong OpenAPI; cần marker FE READY mới trước khi nối.
 
+## FE READY — cọc tiền mặt trên hold và xác nhận có cọc (PAY-006, 2026-11-26)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 35/35:
+
+- Khi staff gắn thông tin khách (`POST .../holds/{id}/details`) hoặc khách tạo public hold, BE snapshot chính sách cọc của kênh cùng lúc với snapshot giá. Hold chi tiết trả `depositPolicySnapshot: {mode,fixedAmountVnd,percent,policyVersion,requiredAmountVnd}`; đổi chính sách sau đó không ảnh hưởng hold này.
+- `GET /v1/merchant/booking/holds/{id}/deposits` (Owner, Branch Manager, Receptionist, Cashier): `{holdId,holdStatus,depositPolicySnapshot|null,requiredAmountVnd,totalRecordedVnd,remainingVnd,depositSatisfied,items[]}`.
+- `POST /v1/merchant/booking/holds/{id}/deposits` (Owner, Branch Manager, Cashier), header `Idempotency-Key`, body `{method:"CASH",amountVnd,note?}`; 200 trả khoản cọc hoặc replay. 409 khi hold hết hạn/đã xác nhận, chưa có snapshot, không cần cọc, vượt số còn thiếu hoặc key dùng cho body khác.
+- `POST .../holds/{id}/confirm`: snapshot NONE vẫn cần quyền không cọc theo kênh như cũ; snapshot FIXED/PERCENT cần cọc đủ, khi đó `confirmationPolicySnapshot` có `requiredDepositVnd` và `depositRecordedVnd`. Thiếu cọc trả 409.
+- Public hold và lookup có thêm `depositRequiredVnd`; lookup có `depositRecordedVnd`. FE khách hiển thị số cọc cần đóng tại quầy, không có thanh toán online.
+- Giả định chờ PO xác nhận: FIXED lớn hơn tổng tiền thì cọc bằng tổng tiền; PERCENT làm tròn lên đến đồng; không cho ghi cọc vượt số còn thiếu. Hoàn cọc khi hold hết hạn chưa có API — xử lý ngoài hệ thống.
+
+## FE READY — Platform Admin duyệt listing (PLT-001, 2026-11-26)
+
+- Platform Admin là quyền toàn hệ thống, **không gửi `X-Tenant-ID`**. Chỉ cấp qua dữ liệu (`platform_admins`), không có API cấp quyền. UAT seed tạo `uat.platform@karaokenow.local`.
+- `GET /v1/platform/catalog/listings?status=PENDING|APPROVED|ALL&limit&offset` (mặc định PENDING = merchant đã publish và chưa duyệt). Item: `{tenantId,merchantCode,merchantName,tenantStatus,published,platformApproved,platformDecidedBy,platformDecidedAt,activeBranchCount,termsConfigured,updatedAt,version}`.
+- `POST /v1/platform/catalog/listings/{tenantId}/approve` body `{note?}`; `POST .../revoke` body `{reason}` bắt buộc. Gọi lại khi đã ở trạng thái đích trả 200 không đổi. 403 nếu không phải Platform Admin hoặc reviewer là thành viên của merchant đó; 409 nếu merchant chưa publish hoặc không active; 404 nếu merchant chưa có listing.
+- Merchant Owner xem lịch sử duyệt qua audit log của tenant (`PLATFORM_LISTING_APPROVED`/`REVOKED`).
+
 ## Phiên đăng nhập
 
 - `POST /v1/auth/login` và `POST /v1/auth/refresh` trả `accessToken`, `expiresIn`, `refreshToken`, `refreshExpiresIn`, `mustChangePassword`; thời gian tính theo giây.
@@ -43,13 +61,13 @@ Session Luồng FE có thể nối tiếp luồng khách từ quote sang hold v�
 - Đã có `POST /v1/merchant/booking/holds/{id}/confirm` cho nhân viên xác nhận **không cọc** khi hold còn hiệu lực, có liên hệ, snapshot giá và xác minh điện thoại, chính sách cọc là NONE và merchant đã cho phép xác nhận không cọc theo kênh. Body có `cancellationTerms` là điều khoản đã hiển thị cho khách; response 200 trả booking. Replay cùng điều khoản trả cùng booking; điều khoản khác hoặc không đủ điều kiện trả 409. `GET /v1/merchant/booking/bookings/{id}` đọc booking trong phạm vi tenant/chi nhánh.
 - Đã có `GET /v1/merchant/branches/{branchId}/booking/bookings` lọc theo `from`/`to` có múi giờ và phân trang. Đây là danh sách booking; khi ghép với danh sách hold, loại hold `CONFIRMED` để tránh trùng. Các trạng thái check-in/check-out chưa có.
 - Đã có GET/POST `/v1/merchant/booking/bookings/{id}/manual-payments` cho Owner, Branch Manager và Cashier; hiện chỉ ghi từng khoản `CASH` của booking đã xác nhận, dùng idempotency key. `GET .../summary` trả tổng khoản đã ghi và số giao dịch chính xác. Đây chưa phải đối soát sổ quỹ: chưa có hoàn/void, điều chỉnh hay trạng thái phải thu/đã thu; chưa xác nhận booking có cọc.
-- Catalog công khai chỉ trả merchant đã `published=true` và được duyệt riêng `platformApproved=true`. FE khách dùng public branches/rooms, availability và quote như mô tả trong OpenAPI. Public hold và lookup đã sẵn sàng ở marker FE READY phía trên; hold không tự xác nhận. API Platform Admin approval và xác nhận booking có cọc vẫn đang được BE triển khai.
+- Catalog công khai chỉ trả merchant đã `published=true` và được duyệt riêng `platformApproved=true`. FE khách dùng public branches/rooms, availability và quote như mô tả trong OpenAPI. Public hold và lookup đã sẵn sàng ở marker FE READY phía trên; hold không tự xác nhận. API Platform Admin approval và xác nhận booking có cọc đã sẵn sàng ở các marker FE READY phía trên.
 - Owner cấu hình một nội dung điều khoản UAT tại `GET/PATCH /v1/merchant/catalog/public-booking-terms`; khách đọc `GET /v1/public/branches/{branchId}/booking-terms`. Response `{configured,terms,version,updatedAt}`; FE phải giữ `version` cùng nội dung khách đã tick đồng ý để gửi vào public hold sau khi contract đó được cấp. Không tự dùng nội dung mới nếu version khách đã xem thay đổi.
-- Cấu hình cọc và quyền xác nhận không cọc theo kênh đã có API; chưa tính số tiền cọc hoặc áp dụng điều kiện xác nhận booking.
+- Cấu hình cọc và quyền xác nhận không cọc theo kênh đã có API; số cọc được tính khi snapshot giá và áp dụng khi xác nhận (xem PAY-006).
 
 ## Ưu tiên tiếp theo
 
-1. BE: hoàn thiện tính cọc/điều kiện theo trường hợp, xác nhận có cọc và kiểm thử cạnh tranh giữa xác nhận với expiry.
+1. FE: màn ghi cọc tiền mặt trên hold, hiển thị số cọc còn thiếu trước khi xác nhận; màn Platform Admin duyệt/thu hồi listing. BE: check-in/check-out và hủy booking (CAN-002).
 2. FE có thể tích hợp lịch booking, hiển thị tổng tiền mặt đã ghi nhận và ghi tiền mặt cơ bản; BE tiếp tục trạng thái check-in/check-out và xác nhận có cọc sau quyết định chính sách.
-3. FE có thể nối public catalog → availability → quote → terms → hold → lookup theo OpenAPI. BE tiếp tục Platform Admin approval và ghi nhận cọc trên hold trước xác nhận.
+3. FE có thể nối public catalog → availability → quote → terms → hold → lookup theo OpenAPI. Hiển thị `depositRequiredVnd` cho khách sau khi tạo hold.
 4. FE: kiểm thử refresh/logout, mất mạng, reload, quyền từng vai trò và tenant/chi nhánh với backend thật khi môi trường trình duyệt sẵn sàng.

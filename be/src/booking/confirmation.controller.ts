@@ -14,8 +14,8 @@ import { ConfirmationService } from './confirmation.service';
 export class ConfirmationController {
   constructor(private readonly service: ConfirmationService) {}
   @Post(':id/confirm') @HttpCode(200) @RequireRoles('OWNER', 'BRANCH_MANAGER', 'RECEPTIONIST')
-  @ApiResponse({ status: 200, type: BookingResponseDto, description: 'Confirmed no-deposit booking or replay with the same terms' })
-  @ApiResponse({ status: 409, description: 'Expired or incomplete hold, ineligible deposit policy, or conflicting replay' })
+  @ApiResponse({ status: 200, type: BookingResponseDto, description: 'Confirmed booking (no-deposit, or deposit fully recorded on the hold) or replay with the same terms' })
+  @ApiResponse({ status: 409, description: 'Expired or incomplete hold, no-deposit not enabled, required deposit not fully recorded, or conflicting replay' })
   confirm(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ConfirmHoldDto) {
     return this.service.confirm(req.actor, id, dto);
   }

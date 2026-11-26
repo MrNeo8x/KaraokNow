@@ -22,6 +22,7 @@ export class PublicHoldResponseDto {
   @ApiProperty({ enum: ['HELD', 'EXPIRED', 'CONFIRMED'] }) status!: string;
   @ApiProperty() totalAmountVnd!: string;
   @ApiProperty() termsVersion!: string;
+  @ApiProperty({ description: 'Deposit the merchant requires before staff can confirm (snapshotted at hold time); "0" when none is required. Paid in person; no online payment' }) depositRequiredVnd!: string;
   @ApiProperty({ description: '128-bit lookup code. Store securely; returned again only for matching idempotent replay.' }) bookingCode!: string;
 }
 
@@ -40,4 +41,6 @@ export class PublicBookingStatusDto {
   @ApiProperty({ enum: ['HELD', 'EXPIRED', 'CONFIRMED'] }) status!: string;
   @ApiProperty() totalAmountVnd!: string;
   @ApiProperty() termsVersion!: string;
+  @ApiProperty({ description: 'Deposit required before confirmation; "0" when none is required' }) depositRequiredVnd!: string;
+  @ApiProperty({ description: 'Deposit recorded by staff so far' }) depositRecordedVnd!: string;
 }

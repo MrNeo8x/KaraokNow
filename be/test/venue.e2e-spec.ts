@@ -591,8 +591,10 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
     await authorized('post', confirmPath).send(terms).expect(409);
     await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/CONFIRM_TEST').send({ allowed: true }).expect(200);
+    // A policy change after the price/deposit snapshot does not affect this hold (UAT-PD-002); restore NONE for later holds.
     await authorized('patch', '/v1/merchant/booking/deposit-policy/CONFIRM_TEST').send({ mode: 'FIXED', fixedAmountVnd: '30000' }).expect(200);
-    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('get', `/v1/merchant/booking/holds/${hold.id}/deposits`).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ depositPolicySnapshot: { mode: 'NONE' }, requiredAmountVnd: '0', depositSatisfied: false }));
     await authorized('patch', '/v1/merchant/booking/deposit-policy/CONFIRM_TEST').send({ mode: 'NONE' }).expect(200);
     await authorized('post', confirmPath).send({ cancellationTerms: '   ' }).expect(400);
     const confirmations = await Promise.all(Array.from({ length: 8 }, () => authorized('post', confirmPath).send(terms).expect(200)));
@@ -1078,6 +1080,121 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('post', '/v1/merchant/branches')
       .send({ code: 'DUP', name: 'Second', timezone: 'Asia/Ho_Chi_Minh' }).expect(409)
       .expect(({ body }) => expect(body.error.code).toBe('CONFLICT'));
+  });
+
+  it('records idempotent CASH deposits on a hold against the snapshotted policy and confirms only when covered', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'DEPOSIT', name: 'Deposit branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'DEPOSIT-R', name: 'Deposit room', capacity: 8 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'DEPOSIT-PLAN', name: 'Deposit plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Deposit plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'DEPOSIT-RULE', name: 'Price', priority: 998, amountVnd: '200000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/DEPOSIT_TEST').send({ mode: 'PERCENT', percent: '30' }).expect(200);
+    const createHold = (key: string, startAt: string) => authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', key)
+      .send({ roomId: room.id, channel: 'DEPOSIT_TEST', startAt, durationMinutes: 60 }).expect(201).then(response => response.body);
+    const hold = await createHold('deposit-hold', '2042-01-01T18:00:00+07:00');
+    const depositPath = `/v1/merchant/booking/holds/${hold.id}/deposits`;
+    const confirmPath = `/v1/merchant/booking/holds/${hold.id}/confirm`;
+    const terms = { cancellationTerms: 'Liên hệ cơ sở để xử lý hủy và hoàn cọc.' };
+    await authorized('get', depositPath).expect(200).expect(({ body }) => expect(body).toEqual({ holdId: hold.id, holdStatus: 'HELD', depositPolicySnapshot: null,
+      requiredAmountVnd: '0', totalRecordedVnd: '0', remainingVnd: '0', depositSatisfied: false, items: [] }));
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-early').send({ method: 'CASH', amountVnd: '10000' }).expect(409);
+    const detailed = (await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '200000' }).expect(200)).body;
+    expect(detailed.depositPolicySnapshot).toEqual({ mode: 'PERCENT', fixedAmountVnd: null, percent: '30.0000', policyVersion: '0', requiredAmountVnd: '60000' });
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/DEPOSIT_TEST').send({ mode: 'FIXED', fixedAmountVnd: '10000' }).expect(200);
+    await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+    await authorized('post', confirmPath).send(terms).expect(409);
+    await authorized('post', depositPath).send({ method: 'CASH', amountVnd: '10000' }).expect(400);
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-zero').send({ method: 'CASH', amountVnd: '0' }).expect(400);
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-card').send({ method: 'CARD', amountVnd: '10000' }).expect(400);
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-too-much').send({ method: 'CASH', amountVnd: '60001' }).expect(409);
+    const first = await Promise.all(Array.from({ length: 5 }, () => authorized('post', depositPath).set('Idempotency-Key', 'dep-1').send({ method: 'CASH', amountVnd: '40000', note: 'Phiếu cọc 1' }).expect(200)));
+    expect(new Set(first.map(response => response.body.id)).size).toBe(1);
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-1').send({ method: 'CASH', amountVnd: '40001' }).expect(409);
+    await authorized('post', confirmPath).send(terms).expect(409);
+    const racing = await Promise.all(['dep-2a', 'dep-2b'].map(key => authorized('post', depositPath).set('Idempotency-Key', key).send({ method: 'CASH', amountVnd: '20000' })));
+    expect(racing.map(response => response.status).sort()).toEqual([200, 409]);
+    await authorized('get', depositPath).expect(200).expect(({ body }) => {
+      expect(body).toMatchObject({ requiredAmountVnd: '60000', totalRecordedVnd: '60000', remainingVnd: '0', depositSatisfied: true, depositPolicySnapshot: { mode: 'PERCENT' } });
+      expect(body.items.map((item: { amountVnd: string }) => item.amountVnd)).toEqual(['40000', '20000']);
+    });
+    const confirmations = await Promise.all(Array.from({ length: 4 }, () => authorized('post', confirmPath).send(terms).expect(200)));
+    expect(new Set(confirmations.map(response => response.body.id)).size).toBe(1);
+    expect(confirmations[0].body.confirmationPolicySnapshot).toEqual({ depositMode: 'PERCENT', depositPolicyVersion: '0', requiredDepositVnd: '60000',
+      depositRecordedVnd: '60000', noDepositAllowed: false, noDepositPolicyVersion: null });
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-after').send({ method: 'CASH', amountVnd: '1' }).expect(409);
+    await authorized('post', depositPath).set('Idempotency-Key', 'dep-1').send({ method: 'CASH', amountVnd: '40000', note: 'Phiếu cọc 1' }).expect(200)
+      .expect(({ body }) => expect(body.id).toBe(first[0].body.id));
+    const depositAudit = await pool.query(`SELECT after_data FROM audit_logs WHERE tenant_id=$1 AND action='HOLD_DEPOSIT_RECORDED' AND after_data->>'holdId'=$2`, [TENANT_A, hold.id]);
+    expect(depositAudit.rows).toHaveLength(2);
+    expect(JSON.stringify(depositAudit.rows)).not.toContain('Phiếu cọc 1');
+    expect((await pool.query(`SELECT after_data FROM audit_logs WHERE action='BOOKING_CONFIRMED' AND entity_id=$1`, [confirmations[0].body.id])).rows[0].after_data.depositMode).toBe('PERCENT');
+
+    const receptionist = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'deposit-reception@example.com',$1,'Reception','ACTIVE') RETURNING id`, [await hash('Reception-password-123', 4)])).rows[0];
+    const member = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, receptionist.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'RECEPTIONIST')`, [member.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [member.id, TENANT_A, branch.id]);
+    const receptionToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'deposit-reception@example.com', password: 'Reception-password-123' }).expect(200)).body.accessToken;
+    const second = await createHold('deposit-hold-2', '2042-01-02T18:00:00+07:00');
+    await authorized('post', `/v1/merchant/booking/holds/${second.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '200000' }).expect(200)
+      .expect(({ body }) => expect(body.depositPolicySnapshot).toMatchObject({ mode: 'FIXED', requiredAmountVnd: '10000', policyVersion: '1' }));
+    const asReception = (method: 'get' | 'post', path: string) => request(app.getHttpServer())[method](path).set('Authorization', `Bearer ${receptionToken}`).set('X-Tenant-ID', TENANT_A);
+    await asReception('get', `/v1/merchant/booking/holds/${second.id}/deposits`).expect(200);
+    await asReception('post', `/v1/merchant/booking/holds/${second.id}/deposits`).set('Idempotency-Key', 'reception-dep').send({ method: 'CASH', amountVnd: '10000' }).expect(403);
+    await request(app.getHttpServer()).get(`/v1/merchant/booking/holds/${second.id}/deposits`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(403);
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [second.id]);
+    await authorized('post', `/v1/merchant/booking/holds/${second.id}/deposits`).set('Idempotency-Key', 'dep-expired').send({ method: 'CASH', amountVnd: '10000' }).expect(409);
+    await authorized('get', `/v1/merchant/booking/holds/${second.id}/deposits`).expect(200).expect(({ body }) => expect(body.holdStatus).toBe('EXPIRED'));
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Deposit plan', status: 'INACTIVE' }).expect(200);
+  }, 30000);
+
+  it('lets only a non-member Platform Admin approve or revoke a published merchant listing with audit', async () => {
+    const adminId = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'platform@example.com',$1,'Platform Admin','ACTIVE') RETURNING id`, [await hash('Platform-password-123', 4)])).rows[0].id;
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const adminToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'platform@example.com', password: 'Platform-password-123' }).expect(200)).body.accessToken;
+    const asAdmin = (method: 'get' | 'post', path: string) => request(app.getHttpServer())[method](path).set('Authorization', `Bearer ${adminToken}`);
+    const branchB = (await pool.query(`INSERT INTO branches(id,tenant_id,code,name,timezone,status) VALUES(gen_random_uuid(),$1,'B-PUBLIC','Tenant B public','Asia/Ho_Chi_Minh','ACTIVE') RETURNING id`, [TENANT_B])).rows[0].id;
+    await pool.query(`INSERT INTO tenant_public_catalog(tenant_id,published,updated_by) VALUES($1,true,$2)`, [TENANT_B, OWNER_ID]);
+    const publicBranchIds = async () => (await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body.items.map((item: { id: string }) => item.id);
+
+    await request(app.getHttpServer()).get('/v1/platform/catalog/listings').expect(401);
+    await request(app.getHttpServer()).get('/v1/platform/catalog/listings').set('Authorization', `Bearer ${ownerToken}`).expect(403);
+    await request(app.getHttpServer()).post(`/v1/platform/catalog/listings/${TENANT_B}/approve`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A).send({}).expect(403);
+    await asAdmin('get', '/v1/platform/catalog/listings').expect(200).expect(({ body }) => {
+      expect(body.items).toContainEqual(expect.objectContaining({ tenantId: TENANT_B, merchantCode: 'B', published: true, platformApproved: false, activeBranchCount: 1, termsConfigured: false }));
+      expect(body.items.some((item: { tenantId: string }) => item.tenantId === TENANT_A)).toBe(false);
+    });
+    await asAdmin('get', '/v1/platform/catalog/listings').query({ status: 'OTHER' }).expect(400);
+    expect(await publicBranchIds()).not.toContain(branchB);
+
+    const approvals = await Promise.all(Array.from({ length: 4 }, () => asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/approve`).send({ note: 'Đã kiểm tra giấy phép' }).expect(200)));
+    for (const response of approvals) expect(response.body).toMatchObject({ tenantId: TENANT_B, platformApproved: true, platformDecidedBy: adminId });
+    expect(await publicBranchIds()).toContain(branchB);
+    await asAdmin('get', '/v1/platform/catalog/listings').query({ status: 'APPROVED' }).expect(200)
+      .expect(({ body }) => expect(body.items.map((item: { tenantId: string }) => item.tenantId)).toContain(TENANT_B));
+
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/revoke`).send({}).expect(400);
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/revoke`).send({ reason: '   ' }).expect(400);
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/revoke`).send({ reason: 'Thông tin chi nhánh chưa đúng' }).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ platformApproved: false, platformDecidedBy: adminId }));
+    expect(await publicBranchIds()).not.toContain(branchB);
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/revoke`).send({ reason: 'Lặp lại' }).expect(200);
+
+    await pool.query('UPDATE tenant_public_catalog SET published=false WHERE tenant_id=$1', [TENANT_B]);
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/approve`).send({}).expect(409);
+    await pool.query('UPDATE tenant_public_catalog SET published=true WHERE tenant_id=$1', [TENANT_B]);
+    await asAdmin('post', '/v1/platform/catalog/listings/cccccccc-cccc-4ccc-8ccc-cccccccccccc/approve').send({}).expect(404);
+    await asAdmin('post', '/v1/platform/catalog/listings/not-a-uuid/approve').send({}).expect(400);
+
+    const selfMembership = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_B, adminId])).rows[0].id;
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/approve`).send({}).expect(403);
+    await pool.query('DELETE FROM tenant_memberships WHERE id=$1', [selfMembership]);
+    await pool.query('UPDATE platform_admins SET revoked_at=clock_timestamp() WHERE user_id=$1', [adminId]);
+    await asAdmin('post', `/v1/platform/catalog/listings/${TENANT_B}/approve`).send({}).expect(403);
+
+    const audit = await pool.query(`SELECT action,actor_user_id,before_data,after_data FROM audit_logs WHERE tenant_id=$1 AND action LIKE 'PLATFORM_LISTING_%' ORDER BY occurred_at`, [TENANT_B]);
+    expect(audit.rows.map(row => row.action)).toEqual(['PLATFORM_LISTING_APPROVED', 'PLATFORM_LISTING_REVOKED']);
+    expect(audit.rows[0]).toMatchObject({ actor_user_id: adminId, before_data: { platformApproved: false }, after_data: { platformApproved: true, note: 'Đã kiểm tra giấy phép' } });
+    expect(audit.rows[1].after_data).toMatchObject({ platformApproved: false, note: 'Thông tin chi nhánh chưa đúng' });
   });
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {

@@ -2857,7 +2857,7 @@
         },
         "responses": {
           "200": {
-            "description": "Confirmed no-deposit booking or replay with the same terms",
+            "description": "Confirmed booking (no-deposit, or deposit fully recorded on the hold) or replay with the same terms",
             "content": {
               "application/json": {
                 "schema": {
@@ -2867,7 +2867,7 @@
             }
           },
           "409": {
-            "description": "Expired or incomplete hold, ineligible deposit policy, or conflicting replay"
+            "description": "Expired or incomplete hold, no-deposit not enabled, required deposit not fully recorded, or conflicting replay"
           }
         },
         "security": [
@@ -3279,6 +3279,120 @@
         ]
       }
     },
+    "/v1/merchant/booking/holds/{id}/deposits": {
+      "get": {
+        "operationId": "HoldDepositController_status",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Snapshotted deposit requirement, recorded CASH entries and remaining amount",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldDepositStatusDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hold deposits"
+        ]
+      },
+      "post": {
+        "operationId": "HoldDepositController_record",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Visible ASCII 1–100 characters; scoped to tenant and user",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordHoldDepositDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded deposit or matching replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldDepositEntryDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Hold inactive, no snapshot, no deposit required, amount above remaining, or idempotency conflict"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "hold deposits"
+        ]
+      }
+    },
     "/v1/merchant/catalog/publication": {
       "get": {
         "operationId": "CatalogPublicationController_get",
@@ -3649,6 +3763,172 @@
         },
         "tags": [
           "public catalog"
+        ]
+      }
+    },
+    "/v1/platform/catalog/listings": {
+      "get": {
+        "operationId": "ListingApprovalController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "PENDING = published by merchant and not approved",
+            "schema": {
+              "default": "PENDING",
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "APPROVED",
+                "ALL"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a Platform Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform listing approval"
+        ]
+      }
+    },
+    "/v1/platform/catalog/listings/{tenantId}/approve": {
+      "post": {
+        "operationId": "ListingApprovalController_approve",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListingDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved listing, or unchanged state when already approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or reviewer belongs to the merchant"
+          },
+          "409": {
+            "description": "Merchant is inactive or has not published its catalog"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform listing approval"
+        ]
+      }
+    },
+    "/v1/platform/catalog/listings/{tenantId}/revoke": {
+      "post": {
+        "operationId": "ListingApprovalController_revoke",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeListingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked listing, or unchanged state when not approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or reviewer belongs to the merchant"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform listing approval"
         ]
       }
     }
@@ -4726,6 +5006,44 @@
           "ttlMinutes"
         ]
       },
+      "DepositPolicySnapshotDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "FIXED",
+              "PERCENT"
+            ]
+          },
+          "fixedAmountVnd": {
+            "type": "string",
+            "nullable": true
+          },
+          "percent": {
+            "type": "string",
+            "nullable": true,
+            "example": "30.0000"
+          },
+          "policyVersion": {
+            "type": "string",
+            "nullable": true,
+            "description": "Channel deposit-policy version at snapshot time; null when the channel was unconfigured (NONE default)"
+          },
+          "requiredAmountVnd": {
+            "type": "string",
+            "description": "Required deposit for the snapshotted quote total. FIXED is capped at the total; PERCENT rounds up to whole VND"
+          }
+        },
+        "required": [
+          "mode",
+          "fixedAmountVnd",
+          "percent",
+          "policyVersion",
+          "requiredAmountVnd"
+        ]
+      },
       "HoldResponseDto": {
         "type": "object",
         "properties": {
@@ -4801,6 +5119,16 @@
             "nullable": true,
             "format": "uuid",
             "description": "Staff user who recorded the verification call; individual responses only"
+          },
+          "depositPolicySnapshot": {
+            "nullable": true,
+            "description": "Deposit policy frozen with the price snapshot; individual responses only",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepositPolicySnapshotDto"
+              }
+            ]
           }
         },
         "required": [
@@ -5434,6 +5762,10 @@
           "termsVersion": {
             "type": "string"
           },
+          "depositRequiredVnd": {
+            "type": "string",
+            "description": "Deposit the merchant requires before staff can confirm (snapshotted at hold time); \"0\" when none is required. Paid in person; no online payment"
+          },
           "bookingCode": {
             "type": "string",
             "description": "128-bit lookup code. Store securely; returned again only for matching idempotent replay."
@@ -5450,6 +5782,7 @@
           "status",
           "totalAmountVnd",
           "termsVersion",
+          "depositRequiredVnd",
           "bookingCode"
         ]
       },
@@ -5510,6 +5843,14 @@
           },
           "termsVersion": {
             "type": "string"
+          },
+          "depositRequiredVnd": {
+            "type": "string",
+            "description": "Deposit required before confirmation; \"0\" when none is required"
+          },
+          "depositRecordedVnd": {
+            "type": "string",
+            "description": "Deposit recorded by staff so far"
           }
         },
         "required": [
@@ -5521,7 +5862,137 @@
           "durationMinutes",
           "status",
           "totalAmountVnd",
-          "termsVersion"
+          "termsVersion",
+          "depositRequiredVnd",
+          "depositRecordedVnd"
+        ]
+      },
+      "HoldDepositEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH"
+            ]
+          },
+          "amountVnd": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "holdId",
+          "branchId",
+          "method",
+          "amountVnd",
+          "note",
+          "recordedBy",
+          "recordedAt"
+        ]
+      },
+      "HoldDepositStatusDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "holdStatus": {
+            "type": "string",
+            "enum": [
+              "HELD",
+              "EXPIRED",
+              "CONFIRMED"
+            ]
+          },
+          "depositPolicySnapshot": {
+            "nullable": true,
+            "description": "Null until customer details and the price snapshot are recorded",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DepositPolicySnapshotDto"
+              }
+            ]
+          },
+          "requiredAmountVnd": {
+            "type": "string"
+          },
+          "totalRecordedVnd": {
+            "type": "string"
+          },
+          "remainingVnd": {
+            "type": "string"
+          },
+          "depositSatisfied": {
+            "type": "boolean",
+            "description": "True when the snapshot requires a deposit and the recorded total covers it"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldDepositEntryDto"
+            }
+          }
+        },
+        "required": [
+          "holdId",
+          "holdStatus",
+          "depositPolicySnapshot",
+          "requiredAmountVnd",
+          "totalRecordedVnd",
+          "remainingVnd",
+          "depositSatisfied",
+          "items"
+        ]
+      },
+      "RecordHoldDepositDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH"
+            ]
+          },
+          "amountVnd": {
+            "type": "string",
+            "description": "Positive integer VND as a decimal string; must not exceed the remaining required deposit",
+            "example": "50000"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "method",
+          "amountVnd"
         ]
       },
       "PublicationResponseDto": {
@@ -5839,6 +6310,120 @@
           "currency",
           "totalAmountVnd",
           "bookingDurationPolicy"
+        ]
+      },
+      "ListingResponseDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "merchantCode": {
+            "type": "string"
+          },
+          "merchantName": {
+            "type": "string"
+          },
+          "tenantStatus": {
+            "type": "string"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "platformApproved": {
+            "type": "boolean"
+          },
+          "platformDecidedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Platform Admin who made the latest approve/revoke decision"
+          },
+          "platformDecidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "activeBranchCount": {
+            "type": "number",
+            "description": "Active branches that would become publicly visible"
+          },
+          "termsConfigured": {
+            "type": "boolean",
+            "description": "Public booking terms configured"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "merchantCode",
+          "merchantName",
+          "tenantStatus",
+          "published",
+          "platformApproved",
+          "platformDecidedBy",
+          "platformDecidedAt",
+          "activeBranchCount",
+          "termsConfigured",
+          "updatedAt",
+          "version"
+        ]
+      },
+      "ListingListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListingResponseDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "ListingDecisionDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Reviewer note stored in the audit record"
+          }
+        }
+      },
+      "RevokeListingDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Reason stored in the audit record"
+          }
+        },
+        "required": [
+          "reason"
         ]
       }
     }

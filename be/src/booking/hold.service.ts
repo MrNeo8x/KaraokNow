@@ -5,8 +5,9 @@ import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
 import { AttachHoldDetailsDto, CreateHoldDto, ListHoldsDto } from './hold.dto';
 import { PricingService } from '../pricing/pricing.service';
+import { snapshotDepositPolicy } from './deposit-snapshot';
 
-const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy"`;
+const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy",h.deposit_policy_snapshot AS "depositPolicySnapshot"`;
 
 @Injectable()
 export class HoldService {
@@ -44,7 +45,7 @@ export class HoldService {
     const client = await this.db.connect();
     try {
       await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
-      const hold = (await client.query(`SELECT branch_id AS "branchId",room_id AS "roomId",start_at AS "startAt",duration_minutes AS "durationMinutes",
+      const hold = (await client.query(`SELECT branch_id AS "branchId",room_id AS "roomId",channel,start_at AS "startAt",duration_minutes AS "durationMinutes",
         customer_phone AS "customerPhone",customer_email AS "customerEmail",price_snapshot AS "priceSnapshot",status,expires_at>clock_timestamp() AS valid
         FROM booking_holds WHERE tenant_id=$1 AND id=$2 FOR UPDATE`, [actor.tenantId, id])).rows[0];
       if (!hold) throw new NotFoundException('Hold not found');
@@ -57,12 +58,13 @@ export class HoldService {
       }
       const quote = await this.pricing.quote(actor, hold.roomId, { startAt: hold.startAt.toISOString(), durationMinutes: hold.durationMinutes }, client);
       if (quote.priceSnapshot.totalAmountVnd !== dto.expectedTotalAmountVnd) throw new ConflictException('Price has changed; request a new quote');
-      const updated = await client.query(`UPDATE booking_holds SET customer_phone=$3,customer_email=$4,price_snapshot=$5,updated_at=clock_timestamp()
+      const deposit = await snapshotDepositPolicy(client, actor.tenantId!, hold.channel, quote.priceSnapshot.totalAmountVnd);
+      const updated = await client.query(`UPDATE booking_holds SET customer_phone=$3,customer_email=$4,price_snapshot=$5,deposit_policy_snapshot=$6,updated_at=clock_timestamp()
         WHERE tenant_id=$1 AND id=$2 AND status='HELD' AND expires_at>clock_timestamp()`,
-      [actor.tenantId, id, dto.phone, dto.email ?? null, JSON.stringify(quote.priceSnapshot)]);
+      [actor.tenantId, id, dto.phone, dto.email ?? null, JSON.stringify(quote.priceSnapshot), JSON.stringify(deposit)]);
       if (!updated.rowCount) throw new ConflictException('Hold has expired');
       await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,after_data) VALUES($1,$2,$3,'HOLD_DETAILS_ATTACHED','BOOKING_HOLD',$4,$5)`,
-        [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify({ priceRuleId: quote.priceSnapshot.calculation.priceRuleId, priceRuleVersion: quote.priceSnapshot.calculation.priceRuleVersion, customerDetailsRecorded: true })]);
+        [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify({ priceRuleId: quote.priceSnapshot.calculation.priceRuleId, priceRuleVersion: quote.priceSnapshot.calculation.priceRuleVersion, customerDetailsRecorded: true, depositMode: deposit.mode, depositPolicyVersion: deposit.policyVersion, requiredDepositVnd: deposit.requiredAmountVnd })]);
       const result = await this.find(client, actor.tenantId!, id);
       await client.query('COMMIT'); return result;
     } catch (error) {

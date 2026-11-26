@@ -6,6 +6,7 @@ import { PG_POOL } from '../platform/database/database.module';
 import type { Actor } from '../platform/auth/auth.types';
 import { PricingService } from '../pricing/pricing.service';
 import { normalizePhone } from './phone';
+import { snapshotDepositPolicy } from './deposit-snapshot';
 import { CreatePublicHoldDto, PublicBookingLookupDto } from './public-booking.dto';
 
 @Injectable()
@@ -68,6 +69,7 @@ export class PublicBookingService {
         ?? { buffer_enabled: true, buffer_minutes: 15 };
       const ttl = (await client.query(`SELECT ttl_minutes FROM tenant_hold_ttl_policies WHERE tenant_id=$1 AND channel='WEB'`, [room.tenantId])).rows[0]?.ttl_minutes ?? 15;
       const bufferMinutes = buffer.buffer_enabled ? buffer.buffer_minutes : 0;
+      const deposit = await snapshotDepositPolicy(client, room.tenantId, 'WEB', quote.priceSnapshot.totalAmountVnd);
       const holdId = randomUUID(), occupancyId = randomUUID();
       const bookingCode = this.bookingCode(holdId);
       try {
@@ -80,13 +82,13 @@ export class PublicBookingService {
       }
       await client.query(`INSERT INTO booking_holds(id,tenant_id,branch_id,room_id,occupancy_id,created_by,idempotency_key,request_hash,channel,
         start_at,duration_minutes,buffer_minutes,expires_at,customer_phone,customer_email,price_snapshot,public_phone_hash,booking_code_hash,
-        public_accepted_terms,public_accepted_terms_version)
-        VALUES($1,$2,$3,$4,$5,NULL,$6,$7,'WEB',$8,$9,$10,clock_timestamp()+($11::integer*interval '1 minute'),$12,$13,$14,$15,$16,$17,$18)`,
+        public_accepted_terms,public_accepted_terms_version,deposit_policy_snapshot)
+        VALUES($1,$2,$3,$4,$5,NULL,$6,$7,'WEB',$8,$9,$10,clock_timestamp()+($11::integer*interval '1 minute'),$12,$13,$14,$15,$16,$17,$18,$19)`,
       [holdId, room.tenantId, room.branchId, dto.roomId, occupancyId, key, requestHash, start.toISOString(), dto.durationMinutes, bufferMinutes,
-        ttl, dto.phone, dto.email ?? null, JSON.stringify(quote.priceSnapshot), phoneHash, this.codeHash(bookingCode), terms.text, terms.version]);
+        ttl, dto.phone, dto.email ?? null, JSON.stringify(quote.priceSnapshot), phoneHash, this.codeHash(bookingCode), terms.text, terms.version, JSON.stringify(deposit)]);
       await client.query(`INSERT INTO audit_logs(id,tenant_id,action,entity_type,entity_id,after_data)
         VALUES($1,$2,'PUBLIC_HOLD_CREATED','BOOKING_HOLD',$3,$4)`,
-      [randomUUID(), room.tenantId, holdId, JSON.stringify({ branchId: room.branchId, roomId: dto.roomId, channel: 'WEB', termsVersion: terms.version })]);
+      [randomUUID(), room.tenantId, holdId, JSON.stringify({ branchId: room.branchId, roomId: dto.roomId, channel: 'WEB', termsVersion: terms.version, depositMode: deposit.mode, requiredDepositVnd: deposit.requiredAmountVnd })]);
       const response = await this.holdResponse(client, room.tenantId, holdId);
       await client.query('COMMIT'); return response;
     } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -106,7 +108,8 @@ export class PublicBookingService {
       await this.expireIfNeeded(client, hold.id);
       const row = (await client.query(`SELECT h.id AS "holdId",b.id AS "bookingId",h.branch_id AS "branchId",h.room_id AS "roomId",
         h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.status,h.price_snapshot->>'totalAmountVnd' AS "totalAmountVnd",
-        h.public_accepted_terms_version::text AS "termsVersion" FROM booking_holds h LEFT JOIN bookings b ON b.hold_id=h.id AND b.tenant_id=h.tenant_id
+        h.public_accepted_terms_version::text AS "termsVersion",COALESCE(h.deposit_policy_snapshot->>'requiredAmountVnd','0') AS "depositRequiredVnd",
+        (SELECT COALESCE(SUM(d.amount_vnd),0)::text FROM hold_deposits d WHERE d.tenant_id=h.tenant_id AND d.hold_id=h.id) AS "depositRecordedVnd" FROM booking_holds h LEFT JOIN bookings b ON b.hold_id=h.id AND b.tenant_id=h.tenant_id
         WHERE h.id=$1 AND h.tenant_id=$2`, [hold.id, hold.tenant_id])).rows[0];
       await client.query('COMMIT'); return row;
     } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -116,7 +119,8 @@ export class PublicBookingService {
   private async holdResponse(client: PoolClient, tenantId: string, holdId: string) {
     const row = (await client.query(`SELECT h.id AS "holdId",h.branch_id AS "branchId",h.room_id AS "roomId",h.start_at AS "startAt",
       h.duration_minutes AS "durationMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,
-      h.price_snapshot->>'totalAmountVnd' AS "totalAmountVnd",h.public_accepted_terms_version::text AS "termsVersion"
+      h.price_snapshot->>'totalAmountVnd' AS "totalAmountVnd",h.public_accepted_terms_version::text AS "termsVersion",
+      COALESCE(h.deposit_policy_snapshot->>'requiredAmountVnd','0') AS "depositRequiredVnd"
       FROM booking_holds h JOIN room_occupancy o ON o.id=h.occupancy_id WHERE h.tenant_id=$1 AND h.id=$2`, [tenantId, holdId])).rows[0];
     return { ...row, bookingCode: this.bookingCode(holdId) };
   }

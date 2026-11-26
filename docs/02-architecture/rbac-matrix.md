@@ -13,6 +13,10 @@ This is the conservative authorization baseline implemented for the current venu
 | Read confirmed-booking calendar in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | No |
 | Read/record manual CASH payment for confirmed booking | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Publish merchant catalog (does not approve listing for marketplace) | Yes | No | No | No |
+| Read hold deposit status in assigned branch | Yes, all tenant branches | Assigned only | Assigned only | Assigned only |
+| Record CASH deposit on an active hold | Yes, all tenant branches | Assigned only | No | Assigned only |
+
+Platform listing approval is outside the merchant matrix. `GET /v1/platform/catalog/listings` and approve/revoke require a global, non-revoked `platform_admins` grant (no `X-Tenant-ID`), provisioned only through data. A Platform Admin who has an active membership in the target tenant is rejected, so merchant users cannot approve their own listing.
 
 `INACTIVE` is the current soft-delete state for branches and rooms. Physical deletion is not exposed because future bookings, attribution and audit records must retain referential history.
 

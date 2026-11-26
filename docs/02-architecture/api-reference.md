@@ -1566,8 +1566,8 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Confirmed no-deposit booking or replay with the same terms | {"$ref":"#/components/schemas/BookingResponseDto"} |
-| 409 | Expired or incomplete hold, ineligible deposit policy, or conflicting replay | Chưa khai báo schema |
+| 200 | Confirmed booking (no-deposit, or deposit fully recorded on the hold) or replay with the same terms | {"$ref":"#/components/schemas/BookingResponseDto"} |
+| 409 | Expired or incomplete hold, no-deposit not enabled, required deposit not fully recorded, or conflicting replay | Chưa khai báo schema |
 
 ### GET /v1/merchant/booking/bookings/{id}
 
@@ -1721,6 +1721,53 @@ Response được khai báo:
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicBookingStatusDto"} |
 | 404 | Generic response for an invalid phone/code pair | Chưa khai báo schema |
 | 429 | IP or phone rate limit exceeded | Chưa khai báo schema |
+
+### GET /v1/merchant/booking/holds/{id}/deposits
+
+Nhóm: hold deposits
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Snapshotted deposit requirement, recorded CASH entries and remaining amount | {"$ref":"#/components/schemas/HoldDepositStatusDto"} |
+
+### POST /v1/merchant/booking/holds/{id}/deposits
+
+Nhóm: hold deposits
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+| header | `idempotency-key` | Có | string |
+| header | `Idempotency-Key` | Có | string — Visible ASCII 1–100 characters; scoped to tenant and user |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/RecordHoldDepositDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Recorded deposit or matching replay | {"$ref":"#/components/schemas/HoldDepositEntryDto"} |
+| 409 | Hold inactive, no snapshot, no deposit required, amount above remaining, or idempotency conflict | Chưa khai báo schema |
 
 ### GET /v1/merchant/catalog/publication
 
@@ -1890,6 +1937,80 @@ Response được khai báo:
 | HTTP | Mô tả | Schema |
 |---|---|---|
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicBookingTermsResponseDto"} |
+
+### GET /v1/platform/catalog/listings
+
+Nhóm: platform listing approval
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `status` | Không | string — PENDING = published by merchant and not approved |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/ListingListDto"} |
+| 403 | Caller is not a Platform Admin | Chưa khai báo schema |
+
+### POST /v1/platform/catalog/listings/{tenantId}/approve
+
+Nhóm: platform listing approval
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/ListingDecisionDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Approved listing, or unchanged state when already approved | {"$ref":"#/components/schemas/ListingResponseDto"} |
+| 403 | Not a Platform Admin, or reviewer belongs to the merchant | Chưa khai báo schema |
+| 409 | Merchant is inactive or has not published its catalog | Chưa khai báo schema |
+
+### POST /v1/platform/catalog/listings/{tenantId}/revoke
+
+Nhóm: platform listing approval
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/RevokeListingDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Revoked listing, or unchanged state when not approved | {"$ref":"#/components/schemas/ListingResponseDto"} |
+| 403 | Not a Platform Admin, or reviewer belongs to the merchant | Chưa khai báo schema |
 
 ## Các schema request và response
 
@@ -3141,6 +3262,49 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### DepositPolicySnapshotDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "FIXED",
+        "PERCENT"
+      ]
+    },
+    "fixedAmountVnd": {
+      "type": "string",
+      "nullable": true
+    },
+    "percent": {
+      "type": "string",
+      "nullable": true,
+      "example": "30.0000"
+    },
+    "policyVersion": {
+      "type": "string",
+      "nullable": true,
+      "description": "Channel deposit-policy version at snapshot time; null when the channel was unconfigured (NONE default)"
+    },
+    "requiredAmountVnd": {
+      "type": "string",
+      "description": "Required deposit for the snapshotted quote total. FIXED is capped at the total; PERCENT rounds up to whole VND"
+    }
+  },
+  "required": [
+    "mode",
+    "fixedAmountVnd",
+    "percent",
+    "policyVersion",
+    "requiredAmountVnd"
+  ]
+}
+```
+
 ### HoldResponseDto
 
 ```json
@@ -3219,6 +3383,16 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "nullable": true,
       "format": "uuid",
       "description": "Staff user who recorded the verification call; individual responses only"
+    },
+    "depositPolicySnapshot": {
+      "nullable": true,
+      "description": "Deposit policy frozen with the price snapshot; individual responses only",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/DepositPolicySnapshotDto"
+        }
+      ]
     }
   },
   "required": [
@@ -3952,6 +4126,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "termsVersion": {
       "type": "string"
     },
+    "depositRequiredVnd": {
+      "type": "string",
+      "description": "Deposit the merchant requires before staff can confirm (snapshotted at hold time); \"0\" when none is required. Paid in person; no online payment"
+    },
     "bookingCode": {
       "type": "string",
       "description": "128-bit lookup code. Store securely; returned again only for matching idempotent replay."
@@ -3968,6 +4146,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "status",
     "totalAmountVnd",
     "termsVersion",
+    "depositRequiredVnd",
     "bookingCode"
   ]
 }
@@ -4038,6 +4217,14 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "termsVersion": {
       "type": "string"
+    },
+    "depositRequiredVnd": {
+      "type": "string",
+      "description": "Deposit required before confirmation; \"0\" when none is required"
+    },
+    "depositRecordedVnd": {
+      "type": "string",
+      "description": "Deposit recorded by staff so far"
     }
   },
   "required": [
@@ -4049,7 +4236,152 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "durationMinutes",
     "status",
     "totalAmountVnd",
-    "termsVersion"
+    "termsVersion",
+    "depositRequiredVnd",
+    "depositRecordedVnd"
+  ]
+}
+```
+
+### HoldDepositEntryDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "holdId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "CASH"
+      ]
+    },
+    "amountVnd": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string",
+      "nullable": true
+    },
+    "recordedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "holdId",
+    "branchId",
+    "method",
+    "amountVnd",
+    "note",
+    "recordedBy",
+    "recordedAt"
+  ]
+}
+```
+
+### HoldDepositStatusDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "holdId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "holdStatus": {
+      "type": "string",
+      "enum": [
+        "HELD",
+        "EXPIRED",
+        "CONFIRMED"
+      ]
+    },
+    "depositPolicySnapshot": {
+      "nullable": true,
+      "description": "Null until customer details and the price snapshot are recorded",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/DepositPolicySnapshotDto"
+        }
+      ]
+    },
+    "requiredAmountVnd": {
+      "type": "string"
+    },
+    "totalRecordedVnd": {
+      "type": "string"
+    },
+    "remainingVnd": {
+      "type": "string"
+    },
+    "depositSatisfied": {
+      "type": "boolean",
+      "description": "True when the snapshot requires a deposit and the recorded total covers it"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/HoldDepositEntryDto"
+      }
+    }
+  },
+  "required": [
+    "holdId",
+    "holdStatus",
+    "depositPolicySnapshot",
+    "requiredAmountVnd",
+    "totalRecordedVnd",
+    "remainingVnd",
+    "depositSatisfied",
+    "items"
+  ]
+}
+```
+
+### RecordHoldDepositDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "method": {
+      "type": "string",
+      "enum": [
+        "CASH"
+      ]
+    },
+    "amountVnd": {
+      "type": "string",
+      "description": "Positive integer VND as a decimal string; must not exceed the remaining required deposit",
+      "example": "50000"
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "method",
+    "amountVnd"
   ]
 }
 ```
@@ -4427,6 +4759,140 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "currency",
     "totalAmountVnd",
     "bookingDurationPolicy"
+  ]
+}
+```
+
+### ListingResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "merchantCode": {
+      "type": "string"
+    },
+    "merchantName": {
+      "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string"
+    },
+    "published": {
+      "type": "boolean"
+    },
+    "platformApproved": {
+      "type": "boolean"
+    },
+    "platformDecidedBy": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid",
+      "description": "Platform Admin who made the latest approve/revoke decision"
+    },
+    "platformDecidedAt": {
+      "type": "string",
+      "nullable": true,
+      "format": "date-time"
+    },
+    "activeBranchCount": {
+      "type": "number",
+      "description": "Active branches that would become publicly visible"
+    },
+    "termsConfigured": {
+      "type": "boolean",
+      "description": "Public booking terms configured"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tenantId",
+    "merchantCode",
+    "merchantName",
+    "tenantStatus",
+    "published",
+    "platformApproved",
+    "platformDecidedBy",
+    "platformDecidedAt",
+    "activeBranchCount",
+    "termsConfigured",
+    "updatedAt",
+    "version"
+  ]
+}
+```
+
+### ListingListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ListingResponseDto"
+      }
+    },
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "items",
+    "limit",
+    "offset",
+    "hasMore"
+  ]
+}
+```
+
+### ListingDecisionDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "note": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Reviewer note stored in the audit record"
+    }
+  }
+}
+```
+
+### RevokeListingDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Reason stored in the audit record"
+    }
+  },
+  "required": [
+    "reason"
   ]
 }
 ```
