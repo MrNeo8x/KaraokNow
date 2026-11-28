@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ApiError, request } from '@/lib/api';
 
-type Publication = { published: boolean; platformApproved: boolean; version?: string; tenantStatus?: 'ACTIVE' | 'INACTIVE' };
+export type Publication = { published: boolean; platformApproved: boolean; version?: string; tenantStatus?: 'ACTIVE' | 'INACTIVE' };
 
 // Owner-only. Other roles receive 403 and the section is hidden.
 export default function CatalogPublication({ token, tenant }: { token: string; tenant: string }) {

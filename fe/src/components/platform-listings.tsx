@@ -5,10 +5,10 @@ import { ApiError, request } from '@/lib/api';
 import { formatBytes } from '@/lib/image-compress';
 import { openPrivatePdf } from '@/lib/open-pdf';
 
-type ListingDocument = { id: string; title: string; sizeBytes: number; uploadedAt: string };
+export type ListingDocument = { id: string; title: string; sizeBytes: number; uploadedAt: string };
 
-type Listing = { tenantId: string; merchantCode: string; merchantName: string; tenantStatus: string; published: boolean; platformApproved: boolean; platformDecidedBy: string | null; platformDecidedAt: string | null; activeBranchCount: number; termsConfigured: boolean; updatedAt: string; version: string };
-type Page = { items: Listing[]; limit: number; offset: number; hasMore: boolean };
+export type Listing = { tenantId: string; merchantCode: string; merchantName: string; tenantStatus: string; published: boolean; platformApproved: boolean; platformDecidedBy: string | null; platformDecidedAt: string | null; activeBranchCount: number; termsConfigured: boolean; updatedAt: string; version: string };
+export type Page = { items: Listing[]; limit: number; offset: number; hasMore: boolean };
 type Filter = 'PENDING' | 'APPROVED' | 'ALL';
 const LIMIT = 20;
 

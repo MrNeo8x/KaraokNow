@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { ROLES, membershipError, roleLabel, temporaryPasswordError, type Role } from '@/lib/admin';
 
-type Membership = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
+export type Membership = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
 export type Grant = { roles: Role[]; branchIds: string[] };
 
 export function GrantPicker({ value, onChange, branches }: { value: Grant; onChange: (next: Grant) => void; branches: { id: string; name: string }[] }) {

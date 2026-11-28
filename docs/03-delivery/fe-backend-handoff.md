@@ -240,6 +240,11 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Gợi ý UI: mục "Người dùng" trong khu Platform (ô tìm, lọc trạng thái/admin, phân trang), trang chi tiết user (merchant + vai trò, các nút có hộp thoại nhập lý do), tab "Thành viên" trong chi tiết merchant.
 - Production: cần migration `20261124060000_platform_user_management` trước khi push (OPS — xem `deploy-vercel.md` §10).
 
+### FE INTEGRATED — type từ OpenAPI và kiểm tra drift (FE-011, API-004, 2026-11-28)
+
+- FE sinh `fe/src/lib/api-types.gen.ts` từ `docs/02-architecture/openapi.json`; `fe/src/lib/api-contract.ts` khẳng định 44 response khớp type FE đang đọc. Cả 44 hiện khớp.
+- **Lưu ý cho Luồng BE:** FE CI chạy `npm run types:check`. Sau khi BE đổi `openapi.json` (kể cả chỉ mô tả), FE CI sẽ đỏ cho tới khi Luồng FE chạy `npm run types:generate` và commit — ghi marker FE READY như thường lệ để Luồng FE biết. Nếu BE đổi tên/xoá/đổi kiểu trường mà FE đang đọc, `next build` của FE sẽ lỗi tại `api-contract.ts` sau khi sinh lại type: đó là tín hiệu cần sửa FE, không phải lỗi công cụ.
+
 ### FE INTEGRATED — quản lý user của Platform (FE-017, IAM-008, 2026-11-28)
 
 - `/platform` → **Người dùng** (danh sách, lọc, chi tiết, khoá/mở khoá, mật khẩu tạm một lần, cấp/thu hồi admin) và nút **Thành viên** trên từng merchant (thêm, sửa quyền, vô hiệu hoá). Mọi thao tác ghi gửi `reason` qua hộp thoại; không gửi `X-Tenant-ID`.

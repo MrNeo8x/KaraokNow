@@ -7,13 +7,13 @@ import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle'
 import { SLOTS, firstSlot, initialChoice, slotOpen, upcomingDates } from '@/lib/booking-time';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, formatBookingCode, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
-type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string };
-type Room = { id: string; branchId?: string; name: string; capacity: number };
+export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string };
+export type Room = { id: string; branchId?: string; name: string; capacity: number };
 type Page<T> = { items: T[]; hasMore: boolean };
-type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
-type Quote = { branchId: string; roomId: string; timezone: string; startAt: string; endAt: string; durationMinutes: number; currency: 'VND'; totalAmountVnd: string; bookingDurationPolicy: { durationStepMinutes: number; minDurationMinutes: number; maxDurationMinutes: number } };
-type Terms = { configured: boolean; terms: string | null; version: string | null; updatedAt?: string | null };
-type Lookup = { holdId: string; bookingId: string | null; branchId: string; roomId: string; startAt: string; durationMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; bookingStatus?: BookingStatus | null; totalAmountVnd: string; termsVersion: string; depositRequiredVnd?: string; depositRecordedVnd?: string };
+export type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
+export type Quote = { branchId: string; roomId: string; timezone: string; startAt: string; endAt: string; durationMinutes: number; currency: 'VND'; totalAmountVnd: string; bookingDurationPolicy: { durationStepMinutes: number; minDurationMinutes: number; maxDurationMinutes: number } };
+export type Terms = { configured: boolean; terms: string | null; version: string | null; updatedAt?: string | null };
+export type Lookup = { holdId: string; bookingId: string | null; branchId: string; roomId: string; startAt: string; durationMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; bookingStatus?: BookingStatus | null; totalAmountVnd: string; termsVersion: string; depositRequiredVnd?: string; depositRecordedVnd?: string };
 const statusLabel = { HELD: 'Đang giữ chỗ · chờ nhân viên gọi xác minh', CONFIRMED: 'Đã xác nhận đặt phòng', EXPIRED: 'Đã hết hạn giữ chỗ' } as const;
 const RETRY_COOLDOWN_MS = 60_000;
 function session(): Storage | null { try { return window.sessionStorage; } catch { return null; } }

@@ -14,6 +14,13 @@ Next.js runs on port 3100 and rewrites `/v1` to `http://localhost:3000` by defau
 
 Run `npm test` for API-client contract unit tests. `.github/workflows/frontend-ci.yml` runs install, tests and build independently of backend CI; browser and live FE–BE tests are not yet configured.
 
+## Type từ OpenAPI (FE-011)
+
+- `src/lib/api-types.gen.ts` sinh bằng `openapi-typescript` từ `../docs/02-architecture/openapi.json` — không sửa tay.
+- `npm run types:generate` sinh lại; `npm run types:check` báo lỗi nếu file đã commit lệch với `openapi.json` (chạy trong FE CI trước `npm test`).
+- `src/lib/api-contract.ts` khẳng định ở mức type rằng mỗi response theo OpenAPI gán được vào type FE đang đọc (44 cặp). Đổi tên, xoá hoặc đổi kiểu một trường FE đang dùng sẽ làm `tsc`/`next build` lỗi tại file này.
+- Khi BE đổi API: chạy `npm run types:generate`, sửa lỗi TypeScript (nếu có), commit cả file sinh.
+
 ## Sprint hiện tại
 
 - Merchant: login, forced password change, logout, in-memory scheduled token refresh, tenant ID selection, branch/room reads and creation, branch name/timezone and room name/capacity edits, and branch/room status changes use the backend API. Session stays in memory; reload requires login. Live browser tests for refresh/logout races and tenant discovery remain backlog. Backend enforces role and branch permissions.

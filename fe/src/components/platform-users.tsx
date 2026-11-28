@@ -8,7 +8,7 @@ import ReasonDialog, { type ReasonRequest } from './reason-dialog';
 
 type Membership = { membershipId: string; tenantId: string; tenantName: string; tenantStatus: string; status: string; roles: Role[]; branchIds: string[] };
 export type PlatformUser = { id: string; email: string; displayName: string; status: 'ACTIVE' | 'DISABLED'; mustChangePassword: boolean; platformAdmin: boolean; createdAt: string; lastLoginAt: string | null; disabledAt: string | null; disabledReason: string | null; memberships: Membership[] };
-type Page = { items: PlatformUser[]; limit: number; offset: number; hasMore: boolean };
+export type Page = { items: PlatformUser[]; limit: number; offset: number; hasMore: boolean };
 const LIMIT = 20;
 
 // Backend messages are translated in lib/api.ts (FRIENDLY); errors pass through unchanged here.

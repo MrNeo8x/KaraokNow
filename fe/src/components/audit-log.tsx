@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { auditHasMore } from '@/lib/admin';
 
-type AuditEntry = { id: string; actorUserId: string | null; action: string; entityType: string; entityId: string; beforeData: unknown; afterData: unknown; occurredAt: string };
+export type AuditEntry = { id: string; actorUserId: string | null; action: string; entityType: string; entityId: string; beforeData: unknown; afterData: unknown; occurredAt: string };
 const LIMIT = 50;
 
 // Owner-only. Other roles receive 403 and the section is hidden.

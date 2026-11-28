@@ -8,9 +8,9 @@ import { zoneDay } from '@/lib/reception-calendar';
 import { useCan } from './permissions-context';
 
 type Totals = { depositsVnd: string; bookingCashVnd: string; cashReversalsVnd: string; refundsVnd: string; netCashVnd: string; surchargesVnd: string };
-type Report = { branchId: string; date: string; timezone: string; from: string; to: string; totals: Totals; byRecorder: (Totals & { userId: string; displayName: string })[] };
-type Unresolved = { holdId: string; roomId: string; channel: string; startAt: string; expiresAt: string; customerPhone: string | null; netDepositVnd: string };
-type UnresolvedPage = { items: Unresolved[]; hasMore: boolean };
+export type Report = { branchId: string; date: string; timezone: string; from: string; to: string; totals: Totals; byRecorder: (Totals & { userId: string; displayName: string })[] };
+export type Unresolved = { holdId: string; roomId: string; channel: string; startAt: string; expiresAt: string; customerPhone: string | null; netDepositVnd: string };
+export type UnresolvedPage = { items: Unresolved[]; hasMore: boolean };
 const PAGE = 50;
 
 /** PD-036: daily till report per branch/local day and expired-hold deposits awaiting an Owner/Branch Manager decision. */

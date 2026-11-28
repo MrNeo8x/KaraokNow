@@ -6,7 +6,7 @@ import { parseVnd } from '@/lib/booking-lifecycle';
 import { balanceText, entrySign, kindLabel, money, reversalTargetLabel, reversalTypeOf, settlementLabel, settlementTone, type LedgerEntry, type Settlement } from '@/lib/cash-account';
 import { useCan } from './permissions-context';
 
-type Account = { bookingId: string; bookingStatus: string; priceTotalVnd: string; surchargesVnd: string; dueVnd: string; depositsVnd: string; cashVnd: string; refundsVnd: string; paidVnd: string; balanceVnd: string; settlement: Settlement; retainedVnd: string | null; entries: LedgerEntry[] };
+export type Account = { bookingId: string; bookingStatus: string; priceTotalVnd: string; surchargesVnd: string; dueVnd: string; depositsVnd: string; cashVnd: string; refundsVnd: string; paidVnd: string; balanceVnd: string; settlement: Settlement; retainedVnd: string | null; entries: LedgerEntry[] };
 const CLOSED = new Set(['CANCELLED', 'NO_SHOW']);
 
 /** Money account of one booking (PD-036): due vs paid, ledger, surcharges, CASH and full reversals. */

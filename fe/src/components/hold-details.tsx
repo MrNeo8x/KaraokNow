@@ -6,9 +6,9 @@ import { confirmationMode, depositAmountError } from '@/lib/booking-lifecycle';
 import { useCan } from './permissions-context';
 
 export type DetailedHold = { id: string; branchId: string; roomId: string; channel: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; bufferMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; customerPhone?: string | null; customerEmail?: string | null; priceSnapshot?: { totalAmountVnd?: string; currency?: string } | null; phoneVerifiedAt?: string | null; phoneVerifiedBy?: string | null; depositPolicySnapshot?: DepositSnapshot | null; publicAcceptedTerms?: string | null };
-type DepositSnapshot = { mode: 'NONE' | 'FIXED' | 'PERCENT'; fixedAmountVnd: string | null; percent: string | null; policyVersion: string | null; requiredAmountVnd: string };
-type DepositEntry = { id: string; amountVnd: string; note: string | null; recordedAt: string; reversed?: boolean };
-type DepositStatus = { holdId: string; holdStatus: string; depositPolicySnapshot: DepositSnapshot | null; requiredAmountVnd: string; totalRecordedVnd: string; remainingVnd: string; depositSatisfied: boolean; items: DepositEntry[] };
+export type DepositSnapshot = { mode: 'NONE' | 'FIXED' | 'PERCENT'; fixedAmountVnd: string | null; percent: string | null; policyVersion: string | null; requiredAmountVnd: string };
+export type DepositEntry = { id: string; amountVnd: string; note: string | null; recordedAt: string; reversed?: boolean };
+export type DepositStatus = { holdId: string; holdStatus: string; depositPolicySnapshot: DepositSnapshot | null; requiredAmountVnd: string; totalRecordedVnd: string; remainingVnd: string; depositSatisfied: boolean; items: DepositEntry[] };
 const money = (value: string) => `${BigInt(value).toLocaleString('vi-VN')} ₫`;
 type Quote = { priceSnapshot: { totalAmountVnd: string; currency: string; timezone: string; calculation: { priceRuleCode: string } } };
 

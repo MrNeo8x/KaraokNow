@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { formatAge } from '@/lib/admin';
 
-type HoldBacklog = { overdueCount: string; oldestOverdueSeconds: number | null };
-type OutboxBacklog = { pendingCount: string; processingCount: string; deadCount: string; oldestReadySeconds: number | null };
+export type HoldBacklog = { overdueCount: string; oldestOverdueSeconds: number | null };
+export type OutboxBacklog = { pendingCount: string; processingCount: string; deadCount: string; oldestReadySeconds: number | null };
 const STALE_SECONDS = 300;
 
 // Owner-only. Other roles receive 403 and the section is hidden.

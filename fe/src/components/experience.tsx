@@ -34,11 +34,11 @@ import { roleLabel, type Role } from '@/lib/admin';
 import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
 import { autoTenant, cookieLogout, cookieRefresh, parseSession, readLastTenant, refreshDelay, rememberTenant, type MyTenant, type Session } from '@/lib/session';
 
-type Branch = { id: string; name: string; code: string; timezone: string; status: string };
-type Room = { id: string; name: string; code: string; capacity: number; status: string };
+export type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
+export type Branch = { id: string; name: string; code: string; timezone: string; status: string };
+export type Room = { id: string; name: string; code: string; capacity: number; status: string };
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
   const page = initialPage;
-  type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
   const [me, setMe] = useState<Me | null>(null); const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [merchantSection, selectMerchant] = useSection(MERCHANT_IDS, 'overview');
   const [platformSection, selectPlatform] = useSection(PLATFORM_IDS, 'listings');

@@ -6,7 +6,7 @@ import { ApiError, request } from '@/lib/api';
 import { compressImage, formatBytes, imageTypeError, type CompressedImage } from '@/lib/image-compress';
 import { useCan } from './permissions-context';
 
-type Media = { id: string; roomId: string; assetRef: string; altText: string | null; displayOrder: number; url: string | null; contentType: string | null; sizeBytes: number | null };
+export type Media = { id: string; roomId: string; assetRef: string; altText: string | null; displayOrder: number; url: string | null; contentType: string | null; sizeBytes: number | null };
 const MAX_PER_ROOM = 10;
 
 /** Room photo gallery (FILE-001, PD-037): images are compressed in the browser before upload. */

@@ -6,7 +6,7 @@ import { ApiError, request } from '@/lib/api';
 import { formatBytes } from '@/lib/image-compress';
 import { openPrivatePdf, pdfError } from '@/lib/open-pdf';
 
-type MerchantDocument = { id: string; tenantId: string; title: string; contentType: string; sizeBytes: number; uploadedBy: string; uploadedAt: string };
+export type MerchantDocument = { id: string; tenantId: string; title: string; contentType: string; sizeBytes: number; uploadedBy: string; uploadedAt: string };
 const MAX_DOCUMENTS = 10;
 
 /** Owner-only PDF documents (licences, contracts) in the private store; Platform Admin reviews them when approving. */

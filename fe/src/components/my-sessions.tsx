@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { request } from '@/lib/api';
 import { currentSessionId } from '@/lib/admin';
 
-type AuthSession = { id: string; createdAt: string; lastUsedAt: string | null; expiresAt: string; revoked: boolean };
+export type AuthSession = { id: string; createdAt: string; lastUsedAt: string | null; expiresAt: string; revoked: boolean };
 
 // Each refresh rotates into a new session row and revokes the previous one, so history rows are hidden by default.
 export default function MySessions({ token, onCurrentRevoked }: { token: string; onCurrentRevoked: () => void }) {

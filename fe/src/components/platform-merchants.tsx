@@ -6,9 +6,9 @@ import { merchantCodeError, temporaryPasswordError } from '@/lib/admin';
 import PlatformMembers from './platform-members';
 import { Fragment } from 'react';
 
-type Merchant = { tenantId: string; code: string; name: string; status: 'ACTIVE' | 'INACTIVE'; createdAt: string; ownerCount: number; activeBranchCount: number; published: boolean; platformApproved: boolean };
-type Created = Merchant & { owner: { userId: string; email: string; membershipId: string; accountCreated: boolean } };
-type Page = { items: Merchant[]; limit: number; offset: number; hasMore: boolean };
+export type Merchant = { tenantId: string; code: string; name: string; status: 'ACTIVE' | 'INACTIVE'; createdAt: string; ownerCount: number; activeBranchCount: number; published: boolean; platformApproved: boolean };
+export type Created = Merchant & { owner: { userId: string; email: string; membershipId: string; accountCreated: boolean } };
+export type Page = { items: Merchant[]; limit: number; offset: number; hasMore: boolean };
 const LIMIT = 20;
 
 function randomPassword(): string {

@@ -6,8 +6,8 @@ import { membershipError, reasonError, roleLabel, temporaryPasswordError, type R
 import { GrantPicker, type Grant } from './memberships';
 import ReasonDialog, { type ReasonRequest } from './reason-dialog';
 
-type Member = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
-type Branch = { id: string; name: string; status: string };
+export type Member = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
+export type Branch = { id: string; name: string; status: string };
 
 // Backend messages are translated in lib/api.ts (FRIENDLY); errors pass through unchanged here.
 function explain(err: unknown): Error { return err instanceof Error ? err : new Error(String(err)); }

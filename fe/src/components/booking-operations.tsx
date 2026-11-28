@@ -6,9 +6,9 @@ import { useCan } from './permissions-context';
 import BookingAccount from './booking-account';
 import { allowedActions, bookingStatusLabel, outcomeLabel, parseVnd, type BookingStatus, type OutcomeType } from '@/lib/booking-lifecycle';
 
-type Booking = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; customerPhone: string; status: BookingStatus; priceSnapshot: { totalAmountVnd?: string; currency?: string }; reservedEndAt?: string; confirmationPolicySnapshot?: { depositMode?: string; requiredDepositVnd?: string; depositRecordedVnd?: string } | null; checkedInAt?: string | null; checkedOutAt?: string | null; lateMinutes?: number | null; overtimeMinutes?: number | null; overtimeGraceMinutes?: number | null; outcome?: { type: OutcomeType; note: string; refundAmountVnd: string; recordedAt: string } | null };
+export type Booking = { id: string; roomId: string; channel: string; startAt: string; durationMinutes: number; customerPhone: string; status: BookingStatus; priceSnapshot: { totalAmountVnd?: string; currency?: string }; reservedEndAt?: string; confirmationPolicySnapshot?: { depositMode?: string; requiredDepositVnd?: string; depositRecordedVnd?: string } | null; checkedInAt?: string | null; checkedOutAt?: string | null; lateMinutes?: number | null; overtimeMinutes?: number | null; overtimeGraceMinutes?: number | null; outcome?: { type: OutcomeType; note: string; refundAmountVnd: string; recordedAt: string } | null };
 type OutcomeDraft = { type: OutcomeType; note: string; refund: string };
-type Page = { items: Booking[]; limit: number; offset: number; hasMore: boolean };
+export type Page = { items: Booking[]; limit: number; offset: number; hasMore: boolean };
 
 export default function BookingOperations({ token, tenant, branchId, timezone, rooms }: { token: string; tenant: string; branchId: string; timezone: string; rooms: { id: string; name: string }[] }) {
   const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [utcOffset, setUtcOffset] = useState('+07:00');

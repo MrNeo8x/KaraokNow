@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { useCan } from './permissions-context';
 
-type OvertimePolicy = { configured: boolean; graceMinutes: number; version: string | null };
+export type OvertimePolicy = { configured: boolean; graceMinutes: number; version: string | null };
 
 // Every merchant role can read; Owner and Branch Manager can update (backend enforces).
 export default function OvertimeSettings({ token, tenant }: { token: string; tenant: string }) {
