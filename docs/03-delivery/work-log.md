@@ -36,6 +36,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: migration deposit exemptions (BKG-008)
+
+- Áp `20261124110000_deposit_exemptions` lên Prisma lúc 16:43:46 (2 bảng mới `tenant_deposit_exemption_policies`, `hold_deposit_waivers` — tương thích ngược). Production 33 migration.
+- Lúc nhận yêu cầu, `23837c3` (BKG-008) **đã được push** (`origin/main` = `9f45831`) — lại push trước migration. Không có khoảng lỗi: BKG-008 chỉ có trong deploy `9f45831`, BE READY sau khi migration xong (deploy trước `cb63c9a` không chứa BKG-008); log BE 90 phút không có 5xx. Smoke: trang/health 200, `/v1/health/jobs` ok.
+- Nhắc lại runbook: áp migration **trước** khi push commit chứa nó.
+
+---
+
 ## 2026-11-28 — Luồng BE: miễn cọc theo trường hợp (BKG-008, PD-050)
 
 - PO định nghĩa "trường hợp" của PD-005: giá trị booking nhỏ, khung giờ vắng, khách quen, quản lý duyệt từng booking, và "nhân viên được quyền quyết định theo phân quyền" → hiểu là merchant chọn vai trò được miễn cọc từng hold (Owner luôn được) → PD-050.
