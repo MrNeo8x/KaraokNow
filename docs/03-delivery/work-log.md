@@ -2,15 +2,17 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau PAY-007)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `caa8de3` API-003 (điều khoản đã chấp nhận trên hold WEB, quyền đọc Thu ngân, `GET /merchant/me`) + OPS-005 (image `tools`, compose `--profile tools|workers`, `SWAGGER_ENABLED`); BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031); FE `c6663d7` thiết kế tím/admin shell; BE `7796a6d` benchmark + sửa deadlock + UAT.
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ (gom nhầm `be/src/jobs/*` của session triển khai, xem nhật ký); BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
 
 **Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration. Backend container chạy code `caa8de3` (smoke: Thu ngân `GET /merchant/me` → `CASHIER`, đọc danh sách hold chi nhánh → 200). Frontend container chưa có phần FE đang dở. Worker tắt; bật bằng `docker compose --profile workers up -d` trong `be/`.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`; smoke: báo cáo tiền mặt, cọc chờ xử lý, tài khoản booking 200; Lễ tân bị chặn báo cáo/đảo bút toán 403), frontend `:3100`. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu.
+
+**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay; deploy `73deaec` (12:55) có trước PAY-007 nên production **chắc chắn chưa** có migration `20261124040000_cash_reconciliation` và code OPS-004/API-004/PAY-007; Luồng BE không kiểm được production đã áp `20261124030000_overtime_recording` hay chưa — việc của session triển khai, cần người dùng xác nhận trước khi đụng production.
 
 **Đang dở (working tree, chưa commit):** Luồng FE: FE-013 và QA-003 (`overtime-settings.tsx`, `fe/e2e/roles.mjs`, các màn `/platform`, publication, lịch), viết lại `README.md`, các mục FE INTEGRATED/FE ROLE TEST/Yêu cầu BE trong handoff, dòng FE-013/QA-003 trên task board. Luồng BE không có việc dở.
 
@@ -19,8 +21,8 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 **Việc tiếp theo**
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008 (không cọc theo trường hợp); xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
-- *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
-- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
+- *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`). FE-014 `READY`: màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt".
+- *Luồng BE:* BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS. Không có contract nào FE đang phải chờ.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
 
@@ -33,6 +35,13 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: rebuild backend local sau PAY-007
+
+- `npm run db:migrate` áp `20261124040000_cash_reconciliation`; `docker compose up -d --build backend` (healthy), frontend/PostgreSQL giữ nguyên.
+- Smoke (chỉ đọc, tài khoản seed UAT): Thu ngân `cash-report` và `unresolved-deposits` 200; Lễ tân `cash-report` và `money-reversals` 403; `bookings/{id}/account` trả due/paid/settlement; overtime-policy 200.
 
 ---
 
