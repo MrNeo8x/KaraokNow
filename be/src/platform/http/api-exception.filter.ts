@@ -8,8 +8,12 @@ const CODES: Record<number, string> = {
   503: 'SERVICE_UNAVAILABLE'
 };
 
-/** PostgreSQL concurrency aborts that a client can safely retry. */
-const RETRYABLE_PG_CODES = new Set(['40P01', '40001']);
+/** PostgreSQL concurrency aborts that a client can safely retry: deadlock, serialization failure, lock wait timeout (OPS-004). */
+const RETRYABLE_PG_CODES = new Set(['40P01', '40001', '55P03']);
+/** Database overload signals (OPS-004): statement timeout, or no pooled connection within PG_CONNECTION_TIMEOUT_MS. */
+function isDatabaseUnavailable(pgCode: string | undefined, exception: unknown): boolean {
+  return pgCode === '57014' || (exception instanceof Error && /timeout exceeded when trying to connect/i.test(exception.message));
+}
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -19,7 +23,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const response = context.getResponse<Response>();
     const pgCode = typeof (exception as { code?: unknown })?.code === 'string' ? (exception as { code: string }).code : undefined;
     const retryable = !(exception instanceof HttpException) && pgCode !== undefined && RETRYABLE_PG_CODES.has(pgCode);
-    const status = exception instanceof HttpException ? exception.getStatus() : retryable ? HttpStatus.CONFLICT : HttpStatus.INTERNAL_SERVER_ERROR;
+    const unavailable = !(exception instanceof HttpException) && !retryable && isDatabaseUnavailable(pgCode, exception);
+    const status = exception instanceof HttpException ? exception.getStatus()
+      : retryable ? HttpStatus.CONFLICT : unavailable ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.INTERNAL_SERVER_ERROR;
     const payload = exception instanceof HttpException ? exception.getResponse()
       : retryable ? { message: 'The resource was changed concurrently; retry the request' } : null;
     if (status >= 500 || retryable) {
@@ -34,7 +40,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
       : payload && typeof payload === 'object' && 'message' in payload ? (payload as { message: string | string[] }).message
       : null;
     const messages = Array.isArray(rawMessage) ? rawMessage : rawMessage ? [rawMessage] : [];
-    const message = status >= 500 ? 'An unexpected error occurred' : messages[0] ?? 'Request failed';
+    const message = unavailable ? 'The service is temporarily busy; retry shortly'
+      : status >= 500 ? 'An unexpected error occurred' : messages[0] ?? 'Request failed';
     response.status(status).json({
       timestamp: new Date().toISOString(), path: request.originalUrl.split('?')[0], correlationId: request.correlationId,
       error: { code: CODES[status] ?? `HTTP_${status}`, message, ...(messages.length > 1 ? { details: messages } : {}) }

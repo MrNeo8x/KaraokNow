@@ -1,3 +1,5 @@
+import { validateDbSettings } from '../platform/database/pool-config';
+
 const DEFAULT_PORT = 3000;
 
 export function validateEnvironment(config: Record<string, unknown>): Record<string, unknown> {
@@ -41,6 +43,8 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
     const value = Number(config[name]);
     if (!Number.isInteger(value) || value < 1 || value > 10000) errors.push(`${name} must be an integer between 1 and 10000`);
   }
+
+  errors.push(...validateDbSettings(config));
 
   if (errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);

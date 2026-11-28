@@ -1,5 +1,6 @@
 import { Global, Inject, Module, OnApplicationShutdown } from '@nestjs/common';
 import { Pool } from 'pg';
+import { poolConfigFromEnv } from './pool-config';
 
 export const PG_POOL = Symbol('PG_POOL');
 
@@ -7,7 +8,7 @@ export const PG_POOL = Symbol('PG_POOL');
 @Module({
   providers: [{
     provide: PG_POOL,
-    useFactory: () => new Pool({ connectionString: process.env.DATABASE_URL })
+    useFactory: () => new Pool(poolConfigFromEnv(process.env))
   }],
   exports: [PG_POOL]
 })

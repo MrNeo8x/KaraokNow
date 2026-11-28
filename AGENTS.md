@@ -64,7 +64,8 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Cột thời gian của `audit_logs` là `occurred_at`.
 - Script Python sửa file: **đọc nội dung xong mới mở file để ghi**. `open(p,'w').write(f(open(p).read()))` xoá trắng file trước khi đọc (đã làm mất tạm thời phần FE chưa commit trong handoff ngày 2026-11-26).
 - Ràng buộc exclusion GiST có thể **deadlock** khi nhiều transaction cùng chèn khoảng chồng lấn (lỗi `40P01`, mỗi chu trình mất 1 s phát hiện). Mọi lệnh tạo hoặc nới rộng `room_occupancy` phải gọi `lockRoomOccupancy(client, roomId)` (`be/src/availability/occupancy-lock.ts`) ngay trước khi ghi. `ApiExceptionFilter` trả 409 cho `40P01`/`40001` và ghi log mọi lỗi 5xx (không ghi message).
-- Benchmark: `npm run bench:booking` (cần Docker); chạy lại sau thay đổi ở đường giữ phòng/xác nhận và so với `docs/04-quality/booking-benchmark.md`.
+- Benchmark: `npm run bench:booking` (cần Docker); chạy lại sau thay đổi ở đường giữ phòng/xác nhận và so với `docs/04-quality/booking-benchmark.md`. macOS không có lệnh `timeout`; đừng bọc lệnh bằng `timeout`.
+- Pool/timeout PostgreSQL có giới hạn mặc định (OPS-004, `be/src/platform/database/pool-config.ts`): mọi transaction và chờ khoá phải xong trong `PG_LOCK_TIMEOUT_MS` (5 s) / `PG_STATEMENT_TIMEOUT_MS` (15 s). Test cố tình giữ khoá lâu hơn sẽ nhận 409 (`55P03`).
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
 
 ## Trạng thái task

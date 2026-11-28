@@ -54,4 +54,18 @@ describe('ApiExceptionFilter', () => {
     expect(String(write.mock.calls[0][0])).not.toContain('secret');
     write.mockRestore();
   });
+
+  it('maps lock-wait timeouts to 409 and statement/pool timeouts to 503 (OPS-004)', () => {
+    const write = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    new ApiExceptionFilter().catch(Object.assign(new Error('canceling statement due to lock timeout'), { code: '55P03' }), host);
+    expect(status).toHaveBeenLastCalledWith(409);
+    for (const error of [Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' }), new Error('timeout exceeded when trying to connect')]) {
+      status.mockClear(); json.mockClear();
+      new ApiExceptionFilter().catch(error, host);
+      expect(status).toHaveBeenCalledWith(503);
+      expect(json.mock.calls[0][0].error).toEqual({ code: 'SERVICE_UNAVAILABLE', message: 'The service is temporarily busy; retry shortly' });
+    }
+    expect(write).toHaveBeenCalled();
+    write.mockRestore();
+  });
 });

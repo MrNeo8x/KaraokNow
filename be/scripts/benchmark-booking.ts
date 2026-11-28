@@ -12,9 +12,9 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { hash } from 'bcryptjs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { cpus, totalmem, platform, release } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { Pool } from 'pg';
 
 const BRANCHES = 5;
@@ -72,8 +72,12 @@ function summarize(name: string, concurrency: number, run: { samples: Sample[]; 
 }
 
 async function main() {
+  // Resources are released in reverse order even when a step fails, so the script never hangs.
+  const cleanups: Array<() => Promise<unknown>> = [];
+  try {
   log('Starting PostgreSQL 17 container…');
   const postgres = await new PostgreSqlContainer('postgres:17-alpine').start();
+  cleanups.unshift(() => postgres.stop());
   process.env.DATABASE_URL = postgres.getConnectionUri();
   process.env.JWT_SECRET = 'benchmark-secret-at-least-32-characters-long';
   process.env.PUBLIC_HOLD_IP_LIMIT = '10000';
@@ -81,6 +85,7 @@ async function main() {
   execFileSync(resolve('node_modules/.bin/node-pg-migrate'), ['up', '-m', 'migrations'], { cwd: resolve('.'), env: { ...process.env }, stdio: 'pipe' });
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  cleanups.unshift(() => pool.end());
   const tenantId = randomUUID(), userId = randomUUID(), membershipId = randomUUID(), planId = randomUUID();
   log('Seeding dataset…');
   await pool.query(`INSERT INTO tenants(id,code,name,status) VALUES($1,'BENCH','Benchmark merchant','ACTIVE')`, [tenantId]);
@@ -118,6 +123,7 @@ async function main() {
   const { ValidationPipe } = await import('@nestjs/common');
   const { AppModule } = await import('../src/app.module');
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] });
+  cleanups.unshift(() => app.close());
   app.setGlobalPrefix('v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(0, '127.0.0.1');
@@ -195,14 +201,14 @@ async function main() {
   };
   log(`Correctness: overlapping active occupancy pairs=${overlaps}; contention single-winner rounds=${roundsWithSingleWinner}/10; confirmed staff flows=${confirmedFlows}/${flows.length}`);
   const output = process.env.BENCH_OUTPUT;
-  if (output) { writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`); log(`Report written to ${output}`); }
+  if (output) { mkdirSync(dirname(resolve(output)), { recursive: true }); writeFileSync(output, `${JSON.stringify(report, null, 2)}\n`); log(`Report written to ${output}`); }
   else log(JSON.stringify(report, null, 2));
 
-  await app.close();
-  await pool.end();
-  await postgres.stop();
   const failed = overlaps !== 0 || roundsWithSingleWinner !== 10 || confirmedFlows !== flows.length;
   process.exitCode = failed ? 1 : 0;
+  } finally {
+    for (const cleanup of cleanups) await cleanup().catch(() => undefined);
+  }
 }
 
 void main().catch((error: unknown) => {

@@ -93,6 +93,7 @@ Backend (`be/.env`, xem `be/.env.example`; giá trị được kiểm tra lúc k
 | `TRUST_PROXY_HOPS` | Không | Số reverse proxy tin cậy phía trước backend (0–10). Phải đặt đúng khi chạy sau proxy để giới hạn tần suất theo IP hoạt động chính xác |
 | `PUBLIC_RATE_LIMIT_WINDOW_MINUTES`, `PUBLIC_HOLD_IP_LIMIT`, `PUBLIC_HOLD_PHONE_LIMIT`, `PUBLIC_LOOKUP_IP_LIMIT`, `PUBLIC_LOOKUP_PHONE_LIMIT` | Không | Giới hạn giữ chỗ/tra cứu công khai; mặc định 15 phút, 20/5/60/10 |
 | `SWAGGER_ENABLED` | Không | `false` tắt Swagger `/docs`; nên tắt ở production |
+| `PG_POOL_MAX`, `PG_CONNECTION_TIMEOUT_MS`, `PG_IDLE_TIMEOUT_MS`, `PG_STATEMENT_TIMEOUT_MS`, `PG_LOCK_TIMEOUT_MS`, `PG_IDLE_IN_TRANSACTION_TIMEOUT_MS` | Không | Pool và timeout PostgreSQL (mặc định 10 kết nối / 5 s / 30 s / 15 s / 5 s / 60 s). Chỉnh theo hạ tầng thật rồi chạy lại `npm run bench:booking` |
 | `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Không | Tracing OpenTelemetry; không đặt endpoint thì không xuất span |
 | `POSTGRES_PORT` | Không | Cổng PostgreSQL của Compose trên máy host (mặc định 5433) |
 

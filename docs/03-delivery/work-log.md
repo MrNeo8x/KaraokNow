@@ -2,13 +2,13 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-27, 00:00)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
 **Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `caa8de3` API-003 (điều khoản đã chấp nhận trên hold WEB, quyền đọc Thu ngân, `GET /merchant/me`) + OPS-005 (image `tools`, compose `--profile tools|workers`, `SWAGGER_ENABLED`); BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031); FE `c6663d7` thiết kế tím/admin shell; BE `7796a6d` benchmark + sửa deadlock + UAT.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 43/43 unit, `npm run test:e2e` 41/41; image `tools` chạy migrate và hai worker trong Docker; `SWAGGER_ENABLED=false` → `/docs` 404. Benchmark đạt mục tiêu (`docs/04-quality/booking-benchmark.md`). FE (handoff): `npm run e2e` 132/134 trước API-003 — hai bước Thu ngân đỏ đang chờ API-003, nay đã có.
+**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 47/47 unit, `npm run test:e2e` 42/42, benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration. Backend container chạy code `caa8de3` (smoke: Thu ngân `GET /merchant/me` → `CASHIER`, đọc danh sách hold chi nhánh → 200). Frontend container chưa có phần FE đang dở. Worker tắt; bật bằng `docker compose --profile workers up -d` trong `be/`.
 
@@ -20,9 +20,19 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); quyết định Thu ngân có được thấy SĐT khách khi đọc hold/booking (API-003); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
 - *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
-- *Luồng BE:* chờ PO cho PAY-007/BKG-008; OPS-004 (pool/timeout) và OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS; tuỳ chọn có quyết định: reset mật khẩu Owner, `GET /platform/me`, bổ sung response schema OpenAPI cho FE-011.
+- *Luồng BE:* bổ sung response schema OpenAPI cho 43 operation còn thiếu (hỗ trợ FE-011); PAY-007/BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-28 — Luồng BE: giới hạn pool/timeout PostgreSQL (OPS-004)
+
+- `be/src/platform/database/pool-config.ts`: biến `PG_POOL_MAX`, `PG_CONNECTION_TIMEOUT_MS`, `PG_IDLE_TIMEOUT_MS`, `PG_STATEMENT_TIMEOUT_MS`, `PG_LOCK_TIMEOUT_MS`, `PG_IDLE_IN_TRANSACTION_TIMEOUT_MS` (mặc định 10 / 5 s / 30 s / 15 s / 5 s / 60 s), kiểm tra trong `env.validation.ts`, ghi trong `.env.example`. Trước đây chờ kết nối, câu lệnh, chờ khoá và transaction bỏ dở đều không có giới hạn.
+- `ApiExceptionFilter`: `55P03` (hết chờ khoá) → 409 thử lại; `57014` (hết thời gian câu lệnh) và hết chờ kết nối pool → 503 "The service is temporarily busy; retry shortly".
+- Script benchmark: luôn dọn dẹp app/pool/container trong `finally` (trước đây treo nếu ghi file kết quả lỗi) và tự tạo thư mục output.
+- Kiểm chứng: unit 47/47, E2E 42/42 (giá trị áp vào phiên PostgreSQL; lock chờ 5 s → 409 rồi gửi lại 201), benchmark sau thay đổi đạt mục tiêu, 0 chồng lấn, 10/10 vòng một người thắng. Backend container local **chưa** rebuild với OPS-004.
+- Không có yêu cầu mới từ FE: API-003 và OPS-005 đã được FE tích hợp (`cd3cd4a`, e2e 138/138); REC-003 FE đang làm không cần API mới.
 
 ---
 

@@ -1513,6 +1513,27 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await pool.query(`DELETE FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel='WEB'`, [TENANT_A]);
   }, 30000);
 
+  it('applies bounded PostgreSQL pool timeouts and turns a long lock wait into a retryable 409 (OPS-004)', async () => {
+    expect((await pool.query('SHOW lock_timeout')).rows[0].lock_timeout).toBe('5s');
+    expect((await pool.query('SHOW statement_timeout')).rows[0].statement_timeout).toBe('15s');
+    expect((await pool.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('1min');
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'LOCK-TIMEOUT', name: 'Lock timeout', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'LOCK-R', name: 'Lock room', capacity: 4 }).expect(201)).body;
+    const blocker = await pool.connect();
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`room-occupancy:${room.id}`]);
+      const started = Date.now();
+      await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'lock-timeout-hold')
+        .send({ roomId: room.id, channel: 'LOCK_TEST', startAt: '2046-01-01T12:00:00Z', durationMinutes: 90 }).expect(409)
+        .expect(({ body }) => expect(body.error.message).toBe('The resource was changed concurrently; retry the request'));
+      expect(Date.now() - started).toBeGreaterThanOrEqual(4500);
+      expect(Date.now() - started).toBeLessThan(10000);
+    } finally { await blocker.query('ROLLBACK'); blocker.release(); }
+    await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'lock-timeout-hold-retry')
+      .send({ roomId: room.id, channel: 'LOCK_TEST', startAt: '2046-01-01T12:00:00Z', durationMinutes: 90 }).expect(201);
+  }, 30000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

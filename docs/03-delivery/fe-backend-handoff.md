@@ -174,6 +174,12 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
 - **Lỗi FE tìm ra khi chạy lại sau 23:00 và đã sửa:** `/booking` được prerender lúc build nên ngày "Hôm nay", ngày/giờ mặc định và khung giờ bị khoá được tính theo giờ build; React không sửa thuộc tính `disabled`/`aria-pressed` khi hydrate nên UI giữ giá trị cũ (deploy hôm nay thì vài ngày sau vẫn hiện "Hôm nay" là ngày deploy). Nay chỉ tính trên trình duyệt sau khi mount, cập nhật mỗi phút (`fe/src/lib/booking-time.ts`, 3 unit test).
 - Kết quả: `npm run e2e` 138/138; FE unit 38/38. Mỗi lượt e2e tạo khoảng 6 giữ chỗ công khai, giới hạn mặc định 20/IP/15 phút nên chạy liên tiếp quá 3 lượt sẽ gặp 429 (ghi trong `fe/e2e/README.md`).
 
+## Thay đổi BE ảnh hưởng FE — giới hạn timeout database (OPS-004, 2026-11-28)
+
+- Chờ khoá quá `PG_LOCK_TIMEOUT_MS` (mặc định 5 s, ví dụ giữ cùng phòng đang bị khoá lâu) trả **409** với message `The resource was changed concurrently; retry the request` — FE đã dịch message này.
+- Câu lệnh quá `PG_STATEMENT_TIMEOUT_MS` (15 s) hoặc không lấy được kết nối trong `PG_CONNECTION_TIMEOUT_MS` (5 s) trả **503** `SERVICE_UNAVAILABLE` với message mới `The service is temporarily busy; retry shortly`. FE nên hiển thị "Hệ thống đang bận, vui lòng thử lại" và không tự retry liên tục.
+- Không đổi contract endpoint nào.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

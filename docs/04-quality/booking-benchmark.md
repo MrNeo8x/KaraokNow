@@ -82,6 +82,10 @@ Lần chạy thứ 3 trước khi sửa, kịch bản tranh chấp trả **198 l
   3. Lỗi 5xx (và 409 do tranh chấp) được ghi log JSON gồm `correlationId`, đường dẫn, mã lỗi PostgreSQL; không ghi message hay tham số vì có thể chứa dữ liệu khách.
 - **Sau khi sửa:** 30/30 vòng chẩn đoán đúng một người thắng, vòng chậm nhất 231 ms, không còn deadlock; 3 lần benchmark đầy đủ không có lỗi 5xx.
 
+## Chạy lại sau OPS-004 (2026-11-28)
+
+Sau khi đặt giới hạn pool/timeout mặc định (pool 10, chờ kết nối 5 s, câu lệnh 15 s, chờ khoá 5 s), một lần chạy cho: tìm phòng p95 48 ms, báo giá 24 ms, giữ phòng 48 ms, tranh chấp 100×10 p95 132 ms, luồng nhân viên ≤ 42 ms; 0 chồng lấn, 10/10 vòng một người thắng, không 5xx. Script nay luôn dọn container/app trong `finally` và tự tạo thư mục output.
+
 ## Giới hạn và việc tiếp theo
 
 - Kết quả dao động theo tải máy: một lần chạy sau đó, khi máy đang chạy song song việc khác, cho tìm phòng p95 55 ms và tranh chấp p95 345 ms — vẫn dưới mục tiêu, đúng đắn vẫn đạt. Khi so sánh giữa các lần đo, chạy trên máy rảnh và lặp ít nhất 3 lần.

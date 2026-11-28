@@ -37,6 +37,8 @@ docker compose --profile workers stop               # stop the workers
 
 Outside Compose: `docker build --target tools -t karaokenow-tools .` then run it with `DATABASE_URL` (default command `npm run db:migrate`) or with command `npm run holds:expire` / `npm run outbox:work` plus `DATABASE_URL` and `JWT_SECRET`. Set `SWAGGER_ENABLED=false` in production to disable `/docs`; block `/v1/metrics` at the reverse proxy.
 
+Database pool and timeouts are bounded by default (OPS-004): `PG_POOL_MAX` 10, `PG_CONNECTION_TIMEOUT_MS` 5000, `PG_IDLE_TIMEOUT_MS` 30000, `PG_STATEMENT_TIMEOUT_MS` 15000, `PG_LOCK_TIMEOUT_MS` 5000, `PG_IDLE_IN_TRANSACTION_TIMEOUT_MS` 60000. Lock-wait timeouts return a retryable 409; statement or pool-wait timeouts return 503.
+
 Access tokens last 15 minutes and are tied to a server-side session. Refresh tokens rotate on every use; reuse revokes the token family. Staff created with temporary passwords must call `POST /v1/auth/password/change` before accessing merchant APIs.
 
 Run unit tests:
