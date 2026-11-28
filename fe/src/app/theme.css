@@ -314,3 +314,26 @@ main.admin-content { margin: 0; }
 .admin-table tr.row-selected td { background: var(--brand-50); }
 .admin-table tbody tr { cursor: default; }
 @media (max-width: 700px) { .calendar-legend .check-row { margin-left: 0; } .timeline-row { grid-template-columns: 96px minmax(0, 1fr); } }
+/* Cash account and reconciliation (FE-014, PD-036) */
+.booking-account { display: grid; gap: 10px; }
+.account-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.account-summary > div { display: grid; gap: 2px; align-content: start; padding: 10px; border-radius: 10px; background: var(--brand-50); border: 1px solid var(--brand-100); }
+.account-summary small { color: var(--muted); font-size: 11.5px; }
+.account-summary strong { font-size: 15px; color: var(--text); }
+.account-summary .pill { justify-self: start; margin-top: 2px; }
+.link-button { border: 0; background: transparent; padding: 2px 0; color: var(--brand-700); font-weight: 700; font-size: 13px; text-align: left; justify-self: start; }
+.link-button.danger { color: var(--danger); }
+.ledger { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ledger li { padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; display: grid; gap: 6px; }
+.ledger li.reversed .ledger-line { opacity: .55; text-decoration: line-through; }
+.ledger-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.ledger-line small { color: var(--muted); }
+.ledger-reverse { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ledger-reverse input { flex: 1 1 180px; margin: 0; padding: 7px 10px; }
+.cash-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0; }
+.cash-totals .kpi.highlight { border-color: var(--brand-300); background: var(--brand-50); }
+.resolve-form { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.resolve-form input { margin: 0; padding: 7px 10px; }
+@media (max-width: 700px) { .account-summary { grid-template-columns: 1fr; } .resolve-form { grid-template-columns: 1fr; } }
+.cash-totals .kpi strong { font-size: 22px; white-space: nowrap; }
+.cash-totals .kpi-head { min-height: 34px; align-items: flex-start; }

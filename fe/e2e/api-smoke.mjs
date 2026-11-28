@@ -96,6 +96,19 @@ if (branch) {
       const oc = await call('POST', `/merchant/booking/bookings/${bid}/outcome`, { token: ot, tenant: T, body: { type: 'NO_SHOW', note: 'smoke' } }); check('outcome after check-in 409', oc.status === 409, oc);
       const co2 = await call('POST', `/merchant/booking/bookings/${bid}/check-out`, { token: ot, tenant: T }); check('check-out', co2.status === 200 && co2.json.status === 'COMPLETED', co2);
       check('check-out ghi lateMinutes/overtimeMinutes', Number.isInteger(co2.json.lateMinutes) && Number.isInteger(co2.json.overtimeMinutes), co2.json);
+      let acc = await call('GET', `/merchant/booking/bookings/${bid}/account`, { token: ot, tenant: T }); check('account: phải thu = giá, đã thu = cọc', acc.status === 200 && acc.json.dueVnd === q.json.totalAmountVnd && acc.json.paidVnd === acc.json.depositsVnd, acc.json);
+      const sk = crypto.randomUUID();
+      const sur = await call('POST', `/merchant/booking/bookings/${bid}/surcharges`, { token: ot, tenant: T, headers: { 'Idempotency-Key': sk }, body: { amountVnd: '30000', reason: 'smoke nước uống' } }); check('surcharge 200', sur.status === 200 && sur.json.amountVnd === '30000', sur);
+      const sur2 = await call('POST', `/merchant/booking/bookings/${bid}/surcharges`, { token: ot, tenant: T, headers: { 'Idempotency-Key': sk }, body: { amountVnd: '30000', reason: 'smoke nước uống' } }); check('surcharge replay cùng id', sur2.json.id === sur.json.id, sur2);
+      const pay = await call('POST', `/merchant/booking/bookings/${bid}/manual-payments`, { token: ot, tenant: T, headers: { 'Idempotency-Key': crypto.randomUUID() }, body: { method: 'CASH', amountVnd: '40000' } });
+      acc = await call('GET', `/merchant/booking/bookings/${bid}/account`, { token: ot, tenant: T }); check('account: phụ thu vào phải thu, tiền mặt vào đã thu', BigInt(acc.json.dueVnd) === BigInt(q.json.totalAmountVnd) + 30000n && acc.json.cashVnd === '40000', acc.json);
+      const rev = await call('POST', '/merchant/booking/money-reversals', { token: ot, tenant: T, body: { entryType: 'MANUAL_PAYMENT', entryId: pay.json.id, reason: 'smoke ghi nhầm' } }); check('reversal 200', rev.status === 200 && rev.json.amountVnd === '40000', rev);
+      const rev2 = await call('POST', '/merchant/booking/money-reversals', { token: ot, tenant: T, body: { entryType: 'MANUAL_PAYMENT', entryId: pay.json.id, reason: 'lý do khác' } }); check('reversal lần hai lý do khác → 409', rev2.status === 409, rev2);
+      acc = await call('GET', `/merchant/booking/bookings/${bid}/account`, { token: ot, tenant: T }); check('account: khoản bị đảo không còn tính', acc.json.cashVnd === '0' && acc.json.entries.some(entry => entry.kind === 'CASH' && entry.reversed), acc.json);
+      const day = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
+      const rep = await call('GET', `/merchant/branches/${branch.id}/cash-report?date=${day}`, { token: ot, tenant: T }); check('cash report hôm nay', rep.status === 200 && typeof rep.json.totals?.netCashVnd === 'string', rep);
+      const bad = await call('GET', `/merchant/branches/${branch.id}/cash-report?date=2026-13-40`, { token: ot, tenant: T }); check('cash report ngày sai → 422', bad.status === 422, bad);
+      const unr = await call('GET', `/merchant/branches/${branch.id}/booking/unresolved-deposits?limit=5`, { token: ot, tenant: T }); check('unresolved deposits list', unr.status === 200 && Array.isArray(unr.json.items), unr);
       const lk2 = await call('POST', '/public/booking/lookup', { body: { phone, bookingCode: h.json.bookingCode } }); check('lookup bookingStatus COMPLETED', lk2.json.bookingStatus === 'COMPLETED', lk2);
     }
   } else console.log('… no room or terms not configured; public flow skipped', { room: !!room, terms });

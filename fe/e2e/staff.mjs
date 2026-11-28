@@ -48,7 +48,15 @@ try {
   await step('Ẩn hủy/no-show sau check-in', async () => { if (await row.getByText('Hủy / khách không đến').count()) throw new Error('vẫn hiện form hủy'); });
   await step('Check-out (có hộp xác nhận)', async () => { await row.getByRole('button', { name: 'Check-out' }).click(); await row.locator('.tag', { hasText: 'Hoàn tất' }).waitFor(); return await row.getByText(/Check-out:/).innerText(); });
   await step('Hiển thị trễ/quá giờ sau check-out', async () => row.getByText(/Trả phòng đúng hoặc trước giờ|Trễ \d+ phút/).innerText());
-  await step('Ghi tiền mặt cho booking', async () => { await row.getByLabel('Khoản thu tiền mặt (VND)').fill('210000'); await row.getByRole('button', { name: 'Ghi nhận tiền mặt' }).click(); await row.getByText(/210\.000 ₫ qua 1 giao dịch/).waitFor({ timeout: 10000 }); });
+  await step('Thu tiền mặt: "Đã thu" tăng', async () => { await row.getByLabel('Khoản thu tiền mặt (VND)').fill('210000'); await row.getByRole('button', { name: 'Ghi nhận tiền mặt' }).click(); await row.getByText('Đã ghi nhận thu tiền mặt 210.000 ₫.').waitFor({ timeout: 10000 }); return await row.locator('.account-summary > div').nth(1).innerText(); });
+  await step('Thêm phụ thu: "Phải thu" tăng, có lý do', async () => { await row.getByLabel('Phụ thu (VND)').fill('25000'); await row.getByLabel('Lý do phụ thu').fill('Nước uống'); await row.getByRole('button', { name: 'Thêm phụ thu' }).click(); await row.getByText('gồm phụ thu 25.000 ₫').waitFor(); });
+  await step('Sổ tiền: đảo khoản thu tiền mặt có lý do', async () => {
+    await row.getByRole('button', { name: /Xem sổ tiền/ }).click();
+    const cashLine = row.locator('.ledger li', { hasText: 'Thu tiền mặt' }).first();
+    await cashLine.getByRole('button', { name: 'Đảo khoản này' }).click(); await cashLine.getByRole('button', { name: 'Xác nhận đảo' }).click(); await row.locator('.error', { hasText: 'lý do' }).waitFor();
+    await cashLine.getByLabel(/Lý do đảo/).fill('Ghi nhầm số tiền'); await cashLine.getByRole('button', { name: 'Xác nhận đảo' }).click();
+    await row.getByText('Đã đảo khoản thu tiền mặt 210.000 ₫.').waitFor(); await row.locator('.ledger li.reversed', { hasText: 'Thu tiền mặt' }).waitFor();
+  });
   await page.screenshot({ path: SHOTS + '/staff-booking-completed.png', fullPage: true });
   // second hold (mobile one) → cancel path
   await step('Hủy booking: xác nhận hold thứ hai rồi ghi CUSTOMER_CANCELLED', async () => {
@@ -67,6 +75,15 @@ try {
     await ops.locator('.error', { hasText: /vượt/ }).waitFor();
     await r2.getByLabel(/Tiền mặt đã hoàn/).fill(lk.depositRequiredVnd); await r2.getByRole('button', { name: 'Ghi nhận kết quả' }).click();
     await r2.locator('.tag', { hasText: 'Đã hủy' }).waitFor(); return await r2.locator('p.outcome').innerText();
+  });
+  await step('Tiền mặt: báo cáo cuối ngày có tổng ròng', async () => { await goSection(page, 'Tiền mặt'); const sec = page.locator('section[aria-labelledby="cash-report-title"]'); await sec.locator('.kpi.highlight strong').waitFor(); return await sec.locator('.kpi.highlight strong').innerText(); });
+  await step('Tiền mặt: xử lý một khoản cọc chờ (nếu có)', async () => {
+    const sec = page.locator('section[aria-labelledby="unresolved-title"]'); await sec.locator('table, .empty').first().waitFor();
+    if (await sec.locator('.empty').count()) return 'không có cọc chờ xử lý trong dữ liệu local';
+    const row = sec.locator('tbody tr').first();
+    await row.getByRole('button', { name: 'Ghi nhận' }).click(); await sec.locator('.error', { hasText: 'lý do' }).waitFor();
+    await row.getByLabel(/Lý do xử lý cọc/).fill('Khách không đến, giữ cọc'); await row.getByRole('button', { name: 'Ghi nhận' }).click();
+    return await sec.locator('.notice').innerText();
   });
   await step('Màn ân hạn quá giờ trong Giá & chính sách', async () => { await goSection(page, 'Giá & chính sách'); await page.getByRole('heading', { name: 'Ân hạn quá giờ' }).waitFor(); return await page.locator('section[aria-labelledby="overtime-title"] .pill').innerText(); });
   await step('Lịch phòng: booking đã hủy ẩn mặc định, hiện khi bật bộ lọc', async () => {

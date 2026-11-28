@@ -7,7 +7,7 @@ import { useCan } from './permissions-context';
 
 export type DetailedHold = { id: string; branchId: string; roomId: string; channel: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; bufferMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; customerPhone?: string | null; customerEmail?: string | null; priceSnapshot?: { totalAmountVnd?: string; currency?: string } | null; phoneVerifiedAt?: string | null; phoneVerifiedBy?: string | null; depositPolicySnapshot?: DepositSnapshot | null; publicAcceptedTerms?: string | null };
 type DepositSnapshot = { mode: 'NONE' | 'FIXED' | 'PERCENT'; fixedAmountVnd: string | null; percent: string | null; policyVersion: string | null; requiredAmountVnd: string };
-type DepositEntry = { id: string; amountVnd: string; note: string | null; recordedAt: string };
+type DepositEntry = { id: string; amountVnd: string; note: string | null; recordedAt: string; reversed?: boolean };
 type DepositStatus = { holdId: string; holdStatus: string; depositPolicySnapshot: DepositSnapshot | null; requiredAmountVnd: string; totalRecordedVnd: string; remainingVnd: string; depositSatisfied: boolean; items: DepositEntry[] };
 const money = (value: string) => `${BigInt(value).toLocaleString('vi-VN')} ₫`;
 type Quote = { priceSnapshot: { totalAmountVnd: string; currency: string; timezone: string; calculation: { priceRuleCode: string } } };
@@ -21,6 +21,7 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
   const [deposits, setDeposits] = useState<DepositStatus | null>(null); const [depositError, setDepositError] = useState(''); const [depositRevision, setDepositRevision] = useState(0);
   const [depositAmount, setDepositAmount] = useState(''); const [depositNote, setDepositNote] = useState(''); const [depositKey, setDepositKey] = useState(() => crypto.randomUUID()); const [depositForbidden, setDepositForbidden] = useState(false);
   const allowed = useCan(); const canManage = allowed('hold.manage');
+  const [reversing, setReversing] = useState<{ id: string; reason: string } | null>(null);
   const hasSnapshot = Boolean(hold.priceSnapshot);
   // A web hold must be confirmed with exactly the terms the guest accepted. Prefer the hold's own copy when the backend
   // returns it; otherwise fall back to the current public terms (Owner-readable only), which fails if they changed since.
@@ -46,6 +47,15 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
   }, [hold.id, hasSnapshot, depositRevision, token, tenant]);
 
   function editDeposit(update: () => void) { update(); setDepositKey(crypto.randomUUID()); }
+  async function reverseDeposit(item: DepositEntry) {
+    if (!reversing?.reason.trim()) { setDepositError('Cần nhập lý do đảo cọc.'); return; }
+    if (!window.confirm(`Đảo toàn bộ khoản cọc ${money(item.amountVnd)}? Khoản gốc vẫn còn trong sổ nhưng không được tính.`)) return;
+    setBusy(true); setDepositError(''); setMessage('');
+    try { await request('/merchant/booking/money-reversals', { method: 'POST', body: JSON.stringify({ entryType: 'HOLD_DEPOSIT', entryId: item.id, reason: reversing.reason.trim() }) }, token, tenant); setReversing(null); setMessage(`Đã đảo khoản cọc ${money(item.amountVnd)}.`); setDepositRevision(value => value + 1); }
+    catch (err) { setDepositError((err as Error).message); }
+    finally { setBusy(false); }
+  }
+
   async function recordDeposit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!deposits) return;
     const invalid = depositAmountError(depositAmount, deposits.remainingVnd); if (invalid) { setDepositError(invalid); return; }
@@ -106,7 +116,7 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
       {!deposits ? !depositError && <p role="status">Đang tải thông tin cọc…</p> : !deposits.depositPolicySnapshot ? <p>Hold chưa có snapshot chính sách cọc.</p> : deposits.depositPolicySnapshot.mode === 'NONE' ? <p>Chính sách tại thời điểm báo giá: không yêu cầu cọc{deposits.depositPolicySnapshot.policyVersion ? ` (phiên bản ${deposits.depositPolicySnapshot.policyVersion})` : ' (kênh chưa cấu hình)'}.</p> : <>
         <p>Chính sách snapshot: {deposits.depositPolicySnapshot.mode === 'FIXED' ? `cố định ${money(deposits.depositPolicySnapshot.fixedAmountVnd ?? '0')}` : `${deposits.depositPolicySnapshot.percent}% tổng tiền`}{deposits.depositPolicySnapshot.policyVersion ? ` · phiên bản ${deposits.depositPolicySnapshot.policyVersion}` : ''}<br />Cần cọc: <strong>{money(deposits.requiredAmountVnd)}</strong> · Đã ghi: {money(deposits.totalRecordedVnd)} · Còn thiếu: <strong>{money(deposits.remainingVnd)}</strong></p>
         <span className={deposits.depositSatisfied ? 'tag' : 'tag warn'}>{deposits.depositSatisfied ? 'Đã đủ cọc' : 'Chưa đủ cọc'}</span>
-        {deposits.items.map(item => <small key={item.id}><br />{money(item.amountVnd)} · {new Date(item.recordedAt).toLocaleString('vi-VN')}{item.note ? ` · ${item.note}` : ''}</small>)}
+        {deposits.items.length > 0 && <ul className="ledger">{deposits.items.map(item => <li key={item.id} className={item.reversed ? 'reversed' : ''}><div className="ledger-line"><span>Cọc{item.reversed ? ' · đã đảo' : ''}<br /><small>{new Date(item.recordedAt).toLocaleString('vi-VN')}{item.note ? ` · ${item.note}` : ''}</small></span><b>{money(item.amountVnd)}</b></div>{!item.reversed && hold.status === 'HELD' && allowed('money.reverse') && (reversing?.id === item.id ? <div className="ledger-reverse"><input aria-label="Lý do đảo cọc" placeholder="Lý do đảo (bắt buộc)" maxLength={500} value={reversing.reason} onChange={event => setReversing({ id: item.id, reason: event.target.value })} /><button type="button" className="secondary danger" disabled={busy} onClick={() => void reverseDeposit(item)}>Xác nhận đảo</button><button type="button" className="link-button" onClick={() => setReversing(null)}>Huỷ</button></div> : <button type="button" className="link-button danger" onClick={() => setReversing({ id: item.id, reason: '' })}>Đảo khoản cọc này</button>)}</li>)}</ul>}
         {hold.status === 'HELD' && allowed('deposit.record') && !depositForbidden && BigInt(deposits.remainingVnd) > 0n && <form className="action-form" onSubmit={recordDeposit}><label>Cọc tiền mặt (VND)<input inputMode="numeric" value={depositAmount} onChange={event => editDeposit(() => setDepositAmount(event.target.value))} placeholder={deposits.remainingVnd} required /></label><label>Ghi chú<input maxLength={500} value={depositNote} onChange={event => editDeposit(() => setDepositNote(event.target.value))} /></label><button className="primary" disabled={busy}>Ghi nhận cọc</button></form>}
       </>}
       <small>Chỉ ghi nhận tiền mặt đã thu tại quầy; không có thanh toán online. Hoàn cọc khi hold hết hạn xử lý ngoài hệ thống.</small></div>}

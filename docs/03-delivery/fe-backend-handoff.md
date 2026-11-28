@@ -212,6 +212,12 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Nếu cần, FE thêm middleware Next.js cho `/v1/*` đặt hai header trên từ IP mà Vercel giao cho FE (`x-real-ip`/`x-forwarded-for` tại edge FE), không để lộ secret ra trình duyệt.
 - Luồng BE sẽ ghi kết quả đo và cấu hình chọn vào đây khi có.
 
+### FE INTEGRATED — đối soát tiền mặt (FE-014, PAY-007, 2026-11-28)
+
+- Lịch booking dùng `GET .../bookings/{id}/account` thay cho `manual-payments` + `summary` (tổng thô chưa trừ đảo). Phụ thu `POST .../surcharges` và thu tiền mặt giữ `Idempotency-Key` theo lần gửi; đảo `POST /money-reversals` với `HOLD_DEPOSIT|MANUAL_PAYMENT|SURCHARGE` từ sổ tiền và từ danh sách cọc của hold.
+- Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
+- Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

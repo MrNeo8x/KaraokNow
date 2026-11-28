@@ -82,6 +82,7 @@ await roleSession('reception', 'Lễ tân', async ({ page, step, holdCard, ops, 
   });
   await step('xem lịch booking không bị báo lỗi tiền mặt', async () => { await listBookings(); await ops.locator('.booking-row', { hasText: h1.phone }).waitFor(); const errors = await ops.locator('.error').allInnerTexts(); if (errors.length) throw new Error(errors[0].slice(0, 160)); });
   await step('không có form thu tiền mặt và hủy/no-show', async () => { const row = ops.locator('.booking-row', { hasText: h1.phone }); for (const label of ['Ghi nhận tiền mặt', 'Hủy / khách không đến']) if (await row.getByText(label).count()) throw new Error(`vẫn hiện ${label}`); });
+  await step('sổ tiền chỉ xem (không đảo) và không có mục Tiền mặt', async () => { const row = ops.locator('.booking-row', { hasText: h1.phone }); await row.getByRole('button', { name: /Xem sổ tiền/ }).click(); await row.locator('.ledger li').first().waitFor(); if (await row.getByRole('button', { name: 'Đảo khoản này' }).count()) throw new Error('Lễ tân vẫn thấy nút đảo'); if (await page.locator('.admin-sidebar').getByRole('button', { name: 'Tiền mặt', exact: true }).count()) throw new Error('Lễ tân vẫn thấy mục Tiền mặt'); });
   await step('check-out booking', async () => { const row = ops.locator('.booking-row', { hasText: h1.phone }); await row.getByRole('button', { name: 'Check-out' }).click(); await row.locator('.tag', { hasText: 'Hoàn tất' }).waitFor(); });
   await step('ân hạn quá giờ chỉ xem, không có nút lưu', async () => { await goSection(page, 'Giá & chính sách'); const sec = page.locator('section[aria-labelledby="overtime-title"]'); await sec.getByText('Chỉ Owner hoặc Quản lý chi nhánh được thay đổi').waitFor(); if (await sec.getByRole('button', { name: 'Lưu ân hạn' }).count()) throw new Error('vẫn có nút lưu'); });
 });
@@ -94,7 +95,8 @@ await roleSession('cashier', 'Thu ngân', async ({ page, step, holdCard, ops, lo
     await listBookings(); if (await ops.locator('.error').count()) throw new Error(`không xem được booking: ${(await ops.locator('.error').first().innerText()).slice(0, 120)}`);
     const row = ops.locator('.booking-row', { hasText: h1.phone }); await row.waitFor();
     for (const label of ['Check-in', 'Check-out']) if (await row.getByRole('button', { name: label }).count()) throw new Error(`vẫn hiện ${label}`);
-    await row.getByLabel('Khoản thu tiền mặt (VND)').fill('50000'); await row.getByRole('button', { name: 'Ghi nhận tiền mặt' }).click(); await row.getByText(/50\.000 ₫ qua 1 giao dịch/).waitFor({ timeout: 10000 });
+    await row.getByLabel('Khoản thu tiền mặt (VND)').fill('50000'); await row.getByRole('button', { name: 'Ghi nhận tiền mặt' }).click(); await row.getByText('Đã ghi nhận thu tiền mặt 50.000 ₫.').waitFor({ timeout: 10000 });
+    await row.getByRole('button', { name: /Xem sổ tiền/ }).click(); if (await row.getByRole('button', { name: 'Đảo khoản này' }).count()) throw new Error('Thu ngân vẫn thấy nút đảo bút toán');
   });
   await step('không có lỗi phân quyền thô', noRawError);
 });

@@ -2,31 +2,49 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau REC-003; gộp bản Luồng BE sau PAY-007)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-014)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: FE REC-003 lịch lễ tân hợp nhất (commit này); BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ; BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: FE FE-014 đối soát tiền mặt (commit này); BE `02202cd`/`44a388e` OPS-007 (IP khách sau rewrite Vercel, runbook); FE `ab345fb` REC-003 lịch lễ tân hợp nhất; BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ; BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
 
-**Kiểm chứng gần nhất:** FE (2026-11-28, frontend container rebuild) `npm test` 42/42, `next build`, `npm run e2e` **142/142** (API 54, khách 20, lễ tân/Owner 25, Platform 16, vai trò 27). BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004.
+**Kiểm chứng gần nhất:** FE (2026-11-28, frontend container rebuild) `npm test` 46/46, `next build`, `npm run e2e` **157/157** (API 64, khách 20, lễ tân/Owner 29, Platform 16, vai trò 28). BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`), frontend `:3100` có REC-003. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu. Mỗi lượt `npm run e2e` dùng ~6 giữ chỗ công khai trên hạn mức 20/IP/15 phút.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`), frontend `:3100` có FE-014. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu. Mỗi lượt `npm run e2e` dùng ~6 giữ chỗ công khai trên hạn mức 20/IP/15 phút.
 
-**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay. Production đã có 25 migration (đến `20261124030000_overtime_recording`), **chỉ thiếu** `20261124040000_cash_reconciliation`; deploy `73deaec` (12:55) có trước PAY-007 nên chưa có code OPS-004/API-004/PAY-007/OPS-007 và REC-003. Người dùng giao session triển khai đưa lên theo `docs/03-delivery/deploy-vercel.md` và runbook `docs/03-delivery/ops-007-client-ip-runbook.md`.
+**Production (Vercel, OPS-006/007):** `vn-karaoke-now(-api).vercel.app` chạy `44a388e` (gồm PAY-007, REC-003, OPS-007). Migration production chạy tay; đã có đủ 26 migration (đến `20261124040000_cash_reconciliation`). Env BE thêm `CLIENT_IP_HEADER=x-real-ip`; `CRON_SECRET` đã đổi giá trị 2026-11-28. Quy trình bắt buộc: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree, chưa commit):** không có của Luồng FE sau commit này. Luồng BE: không có.
+**Đang dở (working tree, chưa commit):** không có của Luồng FE sau commit này. Session khác (BE/triển khai) đang có `AGENTS.md`, `README.md`, `docs/03-delivery/deploy-vercel.md` chưa commit và `docs/merchaint/img.png` đã stage — Luồng FE không commit hộ.
 
-**Trạng thái task:** xem `task-board.md` (REC-003 → `VERIFY` trong commit này; FE-014 `READY`).
+**Trạng thái task:** xem `task-board.md` (FE-014 → `VERIFY` trong commit này).
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (gồm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008; xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
-- *Luồng FE:* **FE-014** màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt"; QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
-- *Session triển khai:* chạy runbook OPS-007: migrate `20261124040000`, push `main`, đo IP qua endpoint chẩn đoán, đặt `CLIENT_IP_HEADER` (hoặc secret chuyển tiếp), redeploy, ghi kết quả.
-- *Luồng BE:* chờ kết quả đo OPS-007 để chốt; BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
+- *Luồng FE:* FE-011 (sinh type từ OpenAPI sau API-004); QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
+- *Session triển khai:* OPS-007 xong (xem nhật ký 2026-11-28 OPS-007). Lần deploy sau theo `docs/03-delivery/deploy-vercel.md`.
+- *Luồng BE:* BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
 
+
+---
+
+## 2026-11-28 — Session triển khai: đo IP khách trên production (OPS-007)
+
+- Theo `ops-007-client-ip-runbook.md` + `deploy-vercel.md`: kiểm tra tại HEAD `44a388e` (BE verify 57/57, E2E 45/45; FE 42/42, `tsc`, `build` trên worktree sạch); áp `20261124040000_cash_reconciliation` lên Prisma **trước** push; người dùng push `main` (5 commit `4af700b`…`44a388e`); hai project READY; smoke 200, `/docs`, cron và diag không secret → 404.
+- `CRON_SECRET` là biến sensitive, `vercel env pull` không trả giá trị thật → đã **đổi giá trị** (`vercel env update`, production + preview) để gọi endpoint chẩn đoán; giá trị mới không lưu ngoài Vercel. Cron với secret mới → 200.
+- Kết quả đo (IP máy đo che bớt: 58.186.x.x): trước cấu hình `req.ip`=`127.0.0.1` mọi đường → mọi khách chung hạn mức. `x-real-ip`, `x-vercel-forwarded-for`, `x-forwarded-for` = IP máy đo cả trực tiếp BE lẫn qua FE rewrite; header giả `1.2.3.4` bị Vercel ghi đè (trừ `cf-connecting-ip`).
+- Áp: `CLIENT_IP_HEADER=x-real-ip` cho `vn-karaoke-now-api` (production + preview), `vercel redeploy` bản production `44a388e`. Kiểm lại 4 ca → `{ip: IP thật, source: platform-header}`. Không cần FE, không dùng `CLIENT_IP_PROXY_SECRET`/`TRUST_PROXY_HOPS`.
+- Endpoint chẩn đoán vẫn còn (bảo vệ bằng `CRON_SECRET`); Luồng BE quyết định giữ hay gỡ.
+
+---
+
+## 2026-11-28 — Luồng FE: đối soát tiền mặt (FE-014)
+
+- Tài khoản tiền trên mỗi booking (phải thu/đã thu/số dư/giữ lại, sổ tiền, phụ thu, thu tiền mặt, đảo bút toán), đảo cọc trên hold, mục **Tiền mặt** (báo cáo cuối ngày, cọc chờ xử lý). Quyền theo PD-036 qua `/me`.
+- Kiểm chứng: FE unit 46/46, `npm run e2e` 157/157; audit local có `BOOKING_SURCHARGE_ADDED`, `MONEY_REVERSED`, `HOLD_DEPOSIT_RESOLVED` từ lượt chạy giao diện. Ảnh review: `docs/deg/fe-review/*-cash.png`, `*-booking-account.png`.
+- Sửa trình bày: số tiền dùng khoảng trắng không ngắt trước "₫" và không hiện "−0 ₫" ở màn tiền mặt.
 ---
 
 ## 2026-11-28 — Triển khai Vercel + Prisma Postgres (OPS-006)

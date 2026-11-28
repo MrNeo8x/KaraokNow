@@ -21,13 +21,14 @@ import AuditLog from './audit-log';
 import OpsBacklog from './ops-backlog';
 import OvertimeSettings from './overtime-settings';
 import ReceptionCalendar from './reception-calendar';
+import CashReconciliation from './cash-reconciliation';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
 import { RolesProvider } from './permissions-context';
 import { can } from '@/lib/permissions';
 import { roleLabel, type Role } from '@/lib/admin';
-import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wrench } from 'lucide-react';
+import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
 import { parseSession, refreshDelay, type Session } from '@/lib/session';
 
 type Branch = { id: string; name: string; code: string; timezone: string; status: string };
@@ -110,12 +111,13 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const nav: NavItem[] = [
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'bookings', label: 'Lịch & Đặt phòng', icon: CalendarDays },
+    ...(roles !== null && !can(roles, 'cash.report') ? [] : [{ id: 'cash', label: 'Tiền mặt', icon: Wallet }]),
     { id: 'rooms', label: 'Phòng hát', icon: DoorOpen },
     { id: 'pricing', label: 'Giá & chính sách', icon: Tags },
     ...(isOwner === false ? [] : [{ id: 'users', label: 'Người dùng', icon: Users }, { id: 'marketplace', label: 'Marketplace', icon: Store }]),
     { id: 'settings', label: 'Cài đặt hệ thống', icon: Settings },
   ];
-  const titles: Record<string, string> = { overview: 'Tổng quan', bookings: 'Lịch & Đặt phòng', rooms: 'Phòng hát', pricing: 'Giá & chính sách', users: 'Người dùng & phân quyền', marketplace: 'Marketplace', settings: 'Cài đặt hệ thống' };
+  const titles: Record<string, string> = { overview: 'Tổng quan', bookings: 'Lịch & Đặt phòng', cash: 'Đối soát tiền mặt', rooms: 'Phòng hát', pricing: 'Giá & chính sách', users: 'Người dùng & phân quyền', marketplace: 'Marketplace', settings: 'Cài đặt hệ thống' };
   const section = nav.some(item => item.id === merchantSection) ? merchantSection : 'overview';
   const tenantForm = <form onSubmit={e => { e.preventDefault(); setBranch(''); setBranches([]); setRooms([]); setActiveTenant(tenant.trim()); setRevision(value => value + 1); }} className="tenant-form"><input aria-label="Tenant ID" placeholder="Tenant ID" value={tenant} onChange={e => setTenant(e.target.value)} required /><button className="primary">Áp dụng</button></form>;
   const counts = { active: rooms.filter(r => r.status === 'ACTIVE').length, maintenance: rooms.filter(r => r.status === 'MAINTENANCE').length, inactive: rooms.filter(r => r.status !== 'ACTIVE' && r.status !== 'MAINTENANCE').length };
@@ -153,6 +155,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         <HoldLookup key={`hold-lookup:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         {currentBranch && <BranchHolds key={`branch-holds:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}
       </>}
+      {section === 'cash' && (currentBranch ? <CashReconciliation key={`cash:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} /> : <div className="card empty">Chọn chi nhánh để xem báo cáo tiền mặt.</div>)}
       {section === 'rooms' && <>
         <section className="card" aria-labelledby="room-table-title"><div className="section-head"><h2 id="room-table-title">Quản lý phòng</h2><span className="pill purple">{rooms.length} phòng</span></div>
           {loading ? <p role="status">Đang tải dữ liệu…</p> : branches.length === 0 ? <div className="empty">Chưa có chi nhánh được cấp quyền.</div> : rooms.length === 0 ? <div className="empty">Chi nhánh này chưa có phòng.</div>
@@ -186,5 +189,5 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   </AdminShell>;
 }
 
-const MERCHANT_IDS = ['overview', 'bookings', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
+const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
 const PLATFORM_IDS = ['listings', 'merchants', 'account'];
