@@ -122,6 +122,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **VEN-006** (PD-048 thư viện ảnh merchant/chi nhánh): **migration `20261124100000_venue_photos` phải áp lên Prisma trước khi push** (bảng mới, không đụng bảng cũ — tương thích ngược). Push BE cùng commit FE đã sinh lại type (FE-022) để Frontend CI không đỏ. Smoke: `GET /v1/public/branches` có `photos`, `merchantPhotos`.
+
 - **OPS-010** (PD-047): backup production hằng đêm qua GitHub Actions — người dùng thêm secret `PROD_DATABASE_URL`, `BACKUP_PASSPHRASE`; runbook `docs/03-delivery/ops-002-backup-restore.md` (cũng là quy trình khôi phục khi sự cố).
 
 - **IAM-009** (PD-045 phiên hỗ trợ Super Admin): **migration `20261124090000_support_sessions` trước push** (cột `platform_admins.super_admin` mặc định false + bảng `support_sessions`). Sau migrate, người dùng **chỉ định Super Admin đầu tiên**; session triển khai chạy một lệnh duy nhất `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL` (không seed dữ liệu khác). Các Super Admin sau cấp qua API/UI.

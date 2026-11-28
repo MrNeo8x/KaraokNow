@@ -2872,6 +2872,392 @@
         ]
       }
     },
+    "/v1/merchant/catalog/photos": {
+      "get": {
+        "operationId": "MerchantPhotoController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VenuePhotoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      },
+      "post": {
+        "operationId": "MerchantPhotoController_upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadVenuePhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenuePhotoDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already 10 photos"
+          },
+          "413": {
+            "description": "File larger than 4 MB"
+          },
+          "422": {
+            "description": "Not a JPEG/PNG/WebP image"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      }
+    },
+    "/v1/merchant/catalog/photos/{photoId}": {
+      "patch": {
+        "operationId": "MerchantPhotoController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVenuePhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenuePhotoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantPhotoController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Photo and its file removed"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/photos": {
+      "get": {
+        "operationId": "BranchPhotoController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VenuePhotoDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      },
+      "post": {
+        "operationId": "BranchPhotoController_upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadVenuePhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenuePhotoDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already 10 photos"
+          },
+          "413": {
+            "description": "File larger than 4 MB"
+          },
+          "422": {
+            "description": "Not a JPEG/PNG/WebP image"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/photos/{photoId}": {
+      "patch": {
+        "operationId": "BranchPhotoController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVenuePhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VenuePhotoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      },
+      "delete": {
+        "operationId": "BranchPhotoController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Photo and its file removed"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "venue photos"
+        ]
+      }
+    },
     "/v1/merchant/audit-logs": {
       "get": {
         "operationId": "AuditController_list",
@@ -8743,6 +9129,94 @@
           }
         }
       },
+      "VenuePhotoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "null = merchant gallery"
+          },
+          "url": {
+            "type": "string",
+            "description": "Public URL (Blob CDN on production, /v1/files/public/… locally)"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "altText": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayOrder": {
+            "type": "number"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "url",
+          "contentType",
+          "sizeBytes",
+          "altText",
+          "displayOrder",
+          "createdAt"
+        ]
+      },
+      "UploadVenuePhotoDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "JPEG, PNG or WebP, at most 4 MB (compress in the browser first)"
+          },
+          "altText": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "file"
+        ]
+      },
+      "UpdateVenuePhotoDto": {
+        "type": "object",
+        "properties": {
+          "altText": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      },
       "AuditLogResponseDto": {
         "type": "object",
         "properties": {
@@ -11670,6 +12144,22 @@
           "startStepMinutes"
         ]
       },
+      "PublicPhotoDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "altText": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "url",
+          "altText"
+        ]
+      },
       "PublicBranchDto": {
         "type": "object",
         "properties": {
@@ -11732,6 +12222,20 @@
           },
           "bookingPolicy": {
             "$ref": "#/components/schemas/PublicBookingPolicyDto"
+          },
+          "photos": {
+            "description": "Branch gallery in display order, at most 10 (PD-048)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPhotoDto"
+            }
+          },
+          "merchantPhotos": {
+            "description": "Merchant gallery in display order, at most 10 (PD-048)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicPhotoDto"
+            }
           }
         },
         "required": [
@@ -11748,7 +12252,9 @@
           "directionsUrl",
           "openingTime",
           "closingTime",
-          "bookingPolicy"
+          "bookingPolicy",
+          "photos",
+          "merchantPhotos"
         ]
       },
       "PublicBranchListDto": {

@@ -6,11 +6,11 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `5135bdd` (tài liệu Merchant Feature Plan). Production chạy `e0daab2` (FE-021) — gồm toàn bộ BE tới IAM-009/010 và OPS-002. **Chưa push:** `16549c2`, `d0c53f9` (rà soát Master Plan) và commit tài liệu này — chỉ tài liệu, không migration.
+**Code trên `main`:** `origin/main` = `5135bdd` (tài liệu Merchant Feature Plan). Production chạy `e0daab2` (FE-021) — gồm toàn bộ BE tới IAM-009/010 và OPS-002. **Chưa push:** `16549c2`, `d0c53f9`, `a0bfb53` (tài liệu) và commit VEN-006 thư viện ảnh (**migration `20261124100000_venue_photos` — áp lên Prisma trước push**, OpenAPI đổi → push cùng FE-022).
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **57/57**; diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
+**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **58/58** (sau VEN-006); diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **31 migration**, seed UAT (Platform Admin UAT là Super Admin); backend `:3000` chạy code BE mới nhất (`c4de3f1`, không đổi tới nay), `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường).
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **32 migration** (đến `20261124100000_venue_photos`), seed UAT (Platform Admin UAT là Super Admin); backend `:3000` chạy commit VEN-006, `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
 **Production (Vercel):** `e0daab2`; Prisma **31 migration** (đến `20261124090000_support_sessions`, áp trước push); **2/2 Platform Admin là Super Admin** (cấp bởi operator, có `platform_audit_logs`). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Workflow backup `.github/workflows/db-backup.yml` có trên `main` nhưng **bỏ qua cho tới khi có secret** (OPS-010). Preview Vercel dùng chung DB production — chưa có staging tách biệt. Chưa kiểm bằng trình duyệt: phiên hỗ trợ Super Admin, màn báo cáo/giờ mở cửa/địa chỉ với tài khoản thật; chưa nhập địa chỉ/SĐT/link/giờ mở cửa cho `LA_KHE`, `THANH_HA` (MAJESTIC). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
@@ -22,10 +22,19 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm A–Q (88 ca); Owner thử upload ảnh/logo/PDF trên production (đóng OPS-008); xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB khỏi production.
 - *Session triển khai:* push các commit tài liệu khi thuận tiện; ghi nhật ký khi Owner/Super Admin thử trên production.
-- *Luồng FE:* các task FE đều `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
+- *Luồng FE:* **FE-022** thư viện ảnh merchant/chi nhánh (handoff "FE READY — thư viện ảnh merchant và chi nhánh"); các task FE khác `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
 - *Luồng BE:* không còn task không bị chặn — BKG-008 (chờ PO), IAM-004 (chờ ZBS), OPS-010 (chờ secret), PAY-002–004 (sau pilot). Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng BE: thư viện ảnh merchant và chi nhánh (VEN-006, PD-048)
+
+- Người dùng: "Thêm phần ảnh cho merchant và chi nhánh, tối đa 10 ảnh". Áp quy tắc ảnh phòng PD-037 (JPEG/PNG/WebP ≤ 4 MB, FE nén, store public); Owner quản lý ảnh merchant, Owner/Branch Manager được giao quản lý ảnh chi nhánh; khách thấy cả hai → PD-048.
+- Code: migration `20261124100000_venue_photos` (bảng chung, FK chi nhánh theo tenant, CHECK loại/kích thước); `be/src/venue/venue-photos.ts` (service + 2 controller, ≤ 10 dưới advisory lock, xoá file sau commit, audit không chứa mô tả); catalog công khai thêm `photos`, `merchantPhotos`.
+- Kiểm chứng: unit 73/73, E2E 58/58 (10 + 1 → 409 ở cả hai thư viện, 422/400, Branch Manager chi nhánh khác 403, chi nhánh lạ 404, Lễ tân chỉ đọc, thứ tự công khai, xoá → file 404, contract), migration up → down → up.
+- **Production cần áp `20261124100000` trước push** và push cùng FE-022 (type sinh lại). FE-022 `READY`.
 
 ---
 

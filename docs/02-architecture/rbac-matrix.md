@@ -27,6 +27,9 @@ This is the conservative authorization baseline implemented for the current venu
 | Resolve an expired-hold deposit (refund/keep) | Yes, all tenant branches | Assigned only | No | No |
 | View/download reports (`/v1/merchant/reports/bookings|occupancy|channels`, JSON or CSV) | Yes, all tenant branches | Assigned only | No | No |
 | Set branch address, phone and Google Maps location; preview a Maps link (`POST /v1/merchant/branch-location/resolve`) | Yes, all tenant branches | Assigned only | No | No |
+| Upload/edit/delete merchant gallery photos (`/v1/merchant/catalog/photos`, ≤ 10) | Yes | No | No | No |
+| Upload/edit/delete branch gallery photos (`/v1/merchant/branches/{id}/photos`, ≤ 10) | Yes, all tenant branches | Assigned only | No | No |
+| View merchant/branch galleries | Yes | Yes (assigned branches) | Yes (assigned branches) | Yes (assigned branches) |
 | Upload/delete room photos (public store) | Yes, all tenant branches | Assigned only | No | No |
 | Read the merchant logo | Yes | Yes | Yes | Yes |
 | Upload/remove the merchant logo | Yes | No | No | No |

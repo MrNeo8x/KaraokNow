@@ -218,6 +218,16 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — thư viện ảnh merchant và chi nhánh (VEN-006, PD-048, 2026-11-28)
+
+**OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check, PostgreSQL Docker E2E 58/58.
+
+- Merchant (header `X-Tenant-ID`): `GET /v1/merchant/catalog/photos` (mọi vai trò) → `VenuePhotoDto[] { id, branchId: null, url, contentType, sizeBytes, altText, displayOrder, createdAt }` theo thứ tự; `POST` multipart `file` + tuỳ chọn `altText` (≤ 300), `displayOrder` (0–1000) → 201 (Owner); `PATCH /{photoId}` `{ altText?: string|null, displayOrder? }`; `DELETE /{photoId}` → 204 (xoá luôn file).
+- Chi nhánh: cùng bộ route dưới `/v1/merchant/branches/{branchId}/photos`; ghi: Owner hoặc Branch Manager được giao chi nhánh (khác → 403), chi nhánh không thuộc merchant → 404; đọc: mọi vai trò của chi nhánh.
+- Tối đa **10 ảnh** mỗi thư viện → 409; > 4 MB → 413; không phải JPEG/PNG/WebP (theo nội dung) → 422; thiếu file → 400. Nén ảnh như ảnh phòng (`image-compress.ts`). Mặc định `displayOrder` = số ảnh hiện có.
+- Khách: `GET /v1/public/branches` thêm `photos` (thư viện chi nhánh) và `merchantPhotos` (thư viện merchant), mỗi phần tử `{ url, altText }`, đã sắp theo `displayOrder`. Dùng nguyên `url` như ảnh phòng.
+- Production cần migration `20261124100000_venue_photos` trước khi push.
+
 ## FE READY — phiên hỗ trợ Super Admin (IAM-009, PD-045) và kiêm nhiệm (PD-046), 2026-11-28
 
 **OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 57/57.

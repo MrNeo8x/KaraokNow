@@ -66,7 +66,11 @@ export class CatalogService {
       CASE WHEN b.latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||b.latitude::float8||','||b.longitude::float8 END AS "directionsUrl",
       to_char(b.opens_at,'HH24:MI') AS "openingTime",to_char(b.closes_at,'HH24:MI') AS "closingTime",
       json_build_object('minDurationMinutes',COALESCE(p.min_duration_minutes,60),'maxDurationMinutes',COALESCE(p.max_duration_minutes,480),
-        'durationStepMinutes',COALESCE(p.duration_step_minutes,30),'startStepMinutes',${PUBLIC_START_STEP_MINUTES}) AS "bookingPolicy"
+        'durationStepMinutes',COALESCE(p.duration_step_minutes,30),'startStepMinutes',${PUBLIC_START_STEP_MINUTES}) AS "bookingPolicy",
+      COALESCE((SELECT json_agg(json_build_object('url',vp.url,'altText',vp.alt_text) ORDER BY vp.display_order,vp.created_at,vp.id)
+        FROM venue_photos vp WHERE vp.tenant_id=t.id AND vp.branch_id=b.id),'[]') AS photos,
+      COALESCE((SELECT json_agg(json_build_object('url',vp.url,'altText',vp.alt_text) ORDER BY vp.display_order,vp.created_at,vp.id)
+        FROM venue_photos vp WHERE vp.tenant_id=t.id AND vp.branch_id IS NULL),'[]') AS "merchantPhotos"
       FROM branches b JOIN tenants t ON t.id=b.tenant_id JOIN tenant_public_catalog c ON c.tenant_id=t.id
       LEFT JOIN merchant_logos l ON l.tenant_id=t.id LEFT JOIN tenant_booking_policies p ON p.tenant_id=t.id
       WHERE c.published=true AND c.platform_approved=true AND t.status='ACTIVE' AND b.status='ACTIVE'

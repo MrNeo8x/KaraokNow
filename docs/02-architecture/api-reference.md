@@ -1361,6 +1361,188 @@ Response được khai báo:
 |---|---|---|
 | 204 | Chưa mô tả | Chưa khai báo schema |
 
+### GET /v1/merchant/catalog/photos
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/VenuePhotoDto"}} |
+
+### POST /v1/merchant/catalog/photos
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`multipart/form-data`
+
+```json
+{
+  "$ref": "#/components/schemas/UploadVenuePhotoDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/VenuePhotoDto"} |
+| 409 | Already 10 photos | Chưa khai báo schema |
+| 413 | File larger than 4 MB | Chưa khai báo schema |
+| 422 | Not a JPEG/PNG/WebP image | Chưa khai báo schema |
+
+### PATCH /v1/merchant/catalog/photos/{photoId}
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `photoId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateVenuePhotoDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/VenuePhotoDto"} |
+
+### DELETE /v1/merchant/catalog/photos/{photoId}
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `photoId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 204 | Photo and its file removed | Chưa khai báo schema |
+
+### GET /v1/merchant/branches/{branchId}/photos
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `branchId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/VenuePhotoDto"}} |
+
+### POST /v1/merchant/branches/{branchId}/photos
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `branchId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`multipart/form-data`
+
+```json
+{
+  "$ref": "#/components/schemas/UploadVenuePhotoDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/VenuePhotoDto"} |
+| 409 | Already 10 photos | Chưa khai báo schema |
+| 413 | File larger than 4 MB | Chưa khai báo schema |
+| 422 | Not a JPEG/PNG/WebP image | Chưa khai báo schema |
+
+### PATCH /v1/merchant/branches/{branchId}/photos/{photoId}
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `branchId` | Có | string |
+| path | `photoId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateVenuePhotoDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/VenuePhotoDto"} |
+
+### DELETE /v1/merchant/branches/{branchId}/photos/{photoId}
+
+Nhóm: venue photos
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `branchId` | Có | string |
+| path | `photoId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 204 | Photo and its file removed | Chưa khai báo schema |
+
 ### GET /v1/merchant/audit-logs
 
 Nhóm: audit
@@ -5255,6 +5437,109 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### VenuePhotoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid",
+      "nullable": true,
+      "description": "null = merchant gallery"
+    },
+    "url": {
+      "type": "string",
+      "description": "Public URL (Blob CDN on production, /v1/files/public/… locally)"
+    },
+    "contentType": {
+      "type": "string",
+      "enum": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    "sizeBytes": {
+      "type": "number"
+    },
+    "altText": {
+      "type": "string",
+      "nullable": true
+    },
+    "displayOrder": {
+      "type": "number"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "branchId",
+    "url",
+    "contentType",
+    "sizeBytes",
+    "altText",
+    "displayOrder",
+    "createdAt"
+  ]
+}
+```
+
+### UploadVenuePhotoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "format": "binary",
+      "description": "JPEG, PNG or WebP, at most 4 MB (compress in the browser first)"
+    },
+    "altText": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "displayOrder": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    }
+  },
+  "required": [
+    "file"
+  ]
+}
+```
+
+### UpdateVenuePhotoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "altText": {
+      "type": "string",
+      "maxLength": 300,
+      "nullable": true
+    },
+    "displayOrder": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1000
+    }
+  }
+}
+```
+
 ### AuditLogResponseDto
 
 ```json
@@ -8572,6 +8857,27 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### PublicPhotoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string"
+    },
+    "altText": {
+      "type": "string",
+      "nullable": true
+    }
+  },
+  "required": [
+    "url",
+    "altText"
+  ]
+}
+```
+
 ### PublicBranchDto
 
 ```json
@@ -8637,6 +8943,20 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "bookingPolicy": {
       "$ref": "#/components/schemas/PublicBookingPolicyDto"
+    },
+    "photos": {
+      "description": "Branch gallery in display order, at most 10 (PD-048)",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PublicPhotoDto"
+      }
+    },
+    "merchantPhotos": {
+      "description": "Merchant gallery in display order, at most 10 (PD-048)",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PublicPhotoDto"
+      }
     }
   },
   "required": [
@@ -8653,7 +8973,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "directionsUrl",
     "openingTime",
     "closingTime",
-    "bookingPolicy"
+    "bookingPolicy",
+    "photos",
+    "merchantPhotos"
   ]
 }
 ```

@@ -2404,6 +2404,83 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(server).patch(`/v1/merchant/memberships/${invited.id}`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A).send({ status: 'INACTIVE' }).expect(200);
   });
 
+  it('keeps photo galleries for the merchant and each branch, at most 10 each, shown publicly (PD-048)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(2048, 9)]);
+    const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(800, 65)]);
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'PHOTO-1', name: 'Photo branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const other = (await authorized('post', '/v1/merchant/branches').send({ code: 'PHOTO-2', name: 'Photo other', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const owner = (method: 'post' | 'get' | 'patch' | 'delete', path: string) => request(server)[method](path).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);
+    const mk = async (email: string, role: string, branchIds: string[]) => {
+      const userId = randomUUID(), membershipId = randomUUID();
+      await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,$2,$3,$4,'ACTIVE')`, [userId, email, await hash('Photo-pass-123', 4), role]);
+      await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES ($1,$2,$3,'ACTIVE')`, [membershipId, TENANT_A, userId]);
+      await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES ($1,$2)`, [membershipId, role]);
+      for (const b of branchIds) await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES ($1,$2,$3)`, [membershipId, TENANT_A, b]);
+      const token = (await request(server).post('/v1/auth/login').send({ email, password: 'Photo-pass-123' }).expect(200)).body.accessToken;
+      return (method: 'post' | 'get' | 'patch' | 'delete', path: string) => request(server)[method](path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A);
+    };
+    const manager = await mk('photo-manager@example.com', 'BRANCH_MANAGER', [branch.id]);
+    const reception = await mk('photo-reception@example.com', 'RECEPTIONIST', [branch.id]);
+
+    // Merchant gallery: Owner only writes, everyone reads.
+    const existing = (await owner('get', '/v1/merchant/catalog/photos').expect(200)).body.length;
+    const first = (await owner('post', '/v1/merchant/catalog/photos').field('altText', 'Sảnh chính').attach('file', jpeg, { filename: 'a.jpg' }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/catalog/photos', 201, first);
+    expect(first).toMatchObject({ branchId: null, contentType: 'image/jpeg', altText: 'Sảnh chính', displayOrder: existing });
+    await request(server).get(first.url).expect(200);
+    await manager('post', '/v1/merchant/catalog/photos').attach('file', jpeg, { filename: 'a.jpg' }).expect(403);
+    await owner('post', '/v1/merchant/catalog/photos').attach('file', pdf, { filename: 'fake.jpg' }).expect(422);
+    await owner('post', '/v1/merchant/catalog/photos').expect(400);
+    const list = (await reception('get', '/v1/merchant/catalog/photos').expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/catalog/photos', 200, list);
+    for (let i = list.length; i < 10; i++) await owner('post', '/v1/merchant/catalog/photos').attach('file', jpeg, { filename: `m${i}.jpg` }).expect(201);
+    await owner('post', '/v1/merchant/catalog/photos').attach('file', jpeg, { filename: 'm11.jpg' }).expect(409);
+    expect((await owner('patch', `/v1/merchant/catalog/photos/${first.id}`).send({ displayOrder: 99, altText: null }).expect(200)).body).toMatchObject({ displayOrder: 99, altText: null });
+
+    // Branch gallery: Owner or the assigned Branch Manager writes; staff of that branch read.
+    const bPhoto = (await manager('post', `/v1/merchant/branches/${branch.id}/photos`).field('altText', 'Phòng VIP').field('displayOrder', '2').attach('file', jpeg, { filename: 'b.jpg' }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/branches/{branchId}/photos', 201, bPhoto);
+    expect(bPhoto).toMatchObject({ branchId: branch.id, displayOrder: 2 });
+    await manager('post', `/v1/merchant/branches/${other.id}/photos`).attach('file', jpeg, { filename: 'b.jpg' }).expect(403);
+    await reception('post', `/v1/merchant/branches/${branch.id}/photos`).attach('file', jpeg, { filename: 'b.jpg' }).expect(403);
+    expect((await reception('get', `/v1/merchant/branches/${branch.id}/photos`).expect(200)).body.map((p: { id: string }) => p.id)).toEqual([bPhoto.id]);
+    await reception('get', `/v1/merchant/branches/${other.id}/photos`).expect(403);
+    await owner('get', `/v1/merchant/branches/${randomUUID()}/photos`).expect(404);
+    await owner('patch', `/v1/merchant/branches/${other.id}/photos/${bPhoto.id}`).send({ displayOrder: 1 }).expect(404);
+    for (let i = 1; i < 10; i++) await owner('post', `/v1/merchant/branches/${branch.id}/photos`).attach('file', jpeg, { filename: `b${i}.jpg` }).expect(201);
+    await owner('post', `/v1/merchant/branches/${branch.id}/photos`).attach('file', jpeg, { filename: 'b11.jpg' }).expect(409);
+    expect((await owner('get', `/v1/merchant/branches/${other.id}/photos`).expect(200)).body).toEqual([]);
+
+    // Public catalog shows both galleries in display order.
+    const catalog = (await pool.query('SELECT published,platform_approved FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=true,platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    else await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [TENANT_A, OWNER_ID]);
+    try {
+      const listed = (await request(server).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/public/branches', 200, listed);
+      const item = listed.items.find((b: { id: string }) => b.id === branch.id);
+      expect(item.photos).toHaveLength(10);
+      expect(item.photos.find((p: { altText: string }) => p.altText === 'Phòng VIP')).toBeTruthy();
+      expect(item.merchantPhotos).toHaveLength(10);
+      expect(item.merchantPhotos[9].url).toBe(first.url);                       // displayOrder 99 → last
+      expect(listed.items.find((b: { id: string }) => b.id === other.id).photos).toEqual([]);
+    } finally {
+      if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=$2,platform_approved=$3 WHERE tenant_id=$1', [TENANT_A, catalog.published, catalog.platform_approved]);
+      else await pool.query('DELETE FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A]);
+    }
+
+    // Delete removes the row and the file; audit keeps structured fields.
+    await manager('delete', `/v1/merchant/branches/${branch.id}/photos/${bPhoto.id}`).expect(204);
+    await request(server).get(bPhoto.url).expect(404);
+    await owner('delete', `/v1/merchant/catalog/photos/${first.id}`).expect(204);
+    await owner('delete', `/v1/merchant/catalog/photos/${first.id}`).expect(404);
+    const audit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE tenant_id=$1 AND entity_type='VENUE_PHOTO'`, [TENANT_A]);
+    expect(audit.rows.filter(r => r.action === 'BRANCH_PHOTO_UPLOADED')).toHaveLength(10);
+    expect(JSON.stringify(audit.rows)).not.toContain('Phòng VIP');
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

@@ -30,6 +30,10 @@ class CatalogPageDto {
   @ApiProperty() offset!: number;
   @ApiProperty() hasMore!: boolean;
 }
+export class PublicPhotoDto {
+  @ApiProperty() url!: string;
+  @ApiProperty({ nullable: true, type: String }) altText!: string | null;
+}
 export class PublicBookingPolicyDto {
   @ApiProperty() minDurationMinutes!: number;
   @ApiProperty() maxDurationMinutes!: number;
@@ -51,6 +55,8 @@ export class PublicBranchDto {
   @ApiProperty({ nullable: true, type: String, example: '09:00', description: 'Opening time HH:mm in the branch timezone; null = open 24 h (PD-043)' }) openingTime!: string | null;
   @ApiProperty({ nullable: true, type: String, example: '02:00', description: 'Closing time HH:mm; ≤ openingTime means after midnight' }) closingTime!: string | null;
   @ApiProperty({ type: PublicBookingPolicyDto }) bookingPolicy!: PublicBookingPolicyDto;
+  @ApiProperty({ type: () => [PublicPhotoDto], description: 'Branch gallery in display order, at most 10 (PD-048)' }) photos!: PublicPhotoDto[];
+  @ApiProperty({ type: () => [PublicPhotoDto], description: 'Merchant gallery in display order, at most 10 (PD-048)' }) merchantPhotos!: PublicPhotoDto[];
 }
 export class PublicRoomDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

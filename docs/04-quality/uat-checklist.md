@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-047` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-048` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -205,6 +205,14 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 |---|---|---|---|---|---|---|
 | J1 | Khách | Giữ chỗ trên điện thoại, đọc mã cho người khác gõ lại | Mã 6 ký tự chữ in hoa và số, không có 0/O/1/I; gõ chữ thường hoặc có khoảng trắng vẫn tra cứu được | PD-038 | | |
 | J2 | Khách | Tra cứu bằng mã đúng nhưng SĐT khác | Không thấy đơn | PD-038 | | |
+
+### R. Thư viện ảnh merchant và chi nhánh (PD-048)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| R1 | Owner, Khách | Tải 3 ảnh merchant và 3 ảnh chi nhánh từ điện thoại, sắp xếp lại | Khách thấy hai thư viện trên trang đặt phòng theo đúng thứ tự | PD-048 | | |
+| R2 | Owner | Tải ảnh thứ 11 cho merchant / cho một chi nhánh | Bị từ chối, báo tối đa 10 ảnh | PD-048 | | |
+| R3 | Branch Manager | Tải ảnh cho chi nhánh được giao và cho chi nhánh khác; thử sửa ảnh merchant | Chỉ chi nhánh được giao làm được | PD-048 | | |
 
 ### I. Ảnh và giấy tờ (PD-037)
 
