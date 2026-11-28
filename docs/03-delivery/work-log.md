@@ -14,13 +14,13 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** chạy `84aa397`; 27 migration (đến `20261124050000_file_storage`); Blob `vn-karaoke-now-blob-pub/-pri` đã gắn vào BE (OPS-008 `VERIFY` — chờ Owner thử upload trên giao diện). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; không đặt `AUTH_COOKIE_SECURE` (cookie Secure). **Trước khi push `693fd7b`: áp migration `20261124060000_platform_user_management` lên Prisma** (chỉ thêm bảng/cột nullable/index). Sau deploy: smoke `GET /v1/platform/users?limit=1` (admin 200, user thường 403); đăng nhập trên domain FE → cookie `kn_refresh` HttpOnly/Secure path `/v1/auth`, F5 vẫn đăng nhập. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-011. Luồng BE đang làm vị trí chi nhánh (`be/src/venue/branch-location.ts`, migration `20261124070000_branch_location`, `openapi.json`) chưa commit — khi BE commit `openapi.json`, FE CI đỏ tới khi Luồng FE chạy `npm run types:generate`. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
+**Đang dở (working tree):** Luồng FE không có sau commit FE-011. Luồng BE đã commit VEN-004 (`b558901`, địa chỉ/SĐT/vị trí chi nhánh; FE-018 `READY`); FE đã sinh lại type theo `openapi.json` mới. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (nhóm I ảnh/giấy tờ, J mã đặt phòng, K phiên đăng nhập, L quản lý user); trả lời BKG-008; quyết định có sửa audit `MEMBERSHIP_CREATED` đang chứa email (có từ trước, lệch quy tắc audit không PII).
 - *Session triển khai:* migrate `20261124060000` → push → smoke như trên; đóng OPS-008 sau khi Owner thử upload.
-- *Luồng FE:* sau deploy kiểm tra cookie `kn_refresh` trên domain FE Vercel (FE-012) và màn Người dùng trên production; khi BE đổi `openapi.json` chạy `npm run types:generate`; QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
+- *Luồng FE:* **FE-018** (địa chỉ, SĐT, chỉ đường Google Maps cho chi nhánh — handoff "FE READY — địa chỉ và vị trí chi nhánh"); sau deploy kiểm tra cookie `kn_refresh` (FE-012) và màn Người dùng trên production; khi BE đổi `openapi.json` chạy `npm run types:generate`; QA-003 phần còn lại.
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.

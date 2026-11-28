@@ -495,6 +495,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/merchant/branch-location/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["VenueController_resolveLocation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/merchant/branches/{id}": {
         parameters: {
             query?: never;
@@ -1880,6 +1896,15 @@ export interface components {
             name: string;
             /** @example Asia/Ho_Chi_Minh */
             timezone: string;
+            /** @description One-line address shown to customers (PD-042); null clears it */
+            address?: string | null;
+            /**
+             * @description Public contact phone (PD-042), stored as +84…; null clears it
+             * @example 0989 015 619
+             */
+            phone?: string | null;
+            /** @description Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location */
+            mapsLink?: string | null;
         };
         BranchResponseDto: {
             /** Format: uuid */
@@ -1893,10 +1918,37 @@ export interface components {
             timezone: string;
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE";
+            address: string | null;
+            /** @description Normalised +84… contact phone */
+            phone: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            /** @description Link the Owner pasted */
+            mapsUrl: string | null;
+            /** @description Google Maps directions to the coordinates */
+            directionsUrl: string | null;
+        };
+        ResolveLocationDto: {
+            mapsLink: string;
+        };
+        ResolvedLocationDto: {
+            latitude: number;
+            longitude: number;
+            mapsUrl: string | null;
+            directionsUrl: string;
         };
         UpdateBranchDto: {
             name?: string;
             timezone?: string;
+            /** @description One-line address shown to customers (PD-042); null clears it */
+            address?: string | null;
+            /**
+             * @description Public contact phone (PD-042), stored as +84…; null clears it
+             * @example 0989 015 619
+             */
+            phone?: string | null;
+            /** @description Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location */
+            mapsLink?: string | null;
         };
         BranchStatusDto: {
             /** @enum {string} */
@@ -2982,6 +3034,14 @@ export interface components {
             merchantLogoUrl: string | null;
             name: string;
             timezone: string;
+            /** @description Branch address (PD-042) */
+            address: string | null;
+            /** @description Branch contact phone, +84… (PD-042) */
+            phone: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            /** @description Google Maps directions link; null when the branch has no location */
+            directionsUrl: string | null;
         };
         PublicBranchListDto: {
             limit: number;
@@ -4098,6 +4158,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["BranchResponseDto"];
                 };
+            };
+        };
+    };
+    VenueController_resolveLocation: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveLocationDto"];
+            };
+        };
+        responses: {
+            /** @description Preview the coordinates of a Google Maps link before saving (PD-042) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResolvedLocationDto"];
+                };
+            };
+            /** @description Not a Google Maps link, or the link has no coordinates */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
