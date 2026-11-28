@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau IAM-008)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-017)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -14,16 +14,25 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** chạy `84aa397`; 27 migration (đến `20261124050000_file_storage`); Blob `vn-karaoke-now-blob-pub/-pri` đã gắn vào BE (OPS-008 `VERIFY` — chờ Owner thử upload trên giao diện). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; không đặt `AUTH_COOKIE_SECURE` (cookie Secure). **Trước khi push `693fd7b`: áp migration `20261124060000_platform_user_management` lên Prisma** (chỉ thêm bảng/cột nullable/index). Sau deploy: smoke `GET /v1/platform/users?limit=1` (admin 200, user thường 403); đăng nhập trên domain FE → cookie `kn_refresh` HttpOnly/Secure path `/v1/auth`, F5 vẫn đăng nhập. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Session triển khai có `deploy-vercel.md`, dòng OPS-008 trong task board và mục nhật ký OPS-008 chưa commit — không commit hộ. `docs/KaraokeNow_Merchant_Feature_Plan.md` chưa track (không phải của Luồng BE).
+**Đang dở (working tree):** Luồng FE không có sau commit FE-017. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (nhóm I ảnh/giấy tờ, J mã đặt phòng, K phiên đăng nhập, L quản lý user); trả lời BKG-008; quyết định có sửa audit `MEMBERSHIP_CREATED` đang chứa email (có từ trước, lệch quy tắc audit không PII).
 - *Session triển khai:* migrate `20261124060000` → push → smoke như trên; đóng OPS-008 sau khi Owner thử upload.
-- *Luồng FE:* **FE-017** màn quản lý user cho Platform Admin (handoff "FE READY — quản lý user của Platform"); FE-011; QA-003 phần còn lại.
+- *Luồng FE:* sau deploy kiểm tra cookie `kn_refresh` trên domain FE Vercel (FE-012) và màn Người dùng trên production (cần migration IAM-008); FE-011 (sinh type từ OpenAPI); QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
+
+
+
+---
+
+## 2026-11-28 — Luồng FE: quản lý user cho Platform Admin (FE-017)
+
+- Mục Người dùng ở `/platform`, chi tiết user với các thao tác có lý do (hộp thoại `<dialog>`), mật khẩu tạm hiện một lần; Thành viên theo merchant. Thông báo lỗi PD-040 dịch sang tiếng Việt.
+- Kiểm chứng: unit 56/56, `next build`; `npm run e2e` **195/195** (API 66, khách 22, lễ tân 29, Platform 16, vai trò 28, files 13, phiên 9, quản lý user 12); backend local rebuild lúc bắt đầu FE-017 từ code có IAM-008 (trước BKG-011/OPS-003).
 
 ---
 

@@ -367,3 +367,19 @@ main.admin-content { margin: 0; }
 .tenant-option:hover { border-color: var(--brand-500); background: var(--brand-50); }
 .tenant-option strong { font-size: 15px; }
 .tenant-option small { color: var(--muted); }
+/* Platform user management (FE-017) */
+.reason-dialog { border: 0; border-radius: var(--radius); padding: 22px; width: min(92vw, 460px); box-shadow: 0 24px 60px rgb(30 21 53 / 30%); }
+.reason-dialog::backdrop { background: rgb(15 10 30 / 45%); }
+.reason-dialog h2 { margin: 0 0 6px; font-size: 18px; }
+.reason-dialog textarea { display: block; width: 100%; margin-top: 6px; padding: 10px; font: inherit; resize: vertical; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); }
+.primary.danger-fill { background: var(--danger); box-shadow: 0 6px 16px rgb(190 18 60 / 22%); }
+.user-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; margin: 12px 0; }
+.user-filters input, .user-filters select { margin-top: 6px; }
+.user-detail { margin-top: 16px; padding: 16px; border: 1px solid var(--brand-200); border-radius: 14px; background: var(--brand-50); display: grid; gap: 10px; }
+.user-detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 13px; }
+.user-detail dt { color: var(--muted); }
+.user-detail dd { margin: 0; overflow-wrap: anywhere; }
+.secret-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px; border: 1px dashed var(--warning); border-radius: 10px; background: var(--warning-bg); }
+.secret-box code { font-size: 16px; font-weight: 700; letter-spacing: .04em; }
+.members-panel { margin-top: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; display: grid; gap: 10px; }
+@media (max-width: 700px) { .user-filters { grid-template-columns: 1fr; } }

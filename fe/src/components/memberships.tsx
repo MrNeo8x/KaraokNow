@@ -5,9 +5,9 @@ import { ApiError, request } from '@/lib/api';
 import { ROLES, membershipError, roleLabel, temporaryPasswordError, type Role } from '@/lib/admin';
 
 type Membership = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
-type Grant = { roles: Role[]; branchIds: string[] };
+export type Grant = { roles: Role[]; branchIds: string[] };
 
-function GrantPicker({ value, onChange, branches }: { value: Grant; onChange: (next: Grant) => void; branches: { id: string; name: string }[] }) {
+export function GrantPicker({ value, onChange, branches }: { value: Grant; onChange: (next: Grant) => void; branches: { id: string; name: string }[] }) {
   const toggle = <T,>(list: T[], item: T) => list.includes(item) ? list.filter(entry => entry !== item) : [...list, item];
   return <div className="grant-picker">
     <fieldset><legend>Vai trò</legend>{ROLES.map(role => <label key={role} className="check-row"><input type="checkbox" checked={value.roles.includes(role)} onChange={() => onChange({ ...value, roles: toggle(value.roles, role) })} /> {roleLabel[role]}</label>)}</fieldset>

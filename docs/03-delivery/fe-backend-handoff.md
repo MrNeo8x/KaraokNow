@@ -230,6 +230,12 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Gợi ý UI: mục "Người dùng" trong khu Platform (ô tìm, lọc trạng thái/admin, phân trang), trang chi tiết user (merchant + vai trò, các nút có hộp thoại nhập lý do), tab "Thành viên" trong chi tiết merchant.
 - Production: cần migration `20261124060000_platform_user_management` trước khi push (OPS — xem `deploy-vercel.md` §10).
 
+### FE INTEGRATED — quản lý user của Platform (FE-017, IAM-008, 2026-11-28)
+
+- `/platform` → **Người dùng** (danh sách, lọc, chi tiết, khoá/mở khoá, mật khẩu tạm một lần, cấp/thu hồi admin) và nút **Thành viên** trên từng merchant (thêm, sửa quyền, vô hiệu hoá). Mọi thao tác ghi gửi `reason` qua hộp thoại; không gửi `X-Tenant-ID`.
+- Thông báo lỗi BE của IAM-008 được dịch trong `fe/src/lib/api.ts`. Nếu BE đổi câu chữ các lỗi này, cập nhật bảng `FRIENDLY`.
+- Kiểm thử: `fe/e2e/platform-users.mjs` 12/12; `npm run e2e` 195/195.
+
 ## FE READY — giữ phiên qua F5 và chọn merchant (IAM-007, PD-039, 2026-11-28)
 
 Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 47/47 (có contract `/v1/me/tenants`). Không đổi body của login/refresh.

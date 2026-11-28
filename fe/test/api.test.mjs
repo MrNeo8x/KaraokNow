@@ -90,3 +90,11 @@ test('requestBlob trả Blob và gửi kèm token', async () => {
   const blob = await requestBlob('/merchant/documents/d/file', 't', 'x');
   assert.equal(blob.type, 'application/pdf'); assert.equal(blob.size, 4);
 });
+
+test('dịch thông báo quản lý user của Platform (PD-040)', async () => {
+  const { friendlyMessage } = await import('../src/lib/api.ts');
+  assert.equal(friendlyMessage('The merchant must keep at least one active Owner'), 'Merchant phải còn ít nhất một Owner đang hoạt động.');
+  assert.match(friendlyMessage('Platform Admin cannot perform this action on their own account'), /chính tài khoản/);
+  assert.match(friendlyMessage('Enable the user before issuing a temporary password'), /mở khoá/);
+  assert.equal(friendlyMessage('Something else'), 'Something else');
+});

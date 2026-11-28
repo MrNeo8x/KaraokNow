@@ -11,7 +11,7 @@ Kiểm thử trình duyệt (Chrome headless qua `playwright-core`) và smoke te
 ## Chạy
 
 ```bash
-npm run e2e                 # setup UAT → API smoke → khách → lễ tân/Owner → Platform + phân quyền → vai trò/khoá merchant/429 → ảnh/logo/giấy tờ → phiên qua F5/chọn merchant
+npm run e2e                 # setup UAT → API smoke → khách → lễ tân/Owner → Platform + phân quyền → vai trò/khoá merchant/429 → ảnh/logo/giấy tờ → phiên qua F5/chọn merchant → quản lý user Platform
 node e2e/customer.mjs       # chạy riêng từng bộ
 ```
 
@@ -33,4 +33,4 @@ Mỗi lượt `npm run e2e` tạo khoảng 6 giữ chỗ công khai (API smoke 1
 
 ## Lưu ý về dữ liệu
 
-Các script **ghi dữ liệu thật** vào database đang chạy: `setup-uat.mjs` tạo điều khoản công khai, bảng giá luôn áp dụng (nếu chưa có bảng giá ACTIVE) và cọc WEB 30%; các bộ test tạo merchant `SMOKE_…`/`UI_…`/`SUSP_…`, nhân viên, hold, booking và giao dịch tiền mặt. Chỉ chạy trên môi trường local/UAT.
+Các script **ghi dữ liệu thật** vào database đang chạy: `setup-uat.mjs` tạo điều khoản công khai, bảng giá luôn áp dụng (nếu chưa có bảng giá ACTIVE) và cọc WEB 30%; các bộ test tạo merchant `SMOKE_…`/`UI_…`/`SUSP_…`/`PU_…` (PU bị khoá sau khi chạy), nhân viên, hold, booking và giao dịch tiền mặt. Chỉ chạy trên môi trường local/UAT.

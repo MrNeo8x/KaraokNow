@@ -24,6 +24,7 @@ import ReceptionCalendar from './reception-calendar';
 import CashReconciliation from './cash-reconciliation';
 import MerchantLogoCard, { type MerchantLogo } from './merchant-logo';
 import MerchantDocuments from './merchant-documents';
+import PlatformUsers from './platform-users';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
@@ -151,13 +152,14 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const sessionsCard = <MySessions token={session.accessToken} onCurrentRevoked={() => void logout()} />;
 
   if (page === 'platform') {
-    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'account', label: 'Tài khoản', icon: UserCog }];
-    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', account: 'Tài khoản' };
+    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'users', label: 'Người dùng', icon: Users }, { id: 'account', label: 'Tài khoản', icon: UserCog }];
+    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', users: 'Người dùng', account: 'Tài khoản' };
     return <AdminShell product="Platform" nav={nav} active={platformSection} onSelect={selectPlatform} title={titles[platformSection]} subtitle="Quản trị toàn hệ thống · không gắn với merchant nào"
       footer={<><strong>Platform Admin</strong><a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
       {error && <div role="alert" className="error">{error}</div>}
       {platformSection === 'listings' && <PlatformListings token={session.accessToken} />}
       {platformSection === 'merchants' && <PlatformMerchants token={session.accessToken} />}
+      {platformSection === 'users' && <PlatformUsers token={session.accessToken} />}
       {platformSection === 'account' && sessionsCard}
     </AdminShell>;
   }
@@ -253,4 +255,4 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
 }
 
 const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
-const PLATFORM_IDS = ['listings', 'merchants', 'account'];
+const PLATFORM_IDS = ['listings', 'merchants', 'users', 'account'];

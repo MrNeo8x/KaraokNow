@@ -35,3 +35,13 @@ test('định dạng tuổi backlog', () => {
   assert.equal(formatAge(3720), '1 giờ 2 phút');
   assert.equal(formatAge(200000), '2 ngày');
 });
+
+test('id user hiện tại từ token và kiểm tra lý do', async () => {
+  const { currentUserId, reasonError } = await import('../src/lib/admin.ts');
+  const token = `h.${btoa(JSON.stringify({ sub: 'user-1', sid: 's' })).replace(/=+$/, '')}.sig`;
+  assert.equal(currentUserId(token), 'user-1');
+  assert.equal(currentUserId('broken'), null);
+  assert.match(reasonError('   '), /lý do/);
+  assert.match(reasonError('x'.repeat(501)), /500/);
+  assert.equal(reasonError('Khách yêu cầu khoá'), null);
+});

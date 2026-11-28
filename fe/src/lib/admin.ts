@@ -35,3 +35,18 @@ export function formatAge(seconds: number | null): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} giờ ${Math.floor((seconds % 3600) / 60)} phút`;
   return `${Math.floor(seconds / 86400)} ngày`;
 }
+
+/** User id (`sub`) of the current access token, used only to hide actions an admin may not apply to themselves. */
+export function currentUserId(accessToken: string): string | null {
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.sub === 'string' ? payload.sub : null;
+  } catch { return null; }
+}
+
+/** Platform write actions require a reason of 1–500 characters that is not only whitespace (PD-040). */
+export function reasonError(value: string): string | null {
+  if (!value.trim()) return 'Cần nhập lý do.';
+  if (value.length > 500) return 'Lý do tối đa 500 ký tự.';
+  return null;
+}
