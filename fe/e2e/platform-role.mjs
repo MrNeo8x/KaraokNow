@@ -1,6 +1,6 @@
 // Platform Admin onboarding plus role separation: Owner blocked on /platform; Owner creates a Receptionist who must change
 // the temporary password and then cannot see Owner-only sections.
-import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter, goSection } from './lib.mjs';
+import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter, goSection, selectTenant } from './lib.mjs';
 const { log, finish } = reporter();
 const browser = await launch();
 async function session(label) {
@@ -51,7 +51,7 @@ async function login(page, path, email, password) { await page.goto(BASE + path)
   });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); log(overflow <= 0, 'platform: không cuộn ngang', `overflow=${overflow}`);
   await page.screenshot({ path: SHOTS + '/platform.png', fullPage: true });
-  log(errors.filter(e => !/status of (409|403)/.test(e)).length === 0, 'platform: không lỗi console ngoài 409', errors.slice(0, 3).join(' | '));
+  log(errors.filter(e => !/status of (409|403|401)/.test(e)).length === 0, 'platform: không lỗi console ngoài 409 (401 = thử khôi phục phiên lúc chưa đăng nhập)', errors.slice(0, 3).join(' | '));
   await ctx.close();
 }
 // Owner trên /platform → thông báo không có quyền
@@ -66,7 +66,7 @@ const staffEmail = `ui.reception.${Date.now()}@karaokenow.local`; const temp = '
   const { ctx, page, step } = await session('owner');
   await step('tạo Lễ tân qua màn Nhân viên', async () => {
     await login(page, '/merchant', OWNER.email, OWNER.password);
-    await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 });
+    await selectTenant(page, TENANT); await page.locator('.kpi').first().waitFor({ timeout: 15000 });
     await goSection(page, 'Người dùng');
     const sec = page.locator('section[aria-labelledby="memberships-title"]'); await sec.locator('table').waitFor({ timeout: 15000 });
     await sec.locator('summary', { hasText: 'Thêm nhân viên' }).click();
@@ -84,10 +84,10 @@ const staffEmail = `ui.reception.${Date.now()}@karaokenow.local`; const temp = '
   await step('đăng nhập lần đầu bị buộc đổi mật khẩu', async () => { await login(page, '/merchant', staffEmail, temp); await page.getByRole('heading', { name: 'Đổi mật khẩu' }).waitFor(); });
   await step('đổi mật khẩu rồi đăng nhập lại', async () => {
     await page.getByLabel('Mật khẩu hiện tại').fill(temp); await page.getByLabel('Mật khẩu mới').fill(fresh); await page.getByRole('button', { name: 'Đổi mật khẩu' }).click();
-    await page.getByText('Đổi mật khẩu thành công').waitFor(); await page.getByLabel('Mật khẩu', { exact: true }).fill(fresh); await page.getByLabel('Email').fill(staffEmail); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.getByLabel('Tenant ID').waitFor();
+    await page.getByText('Đổi mật khẩu thành công').waitFor(); await page.getByLabel('Mật khẩu', { exact: true }).fill(fresh); await page.getByLabel('Email').fill(staffEmail); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.locator('.kpi, .tenant-picker').first().waitFor({ timeout: 15000 });
   });
   await step('Lễ tân thấy màn giữ phòng, không thấy màn Owner', async () => {
-    await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click();
+    await selectTenant(page, TENANT);
     await page.locator('.kpi').first().waitFor({ timeout: 15000 }); await page.waitForTimeout(1500);
     const visible = [];
     const sidebar = page.locator('.admin-sidebar');
@@ -99,7 +99,7 @@ const staffEmail = `ui.reception.${Date.now()}@karaokenow.local`; const temp = '
     if (visible.length) throw new Error('vẫn hiện: ' + visible.join(',')); return 'ẩn menu Người dùng/Marketplace, publication, vận hành, audit';
   });
   await page.screenshot({ path: SHOTS + '/reception.png', fullPage: true });
-  log(errors.filter(e => !/status of (403|404)/.test(e)).length === 0, 'reception: không lỗi console ngoài 403 dự kiến', errors.filter(e => !/status of (403|404)/.test(e)).slice(0, 3).join(' | '));
+  log(errors.filter(e => !/status of (403|404|401)/.test(e)).length === 0, 'reception: không lỗi console ngoài 403 dự kiến (401 = thử khôi phục phiên)', errors.filter(e => !/status of (403|404)/.test(e)).slice(0, 3).join(' | '));
   await ctx.close();
 }
 await browser.close(); finish();

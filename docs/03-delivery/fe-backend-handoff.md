@@ -241,6 +241,13 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - `GET /v1/me/tenants` (Bearer, **không** `X-Tenant-ID`) → `[{ tenantId, tenantName, tenantStatus: 'ACTIVE'|'INACTIVE', roles[] }]`, sắp theo tên, chỉ membership ACTIVE. 0 phần tử → báo không thuộc merchant nào (Platform Admin vẫn vào khu Platform); 1 → tự chọn; nhiều → danh sách chọn. Nhớ `tenantId` gần nhất trong localStorage (không phải bí mật) và kiểm lại với danh sách.
 - **Trả lời yêu cầu FE-015:** `GET /v1/files/public/{pathname}` hết 500 với thư mục `.storage` (`sendFile` cho phép dot-path; lỗi đọc → 404). Cần rebuild backend local.
 
+### FE INTEGRATED — giữ phiên qua F5 và chọn merchant (FE-012, IAM-007, 2026-11-28)
+
+- FE không lưu `refreshToken` ở đâu (body login/refresh bị bỏ qua); khôi phục, hẹn giờ và đăng xuất đều dùng cookie qua `X-KN-Session: 1`. Chọn merchant bằng `GET /v1/me/tenants`; nhớ `tenantId` trong localStorage `karaokenow:last-tenant:v1` và kiểm lại với danh sách.
+- Khi chưa đăng nhập, lần thử khôi phục trả 401 nên trình duyệt ghi một lỗi mạng 401 trong console — đúng thiết kế.
+- FE-015 đã kiểm chứng lại sau bản sửa `sendFile`: `files.mjs` 13/13.
+- **Sau deploy:** kiểm tra cookie `kn_refresh` (HttpOnly, Secure, SameSite=Strict, Path=/v1/auth) có trên domain FE Vercel và F5 giữ phiên.
+
 ## FE READY — mã đặt phòng 6 ký tự (BKG-010, PD-038, 2026-11-28)
 
 **Thay đổi phá vỡ phía FE — FE-016 phải lên production cùng lần deploy với BKG-010.**

@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-015/FE-016)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-012)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -14,13 +14,13 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-015/FE-016. Luồng BE đã commit IAM-007 (`8d85d55`, giữ phiên qua cookie HttpOnly, API chọn merchant — mở đường cho FE-012). Session triển khai có `docs/03-delivery/deploy-vercel.md` và nhật ký OPS-008 trong work log chưa commit — Luồng FE không commit hộ. `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
+**Đang dở (working tree):** Luồng FE không có sau commit FE-012. Luồng BE đang làm quản lý người dùng Platform (`be/src/platform-users/`, migration `20261124060000_platform_user_management`, OpenAPI) chưa commit; session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
 - *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
-- *Luồng FE:* chạy lại `fe/e2e/files.mjs` sau khi BE sửa lỗi phục vụ file rồi chuyển FE-015 sang `VERIFY`; FE-012 khi BE xong refresh cookie/danh sách tenant (đang làm); FE-011; QA-003 phần còn lại.
+- *Luồng FE:* sau deploy FE-012 kiểm tra cookie `kn_refresh` trên domain FE Vercel; FE-011 (sinh type từ OpenAPI); QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng); chờ FE READY tiếp theo của BE (quản lý người dùng Platform đang làm).
 - *Luồng BE:* sửa `files.controller.ts` (`sendFile(file, { dotfiles: 'allow' })` hoặc thư mục mặc định không có dấu chấm; `NotFoundError` → 404); BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
@@ -28,6 +28,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 
 
+
+---
+
+## 2026-11-28 — Luồng FE: giữ phiên qua F5 và chọn merchant (FE-012)
+
+- Refresh token chỉ trong cookie HttpOnly; khôi phục phiên khi tải trang, hẹn giờ refresh và đăng xuất qua cookie; danh sách chọn merchant (`/v1/me/tenants`), nhớ merchant gần nhất.
+- FE-015 chuyển `VERIFY`: `files.mjs` 13/13 sau bản sửa `sendFile` của BE.
+- Kiểm chứng: unit 54/54, `tsc`; `session.mjs` 9/9, `platform-role.mjs` 16/16, `files.mjs` 13/13, `roles.mjs` 28/28, `api-smoke.mjs` 66/66, `customer.mjs` 22/22, `staff.mjs` 29/29 (chạy riêng). Bộ e2e cũ chấp nhận lỗi console 401 của lần thử khôi phục phiên khi chưa đăng nhập.
 ---
 
 ## 2026-11-28 — Luồng BE: quản lý user của Platform Admin (IAM-008, PD-040)

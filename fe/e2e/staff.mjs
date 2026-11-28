@@ -1,5 +1,5 @@
 // Reception/Owner flow on holds created by customer.mjs: deposit → verification → confirm → calendar → check-in/out → cash → cancel/refund → audit → sessions.
-import { BASE, TENANT, OWNER, SHOTS, launch, reporter, readArtifact, goSection } from './lib.mjs';
+import { BASE, TENANT, OWNER, SHOTS, launch, reporter, readArtifact, goSection, selectTenant } from './lib.mjs';
 const holds = readArtifact('customer-holds.json'); const { desktop } = holds;
 const { log, finish } = reporter();
 const lookup = await (await fetch(BASE + '/v1/public/booking/lookup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: desktop.phone, bookingCode: desktop.code }) })).json();
@@ -10,8 +10,8 @@ page.on('response', r => { if (r.status() >= 400) console.log('   ↳', r.status
 page.on('dialog', d => { console.log('   ⚑ confirm:', d.message().slice(0, 90)); d.accept(); });
 const step = async (name, fn) => { try { const extra = await fn(); log(true, name, extra ?? ''); } catch (e) { log(false, name, e.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/staff-error-${results.length}.png`, fullPage: true }); } };
 try {
-  await step('Owner đăng nhập', async () => { await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(OWNER.email); await page.getByLabel('Mật khẩu').fill(OWNER.password); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.getByLabel('Tenant ID').waitFor(); });
-  await step('Nhập tenant, tải chi nhánh', async () => { await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); });
+  await step('Owner đăng nhập', async () => { await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(OWNER.email); await page.getByLabel('Mật khẩu').fill(OWNER.password); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.locator('.kpi, .tenant-picker').first().waitFor({ timeout: 15000 }); });
+  await step('Nhập tenant, tải chi nhánh', async () => { await selectTenant(page, TENANT); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); });
   await step('Màn Owner hiển thị (publication, nhân viên, vận hành, audit)', async () => {
     for (const h of ['Hiển thị catalog công khai', 'Theo dõi vận hành']) await page.getByRole('heading', { name: h }).waitFor({ timeout: 10000 });
     const tag = await page.locator('#publication-title').locator('..').locator('.tag').first().innerText();
@@ -96,6 +96,6 @@ try {
   await step('Phiên đăng nhập: đánh dấu phiên này', async () => { await page.getByText('Phiên đăng nhập của tôi').click(); await page.locator('.tag', { hasText: 'Phiên này' }).waitFor({ timeout: 10000 }); });
   await page.screenshot({ path: SHOTS + '/staff-admin.png', fullPage: true });
 } finally {
-  log(errors.filter(e => !/status of (409|404)/.test(e)).length === 0, 'Không có lỗi console ngoài 409/404 cố ý', errors.slice(0, 4).join(' | '));
+  log(errors.filter(e => !/status of (409|404|401)/.test(e)).length === 0, 'Không có lỗi console ngoài 409/404 cố ý và 401 thử khôi phục phiên', errors.slice(0, 4).join(' | '));
   await browser.close(); finish();
 }

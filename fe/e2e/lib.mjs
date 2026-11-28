@@ -48,3 +48,14 @@ export async function goSection(page, label) {
   await page.locator('.admin-sidebar').getByRole('button', { name: label, exact: true }).click();
   await page.locator('.admin-topbar h1').waitFor();
 }
+
+/** Opens a merchant after sign-in: the app may auto-open it (single membership or remembered) or show the picker. */
+export async function selectTenant(page, tenantId) {
+  await page.locator('.kpi, .tenant-picker').first().waitFor({ timeout: 15000 });
+  if (await page.locator('.tenant-picker').count()) {
+    const option = page.locator(`.tenant-option[data-tenant-id="${tenantId}"]`);
+    if (await option.count()) await option.click();
+    else { await page.getByText('Nhập Tenant ID thủ công').click(); await page.getByLabel('Tenant ID').fill(tenantId); await page.getByRole('button', { name: 'Áp dụng' }).click(); }
+  }
+  await page.locator('.kpi').first().waitFor({ timeout: 15000 });
+}

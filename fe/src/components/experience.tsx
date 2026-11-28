@@ -31,7 +31,7 @@ import { RolesProvider } from './permissions-context';
 import { can } from '@/lib/permissions';
 import { roleLabel, type Role } from '@/lib/admin';
 import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
-import { parseSession, refreshDelay, type Session } from '@/lib/session';
+import { autoTenant, cookieLogout, cookieRefresh, parseSession, readLastTenant, refreshDelay, rememberTenant, type MyTenant, type Session } from '@/lib/session';
 
 type Branch = { id: string; name: string; code: string; timezone: string; status: string };
 type Room = { id: string; name: string; code: string; capacity: number; status: string };
@@ -50,25 +50,69 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const [revision, setRevision] = useState(0);
   const sessionGeneration = useRef(0);
   const refreshFlight = useRef<Promise<Session | null> | null>(null);
+  const [restoring, setRestoring] = useState(page !== 'customer');
+  const [tenants, setTenants] = useState<MyTenant[] | null>(null); const autoChosen = useRef(false);
+  const storage = () => { try { return window.localStorage; } catch { return null; } };
+  function clearMerchant() { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); setTenants(null); autoChosen.current = false; }
+
+  // F5: the HttpOnly cookie restores the session. Transient failures (409/503/network) are retried, 401 shows sign-in.
+  useEffect(() => {
+    if (page === 'customer') return;
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        const result = await cookieRefresh();
+        if (cancelled) return;
+        if (result.kind === 'session') { setSession(result.session); break; }
+        if (result.kind === 'signed-out') break;
+        if (attempt === 2) setError(`${result.reason} Vui lòng đăng nhập lại.`);
+        else await new Promise(resolve => window.setTimeout(resolve, 1500));
+      }
+      if (!cancelled) setRestoring(false);
+    })();
+    return () => { cancelled = true; };
+  }, [page]);
   async function login(e: React.FormEvent) { e.preventDefault(); setError(''); setLoading(true); try { setSession(parseSession(await request<unknown>('/auth/login', { method:'POST', body: JSON.stringify({email,password}) }))); setPassword(''); } catch (err) { setError((err as Error).message); } finally { setLoading(false); } }
-  async function logout() { sessionGeneration.current++; const pending = refreshFlight.current; const previous = session; setSession(null); setActiveTenant(''); setBranches([]); setRooms([]); const latest = pending ? await pending : previous; if (latest) { try { await request('/auth/logout', {method:'POST',body:JSON.stringify({refreshToken:latest.refreshToken})}); } catch { setError('Đã đăng xuất tại trình duyệt; không thể xác nhận thu hồi phiên trên máy chủ.'); } } }
+  async function logout() {
+    sessionGeneration.current++; const pending = refreshFlight.current; setSession(null); clearMerchant();
+    if (pending) await pending.catch(() => null); // let an in-flight rotation finish so logout revokes the newest token
+    if (!(await cookieLogout())) setError('Đã đăng xuất tại trình duyệt; không thể xác nhận thu hồi phiên trên máy chủ.');
+  }
   useEffect(() => {
     if (!session || session.mustChangePassword) return;
     const generation = sessionGeneration.current;
     const delay = refreshDelay(session.expiresIn);
-    const timer = window.setTimeout(() => {
+    let retryTimer = 0;
+    const run = (attempt: number) => {
       if (refreshFlight.current || generation !== sessionGeneration.current) return;
-      const flight = request<unknown>('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken: session.refreshToken }) })
-        .then(value => { const next = parseSession(value); if (generation === sessionGeneration.current) setSession(next); return next; })
-        .catch(() => { if (generation === sessionGeneration.current) { sessionGeneration.current++; setSession(null); setActiveTenant(''); setBranches([]); setRooms([]); setError('Không thể làm mới phiên. Vui lòng đăng nhập lại.'); } return null; })
-        .finally(() => { if (refreshFlight.current === flight) refreshFlight.current = null; });
+      const flight = cookieRefresh().then(result => {
+        if (generation !== sessionGeneration.current) return null;
+        if (result.kind === 'session') { setSession(result.session); return result.session; }
+        if (result.kind === 'signed-out') { sessionGeneration.current++; setSession(null); clearMerchant(); setError('Phiên đăng nhập đã hết. Vui lòng đăng nhập lại.'); return null; }
+        if (attempt < 3) retryTimer = window.setTimeout(() => run(attempt + 1), 10_000); // transient: keep the cookie, retry
+        else setError(`${result.reason} Nếu thao tác báo lỗi xác thực, hãy tải lại trang.`);
+        return null;
+      }).finally(() => { if (refreshFlight.current === flight) refreshFlight.current = null; });
       refreshFlight.current = flight;
-    }, delay);
-    return () => window.clearTimeout(timer);
+    };
+    const timer = window.setTimeout(() => run(0), delay);
+    return () => { window.clearTimeout(timer); window.clearTimeout(retryTimer); };
   }, [session]);
   async function changePassword(e: React.FormEvent) { e.preventDefault(); if (!session) return; setError(''); try { await request('/auth/password/change',{method:'POST',body:JSON.stringify({currentPassword:password,newPassword})},session.accessToken); setSession(null); setPassword(''); setNewPassword(''); setError('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'); } catch(err) { setError((err as Error).message); } }
   useEffect(() => { if (!session || !activeTenant || session.mustChangePassword) return; let live=true; setLoading(true); setError(''); request<Branch[]>('/merchant/branches',{},session.accessToken,activeTenant).then(data=>{ if(live){setBranches(data);setBranch(previous=>data.some(item=>item.id===previous)?previous:data[0]?.id || '');} }).catch(err=>{if(live){setError(err.message);setBranches([]);setBranch('');}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,revision]);
   useEffect(() => { if(!session || !activeTenant || !branch) {setRooms([]);return;} let live=true; setLoading(true); request<Room[]>(`/merchant/branches/${branch}/rooms`,{},session.accessToken,activeTenant).then(data=>{if(live)setRooms(data);}).catch(err=>{if(live){setRooms([]);setError(err.message);}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,branch,revision]);
+  // Merchant picker: GET /v1/me/tenants (no X-Tenant-ID). Auto-open once per session when unambiguous.
+  useEffect(() => {
+    if (!session || session.mustChangePassword || page !== 'merchant') { setTenants(null); return; }
+    const controller = new AbortController();
+    request<MyTenant[]>('/me/tenants', { signal: controller.signal }, session.accessToken).then(list => {
+      setTenants(list);
+      if (!autoChosen.current) { autoChosen.current = true; const chosen = autoTenant(list, readLastTenant(storage())); if (chosen) setActiveTenant(current => current || chosen); }
+    }).catch(err => { if (!controller.signal.aborted) { setTenants([]); setError((err as Error).message); } });
+    return () => controller.abort();
+  }, [session?.accessToken ? 'signed-in' : 'signed-out', session?.mustChangePassword, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (activeTenant) rememberTenant(storage(), activeTenant); }, [activeTenant]);
+
   // Roles drive what the UI offers; the backend still enforces every permission. Unknown roles (null) hide nothing.
   useEffect(() => {
     if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setMe(null); return; }
@@ -87,6 +131,8 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   }, [session, activeTenant, page]);
 
   if (page === 'customer') return <CustomerBooking />;
+
+  if (restoring) return <div className="auth-restoring" role="status"><span className="logo-mark"><Mic2 size={22} aria-hidden /></span><p>Đang khôi phục phiên…</p></div>;
 
   if (!session || session.mustChangePassword) return <div className="auth">
     <section className="auth-hero"><a className="admin-logo" href="/"><span className="logo-mark"><Mic2 size={20} aria-hidden /></span><span><strong>KaraokeNow</strong><small>{page === 'platform' ? 'Platform' : 'Business'}</small></span></a>
@@ -129,7 +175,9 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   ];
   const titles: Record<string, string> = { overview: 'Tổng quan', bookings: 'Lịch & Đặt phòng', cash: 'Đối soát tiền mặt', rooms: 'Phòng hát', pricing: 'Giá & chính sách', users: 'Người dùng & phân quyền', marketplace: 'Marketplace', settings: 'Cài đặt hệ thống' };
   const section = nav.some(item => item.id === merchantSection) ? merchantSection : 'overview';
-  const tenantForm = <form onSubmit={e => { e.preventDefault(); setBranch(''); setBranches([]); setRooms([]); setActiveTenant(tenant.trim()); setRevision(value => value + 1); }} className="tenant-form"><input aria-label="Tenant ID" placeholder="Tenant ID" value={tenant} onChange={e => setTenant(e.target.value)} required /><button className="primary">Áp dụng</button></form>;
+  function openTenant(id: string) { setBranch(''); setBranches([]); setRooms([]); setMe(null); setLogoUrl(null); setActiveTenant(id); setRevision(value => value + 1); }
+  function switchMerchant() { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); setMe(null); setLogoUrl(null); }
+  const tenantForm = <form onSubmit={e => { e.preventDefault(); openTenant(tenant.trim()); }} className="tenant-form"><input aria-label="Tenant ID" placeholder="Tenant ID" value={tenant} onChange={e => setTenant(e.target.value)} required /><button className="primary">Áp dụng</button></form>;
   const counts = { active: rooms.filter(r => r.status === 'ACTIVE').length, maintenance: rooms.filter(r => r.status === 'MAINTENANCE').length, inactive: rooms.filter(r => r.status !== 'ACTIVE' && r.status !== 'MAINTENANCE').length };
   const pct = (value: number) => rooms.length ? `${(value / rooms.length) * 100}%` : '0%';
   const roomStatus = (status: string) => status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : status === 'MAINTENANCE' ? <span className="pill amber">Bảo trì</span> : <span className="pill gray">Ngừng hoạt động</span>;
@@ -138,11 +186,14 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   return <AdminShell product="Business" logoUrl={activeTenant ? logoUrl : null} nav={activeTenant ? nav : []} active={section} onSelect={selectMerchant}
     title={activeTenant ? titles[section] : 'Chọn merchant'} subtitle={activeTenant ? (currentBranch ? `${currentBranch.name} · ${currentBranch.timezone}` : 'Chưa chọn chi nhánh') : 'Nhập Tenant ID được cấp để mở dữ liệu'}
     actions={activeTenant && branches.length > 0 ? <label className="sr-label"><span className="visually-hidden">Chi nhánh</span><select aria-label="Chi nhánh" value={branch} onChange={e => { setRooms([]); setBranch(e.target.value); }}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label> : undefined}
-    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && <button type="button" onClick={() => { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); }}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
+    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && (tenants?.length ?? 0) !== 1 && <button type="button" onClick={switchMerchant}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
     {error && <div role="alert" className="error">{error}</div>}
     {me?.tenantStatus === 'INACTIVE' && <div role="alert" className="error suspended-banner"><strong>Merchant đang bị Platform khoá.</strong> Khách không thấy chi nhánh và không giữ chỗ mới được; giữ chỗ và booking hiện có vẫn xử lý bình thường.</div>}
     <RolesProvider value={roles}>
-    {!activeTenant ? <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><Store size={18} aria-hidden /></span>Chọn Merchant</div><p>Nhập mã Tenant ID được cấp để mở dữ liệu chi nhánh, phòng và lịch đặt.</p>{tenantForm}</section> : <>
+    {!activeTenant ? <section className="card tenant-card tenant-picker" aria-labelledby="picker-title"><div className="kpi-head"><span className="kpi-icon"><Store size={18} aria-hidden /></span><span id="picker-title">Chọn merchant</span></div>
+      {tenants === null ? <p role="status">Đang tải danh sách merchant…</p> : tenants.length === 0 ? <div className="notice">Tài khoản này chưa thuộc merchant nào đang hoạt động. Platform Admin vào <a href="/platform">khu Platform</a>.</div>
+        : <><p>Bạn có quyền ở {tenants.length} merchant. Chọn merchant để mở; lần sau trình duyệt này sẽ tự mở lại merchant vừa chọn.</p><div className="tenant-list">{tenants.map(item => <button type="button" key={item.tenantId} className="tenant-option" data-tenant-id={item.tenantId} onClick={() => openTenant(item.tenantId)}><strong>{item.tenantName}</strong><small>{item.roles.map(role => roleLabel[role as Role] ?? role).join(', ')}</small>{item.tenantStatus === 'INACTIVE' && <span className="pill rose">Đang bị khoá</span>}</button>)}</div></>}
+      <details className="outcome-form"><summary>Nhập Tenant ID thủ công</summary>{tenantForm}</details></section> : <>
       {section === 'overview' && <>
         <div className="kpi-grid">
           <div className="kpi"><div className="kpi-head"><span className="kpi-icon"><Building2 size={18} aria-hidden /></span>Chi nhánh</div><strong>{branches.length}</strong><small>được cấp quyền</small></div>
@@ -191,7 +242,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         <MerchantDocuments key={`documents:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
       </>}
       {section === 'settings' && <>
-        <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><ShieldCheck size={18} aria-hidden /></span>Merchant đang mở</div><p>Tenant {activeTenant}. Đổi sang merchant khác bằng Tenant ID.</p>{tenantForm}</section>
+        <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><ShieldCheck size={18} aria-hidden /></span>Merchant đang mở</div><p><strong>{me?.tenantName ?? 'Merchant'}</strong> · Tenant {activeTenant}</p>{(tenants?.length ?? 0) > 1 && <div className="hold-actions"><button type="button" className="secondary" onClick={switchMerchant}>Đổi merchant</button></div>}</section>
         {sessionsCard}
         {isOwner !== false && <OpsBacklog key={`ops-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />}
         {isOwner !== false && <AuditLog key={`audit:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />}

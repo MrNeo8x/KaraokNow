@@ -1,7 +1,7 @@
 // Role checks (QA-003) for Branch Manager, Receptionist and Cashier, plus merchant suspension (PLT-003) and public
 // lookup rate limiting (429). Pass criteria follow the business rules: each role can do what the backend allows, and a
 // forbidden action ends with a clear Vietnamese message instead of a raw backend error.
-import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter, api, loginToken, goSection } from './lib.mjs';
+import { BASE, TENANT, OWNER, PLATFORM, SHOTS, launch, reporter, api, loginToken, goSection, selectTenant } from './lib.mjs';
 
 const { log, finish } = reporter();
 const ROLES = {
@@ -49,7 +49,7 @@ async function roleSession(key, label, run) {
   page.on('dialog', dialog => dialog.accept());
   const step = async (name, fn) => { try { log(true, `${label}: ${name}`, (await fn()) ?? ''); } catch (error) { log(false, `${label}: ${name}`, error.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/roles-${key}-${name.replace(/[^\p{L}\d]+/gu, '-').slice(0, 40)}.png`, fullPage: true }); } };
   await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(ROLES[key].email); await page.getByLabel('Mật khẩu').fill(ROLES[key].password); await page.getByRole('button', { name: 'Đăng nhập' }).click();
-  await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); await page.waitForTimeout(1200);
+  await selectTenant(page, TENANT); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); await page.waitForTimeout(1200);
   await step('menu không có mục chỉ dành cho Owner', async () => { for (const name of ['Người dùng', 'Marketplace']) if (await page.locator('.admin-sidebar').getByRole('button', { name, exact: true }).count()) throw new Error(`vẫn hiện ${name}`); });
   await goSection(page, 'Lịch & Đặt phòng');
   const holdCard = page.locator('section[aria-labelledby="hold-lookup-title"]');
@@ -117,7 +117,7 @@ await roleSession('cashier', 'Thu ngân', async ({ page, step, holdCard, ops, lo
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); page.setDefaultTimeout(8000);
   const step = async (name, fn) => { try { log(true, `khoá merchant: ${name}`, (await fn()) ?? ''); } catch (error) { log(false, `khoá merchant: ${name}`, error.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/roles-suspended.png`, fullPage: true }); } };
   await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(email); await page.getByLabel('Mật khẩu').fill(fresh); await page.getByRole('button', { name: 'Đăng nhập' }).click();
-  await page.getByLabel('Tenant ID').fill(merchant.tenantId); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor({ timeout: 15000 });
+  await selectTenant(page, merchant.tenantId); await page.locator('.kpi').first().waitFor({ timeout: 15000 });
   await step('Owner thấy cảnh báo merchant đang bị khoá', async () => page.locator('.pill', { hasText: 'Merchant đang bị khoá' }).innerText());
   await step('tạo hold walk-in bị chặn với thông báo tiếng Việt', async () => {
     await goSection(page, 'Lịch & Đặt phòng');

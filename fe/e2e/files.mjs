@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { BASE, TENANT, OWNER, PLATFORM, ARTIFACTS, SHOTS, launch, reporter, api, loginToken, goSection } from './lib.mjs';
+import { BASE, TENANT, OWNER, PLATFORM, ARTIFACTS, SHOTS, launch, reporter, api, loginToken, goSection, selectTenant } from './lib.mjs';
 
 const { log, finish } = reporter();
 const RECEPTION = { email: process.env.E2E_RECEPTION_EMAIL ?? 'uat.reception@karaokenow.local', password: process.env.E2E_RECEPTION_PASSWORD ?? 'Uat-reception-password-2026!' };
@@ -44,7 +44,7 @@ const step = async (name, fn) => { try { log(true, name, (await fn()) ?? ''); } 
 const docTitle = `Giấy phép E2E ${Date.now()}`;
 try {
   await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(OWNER.email); await page.getByLabel('Mật khẩu').fill(OWNER.password); await page.getByRole('button', { name: 'Đăng nhập' }).click();
-  await page.getByLabel('Tenant ID').fill(TENANT); await page.getByRole('button', { name: 'Áp dụng' }).click(); await page.locator('.kpi').first().waitFor();
+  await selectTenant(page, TENANT); await page.locator('.kpi').first().waitFor();
   const media = page.locator('section[aria-labelledby="media-title"]');
   await step('Ảnh phòng: nén trên trình duyệt trước khi tải lên', async () => {
     await goSection(page, 'Phòng hát'); await media.getByLabel('Chọn ảnh phòng').setInputFiles(photo);
@@ -107,7 +107,7 @@ try {
   const rctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const rpage = await rctx.newPage(); rpage.setDefaultTimeout(15000);
   try {
     await rpage.goto(BASE + '/merchant'); await rpage.getByLabel('Email').fill(RECEPTION.email); await rpage.getByLabel('Mật khẩu').fill(RECEPTION.password); await rpage.getByRole('button', { name: 'Đăng nhập' }).click();
-    await rpage.getByLabel('Tenant ID').fill(TENANT); await rpage.getByRole('button', { name: 'Áp dụng' }).click(); await rpage.locator('.kpi').first().waitFor(); await rpage.waitForTimeout(1200);
+    await selectTenant(rpage, TENANT); await rpage.locator('.kpi').first().waitFor(); await rpage.waitForTimeout(1200);
     await goSection(rpage, 'Phòng hát'); const section = rpage.locator('section[aria-labelledby="media-title"]'); await section.waitFor(); await rpage.waitForTimeout(800);
     log(!(await section.getByLabel('Chọn ảnh phòng').count()), 'Lễ tân: xem ảnh phòng, không có nút tải ảnh');
   } catch (error) { log(false, 'Lễ tân: xem ảnh phòng, không có nút tải ảnh', error.message.split('\n')[0]); }

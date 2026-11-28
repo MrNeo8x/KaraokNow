@@ -360,3 +360,10 @@ main.admin-content { margin: 0; }
 @media (max-width: 700px) { .media-preview { grid-template-columns: 1fr; } }
 .file-drop.compact { padding: 9px 14px; border-width: 1px; font-size: 13px; }
 .branch-option img.merchant-logo { object-fit: contain; background: #fff; border: 1px solid var(--border); padding: 4px; }
+/* Session restore and merchant picker (FE-012) */
+.auth-restoring { min-height: 100vh; display: grid; place-content: center; justify-items: center; gap: 12px; background: var(--page); color: var(--muted); }
+.tenant-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.tenant-option { display: grid; gap: 4px; justify-items: start; text-align: left; padding: 14px; border: 1px solid var(--border-strong); border-radius: 12px; background: #fff; color: var(--text); }
+.tenant-option:hover { border-color: var(--brand-500); background: var(--brand-50); }
+.tenant-option strong { font-size: 15px; }
+.tenant-option small { color: var(--muted); }
