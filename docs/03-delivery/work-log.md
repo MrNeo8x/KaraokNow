@@ -27,6 +27,33 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: deploy VEN-004/005, FE-011/018/019/020, RPT-001/002
+
+- Áp lên Prisma **trước** push: `20261124070000_branch_location`, `20261124080000_branch_opening_hours` (cột nullable + CHECK chấp nhận NULL — tương thích ngược); `20261124060000` đã có từ lần trước. Production 30 migration (local cũng 30).
+- Kiểm tra worktree sạch tại `d76ad76` (HEAD đổi nhiều lần trong lúc kiểm — luôn kiểm lại commit mới trước push): BE verify 71/71, E2E 55/55; FE 67/67, `types:check` khớp, `tsc`, `build`. Ở `98920cf` FE `types:check` từng lệch (CI sẽ đỏ) — `3a677bf` của Luồng FE đã sửa trước khi push.
+- Người dùng push 11 commit `b558901`…`d76ad76`; hai project READY `d76ad76`. Smoke: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` 200, báo cáo `merchant/reports/{bookings,occupancy,channels}` và `platform/reports/{overview,merchants}` không auth → 401.
+- Chưa: kiểm màn báo cáo/giờ mở cửa/địa chỉ bằng tài khoản thật trên trình duyệt; nhập địa chỉ/SĐT/giờ mở cửa cho 2 chi nhánh Majestic (dữ liệu trong VEN-004). `20261124090000_support_sessions` đang dở chưa commit — phải áp lên production trước lần push chứa nó.
+
+---
+
+## 2026-11-28 — Session triển khai: deploy BKG-011, OPS-003, FE-017/IAM-008
+
+- Theo `deploy-vercel.md`: worktree sạch tại `45a14e2` — BE verify 67/67, E2E 50/50; FE 56/56, `tsc`, `build`. Biến mới `JOB_*_MAX_LAG_MINUTES` tuỳ chọn (mặc định 1560) → không đặt trên Vercel.
+- Áp `20261124060000_platform_user_management` lên Prisma **trước** push (bảng `platform_audit_logs`, cột nullable `users.disabled_*`, `platform_admins.granted_by/revoked_by` — tương thích ngược). Production: 28 migration.
+- Người dùng push `f5849dc`, `8d420c3`, `45a14e2`; hai project READY `45a14e2`. Smoke: trang/health 200, `/docs` + cron 404, `GET /v1/health/jobs` 200 `status: ok` (hold quá hạn 0, outbox 0, ngưỡng 1560 phút), `/v1/platform/users` không auth → 401; kiểm tra read-only DB: đủ cột/bảng mới.
+- Chưa kiểm màn Người dùng bằng tài khoản Platform Admin trên trình duyệt (agent không giữ mật khẩu admin).
+
+---
+
+## 2026-11-28 — Session triển khai: Vercel Blob trên production (OPS-008)
+
+- Gắn hai store Blob vào `vn-karaoke-now-api` (`--prefix BLOB_PUBLIC|BLOB_PRIVATE --auth token --add-rw-token`, production + preview) → `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN` đúng tên code đọc. Thử thật bằng `ObjectStorageService` + token production: ghi/đọc/xoá cả public và private, public qua CDN 200; không để lại file.
+- Kiểm tra trên worktree sạch (BE và FE đều có việc dở chưa commit): lần đầu E2E 46 fail và `openapi:check` thoát 1 vì worktree thiếu `be/.env` (gitignore) — copy `.env` local thì pass. Session BE thêm `8029594` (BKG-010, không migration/dependency) giữa chừng → chạy lại BE tại `8029594`: verify 65/65, E2E 46/46.
+- Áp `20261124050000_file_storage` lên Prisma trước push (bảng mới, tương thích ngược). Người dùng push 8 commit `560e3e9`…`8029594`; hai project READY. Smoke: trang/health 200, `/docs` + cron 404, route upload ảnh phòng/logo/documents (merchant + platform) không auth → 401, catalog công khai 200.
+- Còn lại (OPS-008 → VERIFY): Owner thử upload/xoá ảnh phòng, logo, PDF trên giao diện production. Hai store Blob vẫn gắn cả vào project FE (không dùng).
+
+---
+
 ## 2026-11-28 — Luồng BE: Super Admin hỗ trợ merchant (IAM-009, PD-045) và Platform Admin kiêm Owner (IAM-010, PD-046)
 
 - Người dùng: admin cao nhất của Platform xem được tính năng của merchant để hỗ trợ khi lỗi; và Platform Admin có thể kiêm Owner merchant nếu được phân/mời. PO chọn: cấp Super Admin riêng, chỉ xem, lý do + 60 phút + audit hai phía, che một phần SĐT/email → PD-045. Kiêm nhiệm → PD-046 (đã hỗ trợ sẵn, bổ sung E2E).

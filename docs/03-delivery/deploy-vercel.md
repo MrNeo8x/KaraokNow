@@ -11,6 +11,7 @@ Tài liệu bắt buộc cho mọi lần đưa code lên production (người ho
 | FE | project `vn-karaoke-now`, Root Directory `fe`, Next.js → https://vn-karaoke-now.vercel.app |
 | BE | project `vn-karaoke-now-api`, Root Directory `be`, NestJS (một Vercel Function) → https://vn-karaoke-now-api.vercel.app |
 | Database | Prisma Postgres `prisma-postgres-cerulean-drawer` (PostgreSQL 17), **chỉ gắn vào project BE** (đã gỡ khỏi FE 2026-11-28; FE không được truy cập PostgreSQL). Không gắn lại vào FE |
+| File | Vercel Blob `vn-karaoke-now-blob-pub` (public) và `vn-karaoke-now-blob-pri` (private), gắn vào project BE (OPS-008) |
 | Worker | Vercel Cron trong `be/vercel.json` → `GET /v1/internal/cron/hold-expiry`, `/v1/internal/cron/outbox` |
 
 Luồng request: trình duyệt → FE (`/v1/*` được Next.js rewrite) → BE → PostgreSQL. Trình duyệt không gọi thẳng BE.
@@ -23,7 +24,7 @@ Luồng request: trình duyệt → FE (`/v1/*` được Next.js rewrite) → BE
 | BE | `JWT_SECRET`, `CRON_SECRET` | Sensitive, sinh ngẫu nhiên, không lưu ở đâu khác; `vercel env pull` **không** trả giá trị thật. Cần dùng `CRON_SECRET` (gọi cron/chẩn đoán tay) thì đổi giá trị bằng `vercel env update` rồi deploy lại. Đổi `JWT_SECRET` = mọi phiên đăng nhập mất hiệu lực |
 | BE | `SWAGGER_ENABLED=false`, `PG_POOL_MAX=5` | Không bật Swagger trên production |
 | BE | `CLIENT_IP_HEADER=x-real-ip` | OPS-007: IP khách cho hạn mức công khai. Vercel ghi đè header này ở edge (đã đo: không giả mạo được, giữ đúng IP qua FE rewrite). Không đặt `TRUST_PROXY_HOPS` (`req.ip` trên Vercel là `127.0.0.1`), không dùng `cf-connecting-ip` |
-| BE | `BLOB_PUBLIC_READ_WRITE_TOKEN` (hoặc `BLOB_READ_WRITE_TOKEN`), `BLOB_PRIVATE_READ_WRITE_TOKEN` | PD-037: token read-write của store `vn-karaoke-now-blob-pub` (ảnh phòng, logo) và `vn-karaoke-now-blob-pri` (giấy tờ PDF). Nối store vào `vn-karaoke-now-api` với custom prefix `BLOB_PUBLIC` / `BLOB_PRIVATE` và **tick tạo read-write token**; nếu tên biến Vercel tạo khác thì đặt đúng hai tên trên. Thiếu token → API upload trả 503 (BE không ghi xuống đĩa của function), các API khác vẫn chạy. **Chưa đặt** — xem OPS-008 |
+| BE | `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN` | PD-037/OPS-008: token read-write (sensitive) của store `vn-karaoke-now-blob-pub` (access public — ảnh phòng, logo) và `vn-karaoke-now-blob-pri` (access private — giấy tờ PDF), vùng `sin1`. Gắn bằng `vercel storage connect <store> -p vn-karaoke-now-api --prefix BLOB_PUBLIC|BLOB_PRIVATE -e production -e preview --auth token --add-rw-token`. Thiếu token → API upload trả 503, API khác vẫn chạy. Hai store cũng đang gắn vào project FE (FE không dùng) — gỡ theo hướng dẫn gắn/gỡ storage nếu muốn |
 | FE | `BACKEND_API_ORIGIN=https://vn-karaoke-now-api.vercel.app` | Đọc lúc **build**; đổi xong phải redeploy FE |
 
 Biến mới: thêm cho cả `production` và `preview` (`vercel env add <TÊN> <env> --project <project>`), ghi vào bảng trên và `be/.env.example`. Biến bắt buộc mới mà thiếu trên Vercel → function crash khi khởi động (`validateEnvironment`).
@@ -139,8 +140,6 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 - **Redis `redis-byzantium-mirror`** (người dùng cho phép dùng làm cache khi cần, 2026-11-28): **chưa dùng** — phiên, hạn mức và khoá đều ở PostgreSQL trong transaction. Chỉ thêm khi có số đo cho thấy cần cache (ví dụ catalog công khai), qua một service bọc riêng; không đưa trạng thái tiền/booking vào Redis.
 
 - **BKG-010 + FE-016** (PD-038, mã đặt phòng 6 ký tự): không có migration, nhưng **BE và FE phải cùng một lần push** — BE đổi định dạng mã, FE cũ chặn tra cứu với mã không phải 32 hex. Chỉ push khi FE-016 đã commit; smoke: giữ chỗ → mã 6 ký tự → tra cứu bằng chữ thường.
-
-- **OPS-008** (PD-037): nối hai store Blob vào project BE với read-write token, áp migration `20261124050000_file_storage` (chỉ thêm cột nullable và bảng mới — tương thích ngược), push, smoke upload ảnh phòng/logo/PDF rồi xoá thử.
 
 - **OPS-002**: backup/restore cho Prisma Postgres.
 - Cân nhắc tách database preview khỏi production (quy tắc 5).
