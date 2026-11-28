@@ -2,25 +2,25 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau VEN-007)
+## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau BKG-008)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `0de3b9a` (FE-022 thư viện ảnh; gồm BE VEN-006 `eb9e128`). **Chưa push:** `9fa051c` BE VEN-007 ảnh phòng cho khách (không migration; OpenAPI đổi → Frontend CI `types:check` đỏ tới khi FE-023 sinh lại type — nên push cùng FE-023), `bb47b38` bind mount lưu file local, và commit tài liệu này.
+**Code trên `main`:** `origin/main` = `cb63c9a` — đã gồm BE VEN-007 `9fa051c` (ảnh phòng cho khách, không migration), `bb47b38`, FE-022. **Chưa push:** `23837c3` BE BKG-008 miễn cọc theo trường hợp (**migration `20261124110000_deposit_exemptions` — áp lên Prisma trước push**; OpenAPI đổi → push cùng FE-024) và commit tài liệu này. **Frontend CI** có thể đang đỏ (`types:check`) từ khi VEN-007 lên `main` mà FE-023 chưa sinh lại type.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **60/60** (sau BKG-008); diễn tập khôi phục local `counts_match=yes`. FE (FE-022) theo nhật ký Luồng FE. Local: `GET /v1/public/branches/{id}/rooms` trả 4–5 ảnh mỗi phòng Majestic.
+**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **60/60** (sau BKG-008); benchmark sau BKG-008 đạt (tìm phòng 29,5 ms, tranh chấp 166 ms, xác nhận 41 ms); migration `20261124110000` up → down → up; diễn tập khôi phục local `counts_match=yes`.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **32 migration** (đến `20261124100000_venue_photos`); backend `:3000` chạy `9fa051c`; file upload ở **`be/.storage`** (bind mount `./.storage:/app/.storage`, gitignore — giữ qua rebuild; có 36 file demo Majestic). Seed UAT (Platform Admin UAT là Super Admin); dữ liệu demo MAJESTIC (6 phòng, 28 ảnh phòng, 8 ảnh chi nhánh, bảng giá `MAJESTIC_STD`) do session triển khai tạo. `/v1/health/jobs` local 503 vì worker tắt (bình thường).
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **33 migration** (đến `20261124110000_deposit_exemptions`); backend `:3000` chạy `23837c3`; file upload ở `be/.storage` (bind mount, giữ qua rebuild; 36 file demo Majestic). Seed UAT (Platform Admin UAT là Super Admin) + dữ liệu demo MAJESTIC. `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
-**Production (Vercel):** `0de3b9a`; Prisma **32 migration** (đến `20261124100000_venue_photos` — theo nhật ký triển khai đã áp **sau** khi VEN-006 READY ~6 phút, không thấy 5xx). MAJESTIC đã có dữ liệu demo, công khai và được duyệt (ảnh stock Unsplash, không phải phòng thật). 2/2 Platform Admin là Super Admin. Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Backup workflow chờ secret (OPS-010). Preview Vercel dùng chung DB production. Quy trình: `docs/03-delivery/deploy-vercel.md`.
+**Production (Vercel):** code tới `cb63c9a` (gồm VEN-007); Prisma **32 migration** (đến `20261124100000_venue_photos`). MAJESTIC có dữ liệu demo công khai (ảnh stock). 2/2 Platform Admin là Super Admin. Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Backup workflow chờ secret (OPS-010). Preview Vercel dùng chung DB production. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Session triển khai: mục nhật ký "dữ liệu demo Karaoke Majestic" trong `work-log.md` (và dòng VEN-007 trong task board trùng nội dung đã commit) chưa commit — không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Session triển khai: mục nhật ký "dữ liệu demo Karaoke Majestic" trong `work-log.md` chưa commit — không commit hộ.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* thêm secret backup và chạy tay workflow (OPS-010); đăng ký uptime monitor (OPS-009); UAT nhóm A–R; thay ảnh demo Majestic bằng ảnh thật khi có; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB.
-- *Session triển khai:* push `9fa051c` cùng FE-023 (không migration); commit nhật ký demo Majestic; nhắc: luôn áp migration trước push.
-- *Luồng FE:* **FE-023** ảnh phòng thật trên trang khách (handoff "FE READY — ảnh phòng cho khách", `types:generate`); các task FE khác `VERIFY`.
+- *Người dùng / PO:* thêm secret backup và chạy tay workflow (OPS-010); đăng ký uptime monitor (OPS-009); UAT nhóm A–S (thêm S: miễn cọc theo trường hợp); thay ảnh demo Majestic bằng ảnh thật; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB.
+- *Session triển khai:* lần push chứa `23837c3`: áp `20261124110000_deposit_exemptions` trước, push cùng FE-024 (và FE-023 nếu chưa), smoke `GET /v1/merchant/booking/deposit-exemptions` không auth → 401; commit nhật ký demo Majestic.
+- *Luồng FE:* **FE-023** ảnh phòng thật trên trang khách, **FE-024** màn miễn cọc theo trường hợp (handoff "FE READY — miễn cọc theo trường hợp"); chạy `types:generate` trước.
 - *Luồng BE:* không còn task không bị chặn — IAM-004 (ZBS), OPS-010 (secret), PAY-002–004 (sau pilot).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
