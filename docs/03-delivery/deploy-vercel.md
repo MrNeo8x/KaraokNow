@@ -10,7 +10,7 @@ Tài liệu bắt buộc cho mọi lần đưa code lên production (người ho
 | Repo | GitHub `MrNeo8x/KaraokNow`, nhánh production `main` |
 | FE | project `vn-karaoke-now`, Root Directory `fe`, Next.js → https://vn-karaoke-now.vercel.app |
 | BE | project `vn-karaoke-now-api`, Root Directory `be`, NestJS (một Vercel Function) → https://vn-karaoke-now-api.vercel.app |
-| Database | Prisma Postgres `prisma-postgres-cerulean-drawer` (PostgreSQL 17), gắn vào cả hai project |
+| Database | Prisma Postgres `prisma-postgres-cerulean-drawer` (PostgreSQL 17), **chỉ gắn vào project BE** (đã gỡ khỏi FE 2026-11-28; FE không được truy cập PostgreSQL). Không gắn lại vào FE |
 | Worker | Vercel Cron trong `be/vercel.json` → `GET /v1/internal/cron/hold-expiry`, `/v1/internal/cron/outbox` |
 
 Luồng request: trình duyệt → FE (`/v1/*` được Next.js rewrite) → BE → PostgreSQL. Trình duyệt không gọi thẳng BE.
@@ -27,6 +27,8 @@ Luồng request: trình duyệt → FE (`/v1/*` được Next.js rewrite) → BE
 | FE | `BACKEND_API_ORIGIN=https://vn-karaoke-now-api.vercel.app` | Đọc lúc **build**; đổi xong phải redeploy FE |
 
 Biến mới: thêm cho cả `production` và `preview` (`vercel env add <TÊN> <env> --project <project>`), ghi vào bảng trên và `be/.env.example`. Biến bắt buộc mới mà thiếu trên Vercel → function crash khi khởi động (`validateEnvironment`).
+
+Gắn/gỡ storage (Prisma, Blob): gắn thì `vercel storage connect <store> -p <project>`; **gỡ** (`vercel storage disconnect`) bị CLI chặn với agent và với lệnh `!` trong Claude Code — người dùng tự gỡ trên dashboard (project → Storage → Disconnect) hoặc trong terminal tương tác riêng, sau đó kiểm tra bằng `vercel storage list`.
 
 Env chỉ có hiệu lực ở lần deploy **mới**. Đổi env mà không có commit mới: `vercel redeploy <url bản production hiện tại> --target production` — build lại đúng commit Git đó (không tải working tree lên), được phép theo quy tắc 2.
 
@@ -116,5 +118,4 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 - **OPS-008** (PD-037): nối hai store Blob vào project BE với read-write token, áp migration `20261124050000_file_storage` (chỉ thêm cột nullable và bảng mới — tương thích ngược), push, smoke upload ảnh phòng/logo/PDF rồi xoá thử.
 
 - **OPS-002**: backup/restore cho Prisma Postgres.
-- Project FE đang nhận biến database do Prisma gắn (FE không dùng) — có thể gỡ kết nối storage khỏi `vn-karaoke-now`.
 - Cân nhắc tách database preview khỏi production (quy tắc 5).
