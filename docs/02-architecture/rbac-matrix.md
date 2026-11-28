@@ -25,6 +25,7 @@ This is the conservative authorization baseline implemented for the current venu
 | Reverse a deposit, CASH payment or surcharge | Yes, all tenant branches | Assigned only | No | No |
 | List unresolved expired-hold deposits; read daily cash report | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Resolve an expired-hold deposit (refund/keep) | Yes, all tenant branches | Assigned only | No | No |
+| View/download reports (`/v1/merchant/reports/bookings|occupancy|channels`, JSON or CSV) | Yes, all tenant branches | Assigned only | No | No |
 | Set branch address, phone and Google Maps location; preview a Maps link (`POST /v1/merchant/branch-location/resolve`) | Yes, all tenant branches | Assigned only | No | No |
 | Upload/delete room photos (public store) | Yes, all tenant branches | Assigned only | No | No |
 | Read the merchant logo | Yes | Yes | Yes | Yes |
@@ -46,3 +47,5 @@ Platform user management (PD-040), all under `AuthGuard` → `PlatformAdminGuard
 Any signed-in user may list their own active merchant memberships (`GET /v1/me/tenants`: tenant name, status and their roles; no X-Tenant-ID, no other members' data) — PD-039.
 
 Platform Admins may list and download any merchant's PDF documents (`/v1/platform/merchants/{tenantId}/documents`) for listing review (PD-037).
+
+Platform reports (`GET /v1/platform/reports/overview|merchants`, JSON or CSV) require the Platform Admin grant; they return counts and money totals per merchant, no customer data (PD-044).

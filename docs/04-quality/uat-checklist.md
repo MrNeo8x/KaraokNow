@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-043` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-044` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -137,6 +137,15 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H4 | Cashier, Branch Manager | Để một hold đã thu cọc hết hạn; mở danh sách "cọc chờ xử lý"; Quản lý ghi hoàn một phần với lý do | Hold hiện trong danh sách; hoàn vượt cọc bị chặn; sau khi ghi, hold biến khỏi danh sách và báo số giữ lại | PD-036 | | |
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
+
+### P. Báo cáo và thống kê (PD-044)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| P1 | Owner | Xem báo cáo booking & doanh thu tuần này, theo ngày và theo tháng | Số booking theo trạng thái và tiền thực thu khớp báo cáo tiền mặt từng ngày | PD-044 | | |
+| P2 | Owner, Branch Manager | Xem công suất phòng và giờ cao điểm; Branch Manager chọn chi nhánh không được giao | Tỷ lệ lấp đầy theo phòng; Branch Manager bị chặn | PD-044 | | |
+| P3 | Owner | Xem kênh & chuyển đổi; tải CSV và mở bằng Excel | Tiếng Việt hiển thị đúng; không có SĐT khách | PD-044 | | |
+| P4 | Platform Admin | Xem tổng quan nền tảng và bảng theo merchant; tải CSV | Merchant mới, booking theo kỳ, merchant chờ duyệt đúng | PD-044 | | |
 
 ### O. Giờ lẻ và giờ mở cửa (PD-043)
 

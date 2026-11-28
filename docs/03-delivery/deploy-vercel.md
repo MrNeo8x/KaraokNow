@@ -121,6 +121,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **RPT-001** (báo cáo): không migration, không env. Truy vấn tổng hợp trên bảng booking/tiền hiện có; theo dõi thời gian phản hồi khi dữ liệu lớn.
+
 - **PD-043** (giờ lẻ 15 phút, giờ mở cửa chi nhánh): **migration `20261124080000_branch_opening_hours` trước push** (cột nullable + CHECK). Chi nhánh chưa đặt giờ mở cửa = không giới hạn, nên không ảnh hưởng đặt phòng hiện tại; chỉ thêm ràng buộc giờ chia hết 15 phút cho khách. Push cùng lần với commit FE sinh lại type (`types:check`).
 
 - **VEN-004** (PD-042, địa chỉ/SĐT/vị trí chi nhánh): **migration `20261124070000_branch_location` phải áp lên Prisma trước khi push** (cột nullable + CHECK — tương thích ngược). Function BE gọi ra `maps.app.goo.gl`/`google.com` để mở link rút gọn (không cần env). Sau deploy: Owner MAJESTIC nhập địa chỉ/SĐT/link cho `LA_KHE`, `THANH_HA` qua giao diện (không seed).

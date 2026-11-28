@@ -20,6 +20,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { StorageModule } from './platform/storage/storage.module';
 import { MerchantDocumentsModule } from './merchant-documents/merchant-documents.module';
 import { PlatformUsersModule } from './platform-users/platform-users.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PlatformUsersModule } from './platform-users/platform-users.module';
     StorageModule,
     MerchantDocumentsModule,
     PlatformUsersModule,
+    ReportsModule,
     VenueModule,
     AuditModule,
     AvailabilityModule,

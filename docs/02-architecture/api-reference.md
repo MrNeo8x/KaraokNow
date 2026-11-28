@@ -728,6 +728,120 @@ Response được khai báo:
 | 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
 | 409 | Would leave the merchant without an active Owner | Chưa khai báo schema |
 
+### GET /v1/merchant/reports/bookings
+
+Nhóm: reports
+
+Bookings by service date and money by recorded date, per period. With format=csv the same rows are returned as text/csv (UTF-8 BOM)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `from` | Có | string — First local date (inclusive), YYYY-MM-DD |
+| query | `to` | Có | string — Last local date (inclusive); at most 366 days after from |
+| query | `groupBy` | Không | string — Period size (weeks start on Monday) |
+| query | `format` | Không | string — csv returns text/csv (UTF-8 with BOM) for spreadsheets |
+| query | `branchId` | Không | string — One branch; omitted = every branch the caller can see |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BookingReportDto"} |
+| 403 | Branch outside the caller scope | Chưa khai báo schema |
+| 422 | Invalid range (max 366 days) | Chưa khai báo schema |
+
+### GET /v1/merchant/reports/occupancy
+
+Nhóm: reports
+
+Room occupancy and peak start hours. With format=csv the same rows are returned as text/csv (UTF-8 BOM) (one row per room)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `from` | Có | string — First local date (inclusive), YYYY-MM-DD |
+| query | `to` | Có | string — Last local date (inclusive); at most 366 days after from |
+| query | `groupBy` | Không | string — Period size (weeks start on Monday) |
+| query | `format` | Không | string — csv returns text/csv (UTF-8 with BOM) for spreadsheets |
+| query | `branchId` | Không | string — One branch; omitted = every branch the caller can see |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/OccupancyReportDto"} |
+
+### GET /v1/merchant/reports/channels
+
+Nhóm: reports
+
+Holds by channel and conversion to bookings. With format=csv the same rows are returned as text/csv (UTF-8 BOM)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| query | `from` | Có | string — First local date (inclusive), YYYY-MM-DD |
+| query | `to` | Có | string — Last local date (inclusive); at most 366 days after from |
+| query | `groupBy` | Không | string — Period size (weeks start on Monday) |
+| query | `format` | Không | string — csv returns text/csv (UTF-8 with BOM) for spreadsheets |
+| query | `branchId` | Không | string — One branch; omitted = every branch the caller can see |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/ChannelReportDto"} |
+
+### GET /v1/platform/reports/overview
+
+Nhóm: reports
+
+Platform growth and activity per period (Vietnam time) plus a current snapshot. With format=csv the same rows are returned as text/csv (UTF-8 BOM)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `from` | Có | string — First local date (inclusive), YYYY-MM-DD |
+| query | `to` | Có | string — Last local date (inclusive); at most 366 days after from |
+| query | `groupBy` | Không | string — Period size (weeks start on Monday) |
+| query | `format` | Không | string — csv returns text/csv (UTF-8 with BOM) for spreadsheets |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformOverviewDto"} |
+| 403 | Caller is not a Platform Admin | Chưa khai báo schema |
+
+### GET /v1/platform/reports/merchants
+
+Nhóm: reports
+
+Activity per merchant in the range (counts and money totals only). With format=csv the same rows are returned as text/csv (UTF-8 BOM)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `from` | Có | string — First local date (inclusive), YYYY-MM-DD |
+| query | `to` | Có | string — Last local date (inclusive); at most 366 days after from |
+| query | `groupBy` | Không | string — Period size (weeks start on Monday) |
+| query | `format` | Không | string — csv returns text/csv (UTF-8 with BOM) for spreadsheets |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformMerchantReportDto"} |
+
 ### POST /v1/merchant/branches
 
 Nhóm: merchant venues
@@ -3863,6 +3977,551 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   },
   "required": [
     "reason"
+  ]
+}
+```
+
+### BookingReportRowDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "period": {
+      "type": "string",
+      "example": "2026-11-01",
+      "description": "Period start date"
+    },
+    "bookings": {
+      "type": "number",
+      "description": "Bookings whose start falls in the period (service date)"
+    },
+    "upcoming": {
+      "type": "number"
+    },
+    "completed": {
+      "type": "number"
+    },
+    "cancelled": {
+      "type": "number"
+    },
+    "noShow": {
+      "type": "number"
+    },
+    "expectedRevenueVnd": {
+      "type": "string",
+      "description": "Price + net surcharges of bookings not cancelled/no-show, by service date"
+    },
+    "depositsVnd": {
+      "type": "string",
+      "description": "Deposits recorded in the period (by recorded date, same as the cash report)"
+    },
+    "bookingCashVnd": {
+      "type": "string"
+    },
+    "reversalsVnd": {
+      "type": "string",
+      "description": "Reversed deposits and cash payments"
+    },
+    "refundsVnd": {
+      "type": "string"
+    },
+    "netCollectedVnd": {
+      "type": "string",
+      "description": "deposits + cash − reversals − refunds"
+    }
+  },
+  "required": [
+    "period",
+    "bookings",
+    "upcoming",
+    "completed",
+    "cancelled",
+    "noShow",
+    "expectedRevenueVnd",
+    "depositsVnd",
+    "bookingCashVnd",
+    "reversalsVnd",
+    "refundsVnd",
+    "netCollectedVnd"
+  ]
+}
+```
+
+### BookingReportDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "groupBy": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month"
+      ]
+    },
+    "branchIds": {
+      "description": "Branches included",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "totals": {
+      "$ref": "#/components/schemas/BookingReportRowDto"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/BookingReportRowDto"
+      }
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "groupBy",
+    "branchIds",
+    "totals",
+    "rows"
+  ]
+}
+```
+
+### RoomOccupancyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchName": {
+      "type": "string"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomName": {
+      "type": "string"
+    },
+    "bookedMinutes": {
+      "type": "number",
+      "description": "Minutes of confirmed/checked-in/completed bookings starting in the range (buffer excluded)"
+    },
+    "availableMinutes": {
+      "type": "number",
+      "description": "Days × daily opening minutes (1440 when the branch has no opening hours)"
+    },
+    "occupancyRate": {
+      "type": "number",
+      "description": "bookedMinutes / availableMinutes, 0–1 (4 decimals)"
+    }
+  },
+  "required": [
+    "branchId",
+    "branchName",
+    "roomId",
+    "roomName",
+    "bookedMinutes",
+    "availableMinutes",
+    "occupancyRate"
+  ]
+}
+```
+
+### PeakHourDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "weekday": {
+      "type": "number",
+      "description": "ISO weekday, 1 = Monday … 7 = Sunday"
+    },
+    "hour": {
+      "type": "number",
+      "description": "Local start hour 0–23"
+    },
+    "bookings": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "weekday",
+    "hour",
+    "bookings"
+  ]
+}
+```
+
+### OccupancyReportDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "branchIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bookedMinutes": {
+      "type": "number"
+    },
+    "availableMinutes": {
+      "type": "number"
+    },
+    "occupancyRate": {
+      "type": "number"
+    },
+    "rooms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/RoomOccupancyDto"
+      }
+    },
+    "peakHours": {
+      "description": "Only cells with at least one booking",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PeakHourDto"
+      }
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "branchIds",
+    "bookedMinutes",
+    "availableMinutes",
+    "occupancyRate",
+    "rooms",
+    "peakHours"
+  ]
+}
+```
+
+### ChannelRowDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "channel": {
+      "type": "string",
+      "example": "WEB"
+    },
+    "holds": {
+      "type": "number",
+      "description": "Holds created in the range (by created date)"
+    },
+    "confirmed": {
+      "type": "number",
+      "description": "Of those, holds that became bookings"
+    },
+    "expired": {
+      "type": "number",
+      "description": "Of those, holds that expired without a booking"
+    },
+    "conversionRate": {
+      "type": "number",
+      "description": "confirmed / holds, 0–1 (4 decimals)"
+    }
+  },
+  "required": [
+    "channel",
+    "holds",
+    "confirmed",
+    "expired",
+    "conversionRate"
+  ]
+}
+```
+
+### ChannelReportDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "branchIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "totals": {
+      "description": "All channels together (channel = \"ALL\")",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/ChannelRowDto"
+        }
+      ]
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ChannelRowDto"
+      }
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "branchIds",
+    "totals",
+    "rows"
+  ]
+}
+```
+
+### PlatformSnapshotDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "merchantsActive": {
+      "type": "number"
+    },
+    "merchantsSuspended": {
+      "type": "number"
+    },
+    "listingsPendingApproval": {
+      "type": "number",
+      "description": "Published listings waiting for Platform approval"
+    },
+    "listingsLive": {
+      "type": "number",
+      "description": "Listings visible to customers"
+    },
+    "merchantsWithBookings": {
+      "type": "number",
+      "description": "Merchants with at least one booking confirmed in the range"
+    },
+    "activeUsers": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "merchantsActive",
+    "merchantsSuspended",
+    "listingsPendingApproval",
+    "listingsLive",
+    "merchantsWithBookings",
+    "activeUsers"
+  ]
+}
+```
+
+### PlatformOverviewRowDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "period": {
+      "type": "string"
+    },
+    "newMerchants": {
+      "type": "number"
+    },
+    "newBranches": {
+      "type": "number"
+    },
+    "newUsers": {
+      "type": "number"
+    },
+    "holds": {
+      "type": "number"
+    },
+    "bookingsConfirmed": {
+      "type": "number",
+      "description": "Bookings confirmed in the period (by confirmation date)"
+    }
+  },
+  "required": [
+    "period",
+    "newMerchants",
+    "newBranches",
+    "newUsers",
+    "holds",
+    "bookingsConfirmed"
+  ]
+}
+```
+
+### PlatformOverviewDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "groupBy": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month"
+      ]
+    },
+    "timezone": {
+      "type": "string",
+      "example": "Asia/Ho_Chi_Minh"
+    },
+    "snapshot": {
+      "$ref": "#/components/schemas/PlatformSnapshotDto"
+    },
+    "totals": {
+      "$ref": "#/components/schemas/PlatformOverviewRowDto"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PlatformOverviewRowDto"
+      }
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "groupBy",
+    "timezone",
+    "snapshot",
+    "totals",
+    "rows"
+  ]
+}
+```
+
+### PlatformMerchantRowDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantName": {
+      "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "listingLive": {
+      "type": "boolean"
+    },
+    "branches": {
+      "type": "number"
+    },
+    "rooms": {
+      "type": "number"
+    },
+    "holds": {
+      "type": "number"
+    },
+    "bookings": {
+      "type": "number"
+    },
+    "completed": {
+      "type": "number"
+    },
+    "cancelled": {
+      "type": "number"
+    },
+    "noShow": {
+      "type": "number"
+    },
+    "conversionRate": {
+      "type": "number"
+    },
+    "expectedRevenueVnd": {
+      "type": "string"
+    },
+    "netCollectedVnd": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "tenantId",
+    "tenantName",
+    "tenantStatus",
+    "listingLive",
+    "branches",
+    "rooms",
+    "holds",
+    "bookings",
+    "completed",
+    "cancelled",
+    "noShow",
+    "conversionRate",
+    "expectedRevenueVnd",
+    "netCollectedVnd"
+  ]
+}
+```
+
+### PlatformMerchantReportDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PlatformMerchantRowDto"
+      }
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "rows"
   ]
 }
 ```

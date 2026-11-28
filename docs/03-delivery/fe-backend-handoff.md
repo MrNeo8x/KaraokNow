@@ -218,6 +218,21 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — báo cáo và thống kê (RPT-001, PD-044, 2026-11-28)
+
+**OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 53/53 (số liệu đối chiếu dữ liệu dựng sẵn, contract, CSV).
+
+Tham số chung (query): `from`, `to` (`YYYY-MM-DD`, ngày địa phương, gồm cả hai đầu, ≤ 366 ngày — sai → 422), `groupBy` = `day` | `week` (bắt đầu thứ Hai) | `month`, `format` = `json` (mặc định) | `csv`. Với `csv`: `text/csv; charset=utf-8` có BOM, `Content-Disposition: attachment` — tải bằng `requestBlob` có token rồi lưu file. `period` là ngày bắt đầu kỳ; `rows` có đủ mọi kỳ trong khoảng (kỳ trống = 0) để vẽ biểu đồ. Tiền là chuỗi VND nguyên.
+
+- Merchant (Owner, Branch Manager; header `X-Tenant-ID`; thêm `branchId` tuỳ chọn — Branch Manager chọn chi nhánh không được giao → 403; bỏ trống = mọi chi nhánh được thấy):
+  - `GET /v1/merchant/reports/bookings` → `{ from, to, groupBy, branchIds, totals, rows[] }`, mỗi dòng: `bookings, upcoming, completed, cancelled, noShow` (theo **ngày diễn ra**), `expectedRevenueVnd` (giá + phụ thu của booking không huỷ/no-show), `depositsVnd, bookingCashVnd, reversalsVnd, refundsVnd, netCollectedVnd` (theo **ngày ghi nhận**, khớp báo cáo tiền mặt). Ghi chú hai cách tính ngày này trên màn hình.
+  - `GET /v1/merchant/reports/occupancy` → `{ bookedMinutes, availableMinutes, occupancyRate, rooms[{ branchId, branchName, roomId, roomName, bookedMinutes, availableMinutes, occupancyRate }], peakHours[{ weekday 1=T2…7=CN, hour 0–23, bookings }] }` (heatmap: ô thiếu = 0). `groupBy` không dùng.
+  - `GET /v1/merchant/reports/channels` → `{ totals, rows[{ channel, holds, confirmed, expired, conversionRate }] }` (tỷ lệ 0–1). `WEB` = khách tự đặt.
+- Platform (Platform Admin, không `X-Tenant-ID`; giờ Việt Nam):
+  - `GET /v1/platform/reports/overview` → `{ snapshot{ merchantsActive, merchantsSuspended, listingsPendingApproval, listingsLive, merchantsWithBookings, activeUsers }, totals, rows[{ period, newMerchants, newBranches, newUsers, holds, bookingsConfirmed }] }`.
+  - `GET /v1/platform/reports/merchants` → `rows[{ tenantId, tenantName, tenantStatus, listingLive, branches, rooms, holds, bookings, completed, cancelled, noShow, conversionRate, expectedRevenueVnd, netCollectedVnd }]` (sắp theo số booking).
+- Lễ tân/Thu ngân: 403 (vẫn dùng báo cáo tiền mặt theo ngày).
+
 ## FE READY — giờ lẻ và giờ mở cửa (VEN-005, PD-043, 2026-11-28)
 
 **OpenAPI đổi → chạy `npm run types:generate` trước, nếu không `types:check` trong CI sẽ đỏ.** Đã qua build, drift check BE, PostgreSQL Docker E2E 52/52.

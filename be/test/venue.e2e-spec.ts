@@ -2164,6 +2164,93 @@ describe('Authentication, membership, RBAC and venue API', () => {
       .toMatchObject({ openingTime: null, closingTime: null });
   });
 
+  it('reports bookings, money, occupancy and channels for a merchant and the platform, with CSV (RPT-001, PD-044)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'RPT', name: 'Report branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'RPT-R', name: 'Report room', capacity: 8 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'RPT-PLAN', name: 'Report plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Report plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'RPT-RULE', name: 'Price', priority: 996, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/RPT_TEST').send({ allowed: true }).expect(200);
+    const duration = (await pool.query('SELECT min_duration_minutes AS m FROM tenant_booking_policies WHERE tenant_id=$1', [TENANT_A])).rows[0]?.m ?? 60;
+    // Local (Vietnam) dates: today and the following days.
+    const vnDate = (offsetDays: number) => new Date(Date.now() + 7 * 3600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
+    const today = vnDate(0), d2 = vnDate(2), d3 = vnDate(3), to = vnDate(5);
+    const hold = async (key: string, startAt: string) => (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', key)
+      .send({ roomId: room.id, channel: 'RPT_TEST', startAt, durationMinutes: duration }).expect(201)).body;
+    const confirm = async (key: string, startAt: string) => {
+      const h = await hold(key, startAt);
+      await authorized('post', `/v1/merchant/booking/holds/${h.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '100000' }).expect(200);
+      await authorized('post', `/v1/merchant/booking/holds/${h.id}/phone-verification`).expect(200);
+      return (await authorized('post', `/v1/merchant/booking/holds/${h.id}/confirm`).send({ cancellationTerms: 'Liên hệ cơ sở.' }).expect(200)).body;
+    };
+    const done = await confirm('rpt-1', `${d2}T19:00:00+07:00`);
+    await authorized('post', `/v1/merchant/booking/bookings/${done.id}/manual-payments`).set('Idempotency-Key', 'rpt-pay-1').send({ method: 'CASH', amountVnd: '100000' }).expect(200);
+    await authorized('post', `/v1/merchant/booking/bookings/${done.id}/check-in`).expect(200);
+    await authorized('post', `/v1/merchant/booking/bookings/${done.id}/check-out`).expect(200);
+    const cancelled = await confirm('rpt-2', `${d2}T22:00:00+07:00`);
+    await authorized('post', `/v1/merchant/booking/bookings/${cancelled.id}/manual-payments`).set('Idempotency-Key', 'rpt-pay-2').send({ method: 'CASH', amountVnd: '30000' }).expect(200);
+    await authorized('post', `/v1/merchant/booking/bookings/${cancelled.id}/outcome`).send({ type: 'CUSTOMER_CANCELLED', note: 'Khách hủy', refundAmountVnd: '10000' }).expect(200);
+    const upcoming = await confirm('rpt-3', `${d3}T20:00:00+07:00`);
+    await authorized('post', `/v1/merchant/booking/bookings/${upcoming.id}/surcharges`).set('Idempotency-Key', 'rpt-sur').send({ amountVnd: '20000', reason: 'Nước' }).expect(200);
+    const abandoned = await hold('rpt-4', `${d3}T23:00:00+07:00`);
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [abandoned.id]);
+
+    const q = { from: today, to, branchId: branch.id };
+    const bookings = (await authorized('get', '/v1/merchant/reports/bookings').query(q).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/reports/bookings', 200, bookings);
+    expect(bookings.rows.map((r: { period: string }) => r.period)).toEqual([0, 1, 2, 3, 4, 5].map(vnDate));
+    const row = (date: string) => bookings.rows.find((r: { period: string }) => r.period === date);
+    expect(row(d2)).toMatchObject({ bookings: 2, completed: 1, cancelled: 1, upcoming: 0, expectedRevenueVnd: '100000' });
+    expect(row(d3)).toMatchObject({ bookings: 1, upcoming: 1, expectedRevenueVnd: '120000' });
+    expect(row(today)).toMatchObject({ bookings: 0, bookingCashVnd: '130000', refundsVnd: '10000', depositsVnd: '0', netCollectedVnd: '120000' });
+    expect(bookings.totals).toMatchObject({ bookings: 3, expectedRevenueVnd: '220000', netCollectedVnd: '120000' });
+    expect(bookings.branchIds).toEqual([branch.id]);
+    const monthly = (await authorized('get', '/v1/merchant/reports/bookings').query({ ...q, groupBy: 'month' }).expect(200)).body;
+    expect(monthly.totals.bookings).toBe(3);
+    expect(monthly.rows.every((r: { period: string }) => r.period.endsWith('-01'))).toBe(true);
+
+    const occupancy = (await authorized('get', '/v1/merchant/reports/occupancy').query(q).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/reports/occupancy', 200, occupancy);
+    expect(occupancy.rooms).toEqual([{ branchId: branch.id, branchName: 'Report branch', roomId: room.id, roomName: 'Report room',
+      bookedMinutes: 2 * duration, availableMinutes: 6 * 1440, occupancyRate: Math.round((2 * duration) / (6 * 1440) * 10000) / 10000 }]);
+    expect(occupancy.peakHours.map((p: { hour: number; bookings: number }) => [p.hour, p.bookings]).sort()).toEqual([[19, 1], [20, 1]]);
+
+    const channels = (await authorized('get', '/v1/merchant/reports/channels').query(q).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/reports/channels', 200, channels);
+    expect(channels.rows).toEqual([{ channel: 'RPT_TEST', holds: 4, confirmed: 3, expired: 1, conversionRate: 0.75 }]);
+
+    const csv = await authorized('get', '/v1/merchant/reports/bookings').query({ ...q, format: 'csv' }).expect(200);
+    expect(csv.headers['content-type']).toContain('text/csv');
+    expect(csv.text.charCodeAt(0)).toBe(0xfeff);
+    expect(csv.text.split('\r\n')[0]).toBe('﻿period,bookings,upcoming,completed,cancelled,noShow,expectedRevenueVnd,depositsVnd,bookingCashVnd,reversalsVnd,refundsVnd,netCollectedVnd');
+    expect(csv.text).toContain(`${d2},2,0,1,1,0,100000`);
+    expect(csv.text).not.toContain('0912345678');
+
+    await authorized('get', '/v1/merchant/reports/bookings').query({ from: to, to: today }).expect(422);
+    await authorized('get', '/v1/merchant/reports/bookings').query({ from: '2025-01-01', to: '2026-06-01' }).expect(422);
+    await authorized('get', '/v1/merchant/reports/bookings').query({ from: '2026-02-30', to: '2026-03-01' }).expect(422);
+
+    // Platform reports
+    const adminId = randomUUID();
+    await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,'rpt-admin@example.com',$2,'Report admin','ACTIVE')`, [adminId, await hash('Rpt-admin-pass-1', 4)]);
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const admin = (await request(server).post('/v1/auth/login').send({ email: 'rpt-admin@example.com', password: 'Rpt-admin-pass-1' }).expect(200)).body.accessToken;
+    await request(server).get('/v1/platform/reports/overview').query({ from: today, to }).set('Authorization', `Bearer ${ownerToken}`).expect(403);
+    const overview = (await request(server).get('/v1/platform/reports/overview').query({ from: today, to }).set('Authorization', `Bearer ${admin}`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/reports/overview', 200, overview);
+    expect(overview.rows.find((r: { period: string }) => r.period === today).bookingsConfirmed).toBeGreaterThanOrEqual(3);
+    expect(overview.snapshot.merchantsWithBookings).toBeGreaterThanOrEqual(1);
+    const merchants = (await request(server).get('/v1/platform/reports/merchants').query({ from: today, to }).set('Authorization', `Bearer ${admin}`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/reports/merchants', 200, merchants);
+    const a = merchants.rows.find((r: { tenantId: string }) => r.tenantId === TENANT_A);
+    expect(a.bookings).toBeGreaterThanOrEqual(3);
+    expect(BigInt(a.netCollectedVnd)).toBeGreaterThanOrEqual(120000n);
+    const platformCsv = await request(server).get('/v1/platform/reports/merchants').query({ from: today, to, format: 'csv' }).set('Authorization', `Bearer ${admin}`).expect(200);
+    expect(platformCsv.text).toContain('Tenant A');
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);
