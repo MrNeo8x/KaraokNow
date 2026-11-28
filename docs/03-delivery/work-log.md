@@ -2,32 +2,28 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-018)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau RPT-001)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit RPT-001 (báo cáo, không migration), commit VEN-005 (giờ lẻ/giờ mở cửa, **có migration `20261124080000`**), commit VEN-004 (vị trí chi nhánh, **có migration `20261124070000`**), commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
+**Code trên `main`:** `origin/main` = `45a14e2` (đã deploy production: IAM-008/FE-017, BKG-011/AUD-002, OPS-003, FE-012, IAM-007, BKG-010/FE-016, FILE-001/FE-015). **Chưa push** (theo thứ tự): `b558901` BE VEN-004 vị trí chi nhánh (**migration `20261124070000`**), `e23d5ca` FE-011 type từ OpenAPI, `faf337e` FE sinh lại type, `98920cf` BE VEN-005 giờ mở cửa + giờ lẻ 15 phút (**migration `20261124080000`**), `3a677bf` FE-018 địa chỉ/chỉ đường, `5620f76` BE RPT-001 báo cáo (không migration), và commit tài liệu này. Luồng FE đang làm FE-019 (chưa commit).
 
-**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **53/53** (sau RPT-001), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
+**Kiểm chứng gần nhất:** BE (sau RPT-001) `npm run verify` 71/71 unit + drift OpenAPI/Markdown, `npm run test:e2e` **53/53**; migration `20261124070000`, `20261124080000` up → down → up trên Postgres 17 tạm; benchmark sau BKG-011 đạt (tìm phòng p95 24,5 ms, tranh chấp 175 ms). FE (sau FE-018) unit 58/58, `next build`, `npm run e2e` 206/206 (trên backend có VEN-004, chưa có VEN-005/RPT-001).
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **30 migration** (đến `20261124080000_branch_opening_hours`); backend `:3000` chạy `5620f76` (có báo cáo), `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container, mất khi rebuild; `/v1/health/jobs` local trả 503 vì worker tắt (bình thường). Đã seed UAT; `uat.owner` thuộc >30 merchant thử do e2e tạo.
 
-**Production (Vercel):** chạy `84aa397`; 27 migration (đến `20261124050000_file_storage`); Blob `vn-karaoke-now-blob-pub/-pri` đã gắn vào BE (OPS-008 `VERIFY` — chờ Owner thử upload trên giao diện). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; không đặt `AUTH_COOKIE_SECURE` (cookie Secure). **Trước khi push `693fd7b`: áp migration `20261124060000_platform_user_management` lên Prisma** (chỉ thêm bảng/cột nullable/index). Sau deploy: smoke `GET /v1/platform/users?limit=1` (admin 200, user thường 403); đăng nhập trên domain FE → cookie `kn_refresh` HttpOnly/Secure path `/v1/auth`, F5 vẫn đăng nhập. Quy trình: `docs/03-delivery/deploy-vercel.md`.
+**Production (Vercel):** `45a14e2`; **28 migration** (đến `20261124060000_platform_user_management`); Blob đã gắn (OPS-008 `VERIFY`); env BE `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; `/v1/health/jobs` 200. **Lần push tới phải áp trước lên Prisma: `20261124070000_branch_location` rồi `20261124080000_branch_opening_hours`** (đều chỉ thêm cột nullable + CHECK). Push BE (OpenAPI đổi) cùng các commit FE đã sinh lại type, nếu không FE `types:check` đỏ. Sau deploy: smoke `GET /v1/public/branches` có `address`, `openingTime`, `bookingPolicy`; `GET /v1/merchant/reports/bookings` (Owner) 200; Owner MAJESTIC nhập địa chỉ/SĐT/link Google Maps/giờ mở cửa cho `LA_KHE`, `THANH_HA` qua giao diện (không seed). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-018. Luồng BE đã commit VEN-005 (`98920cf`, giờ mở cửa và giờ lẻ 15 phút; FE-019 `READY`); FE đã sinh lại type theo `openapi.json` mới. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Luồng FE: FE-019 (`fe/src/components/branch-hours-fields.tsx`, `booking-time.ts`, `customer-booking.tsx`, `fe/e2e/opening-hours.mjs`…). Session triển khai: `deploy-vercel.md`, dòng OPS-008 trong task board, mục nhật ký deploy chưa commit. `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE. Không commit hộ.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (nhóm I ảnh/giấy tờ, J mã đặt phòng, K phiên đăng nhập, L quản lý user); trả lời BKG-008; quyết định có sửa audit `MEMBERSHIP_CREATED` đang chứa email (có từ trước, lệch quy tắc audit không PII).
-- *Session triển khai:* migrate `20261124060000` → push → smoke như trên; đóng OPS-008 sau khi Owner thử upload.
-- *Luồng FE:* **FE-019** (giờ lẻ 15 phút, giờ mở cửa, thời lượng theo chính sách — handoff "FE READY — giờ lẻ và giờ mở cửa"); rebuild backend local có VEN-005 rồi chạy lại `npm run e2e` (e2e FE-018 chạy trên backend trước VEN-005); sau deploy kiểm tra cookie `kn_refresh`, màn Người dùng và vị trí chi nhánh trên production.
-- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
+- *Người dùng / PO:* đăng ký uptime monitor (OPS-009, `deploy-vercel.md` §6a); UAT theo `docs/04-quality/uat-checklist.md` (nhóm I–P: ảnh/giấy tờ, mã đặt phòng, phiên, quản lý user, giữ chỗ quá hạn, địa chỉ/chỉ đường, giờ mở cửa, báo cáo); xem lại định nghĩa số liệu báo cáo trong PD-044; trả lời BKG-008; quyết định có làm sạch email/lý do trong audit cũ trên production (AUD-002 chỉ sửa từ nay về sau).
+- *Session triển khai:* migrate `20261124070000` + `20261124080000` → push → smoke như trên.
+- *Luồng FE:* FE-019 (giờ lẻ/giờ mở cửa), **FE-020** màn báo cáo (handoff "FE READY — báo cáo và thống kê", cần `types:generate`); chạy lại `npm run e2e` trên backend local mới.
+- *Luồng BE:* BKG-008 khi có PO; OPS-002 (cần quyền Prisma production); IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache (ứng viên đầu tiên: báo cáo nếu chậm).
 
-**Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
-
-
-
-
+**Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường.
 
 ---
 
