@@ -99,6 +99,12 @@ Sau đó đăng nhập thử `/merchant` hoặc `/platform` trên trình duyệt
 
 Lưu ý: vài request ngay sau khi deploy có thể rơi vào bản cũ đang được thay; gọi lại trước khi kết luận.
 
+## 6a. Giám sát job nền (OPS-003, PD-041)
+
+- Endpoint công khai `https://vn-karaoke-now-api.vercel.app/v1/health/jobs`: 200 = ổn, 503 = tồn đọng (giữ chỗ quá hạn chưa dọn hoặc outbox chờ quá ngưỡng, hoặc có sự kiện outbox `DEAD`). Chỉ trả số đếm. Ngưỡng: env `JOB_HOLD_EXPIRY_MAX_LAG_MINUTES`, `JOB_OUTBOX_MAX_LAG_MINUTES` (mặc định 1560 = cron hằng ngày + 2 h; không cần đặt).
+- Đăng ký (người dùng, OPS-009): UptimeRobot (hoặc dịch vụ tương tự) → New monitor → HTTP(s), URL trên, chu kỳ 5 phút, cảnh báo email. Thêm monitor thứ hai cho `/v1/health/ready`.
+- Khi nhận cảnh báo: mở URL xem check nào `ok: false`; chạy tay cron bằng `curl -H "Authorization: Bearer $CRON_SECRET" https://vn-karaoke-now-api.vercel.app/v1/internal/cron/hold-expiry` (hoặc `/outbox`); `DEAD` cần xem log và xử lý thủ công.
+
 ## 7. Tạo tài khoản quản trị trên production
 
 Chỉ làm khi người dùng yêu cầu, với email do người dùng cung cấp. Dùng script một lần (không commit) với `DATABASE_URL` production: trong một transaction, kiểm tra email (chữ thường) chưa tồn tại, `INSERT INTO users(..., status='ACTIVE', must_change_password=true)` với mật khẩu tạm ngẫu nhiên băm `bcryptjs` cost 12, rồi `INSERT INTO platform_admins(user_id)`. Đưa mật khẩu tạm cho người dùng đúng một lần; không ghi email/mật khẩu vào tài liệu hay work log. Kiểm tra bằng `POST $F/v1/auth/login` → 200, `mustChangePassword: true`.
@@ -114,6 +120,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 - `task-board.md`: cập nhật task liên quan; thay đổi hạ tầng thì sửa file này.
 
 ## 10. Việc còn mở
+
+- **OPS-003** (`/v1/health/jobs`): không migration. Sau deploy làm OPS-009 (đăng ký uptime monitor, §6a).
 
 - **BKG-011** (lỗi production: giữ chỗ quá hạn chặn phòng tới lần cron hằng ngày) + **AUD-002**: không migration, không env. Nên push sớm. Smoke: tìm phòng trống `/v1/public/branches/{id}/availability` 200.
 

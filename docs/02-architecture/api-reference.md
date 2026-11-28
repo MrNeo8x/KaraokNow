@@ -109,6 +109,17 @@ Response được khai báo:
 |---|---|---|
 | 200 | Prometheus text exposition | Chưa khai báo schema |
 
+### GET /v1/health/jobs
+
+Nhóm: operations · Background job backlog for uptime monitoring (counts only)
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | All checks within thresholds | {"$ref":"#/components/schemas/JobHealthDto"} |
+| 503 | At least one check is over its threshold | {"$ref":"#/components/schemas/JobHealthDto"} |
+
 ### POST /v1/auth/login
 
 Nhóm: authentication
@@ -2931,6 +2942,122 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "status",
     "dependencies"
+  ]
+}
+```
+
+### HoldExpiryCheckDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "overdue": {
+      "type": "number",
+      "description": "HELD holds past their TTL that no job or request has expired yet"
+    },
+    "oldestOverdueMinutes": {
+      "type": "number",
+      "nullable": true,
+      "description": "Minutes since the oldest overdue hold expired"
+    },
+    "thresholdMinutes": {
+      "type": "number"
+    },
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "overdue",
+    "oldestOverdueMinutes",
+    "thresholdMinutes",
+    "ok"
+  ]
+}
+```
+
+### OutboxCheckDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "due": {
+      "type": "number",
+      "description": "PENDING events already due"
+    },
+    "oldestDueMinutes": {
+      "type": "number",
+      "nullable": true,
+      "description": "Minutes the oldest due event has been waiting"
+    },
+    "dead": {
+      "type": "number",
+      "description": "Events that exhausted retries (DEAD)"
+    },
+    "thresholdMinutes": {
+      "type": "number"
+    },
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "due",
+    "oldestDueMinutes",
+    "dead",
+    "thresholdMinutes",
+    "ok"
+  ]
+}
+```
+
+### JobChecksDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "holdExpiry": {
+      "$ref": "#/components/schemas/HoldExpiryCheckDto"
+    },
+    "outbox": {
+      "$ref": "#/components/schemas/OutboxCheckDto"
+    }
+  },
+  "required": [
+    "holdExpiry",
+    "outbox"
+  ]
+}
+```
+
+### JobHealthDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "degraded"
+      ]
+    },
+    "checks": {
+      "$ref": "#/components/schemas/JobChecksDto"
+    },
+    "checkedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "status",
+    "checks",
+    "checkedAt"
   ]
 }
 ```

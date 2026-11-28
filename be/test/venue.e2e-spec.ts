@@ -2050,6 +2050,35 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('post', '/v1/merchant/room-blocks').send({ roomId: room.id, startAt: '2047-03-01T12:00:00Z', endAt: '2047-03-01T14:00:00Z', reason: 'Sửa loa' }).expect(201);
   });
 
+  it('reports background job backlog for an uptime monitor with 200/503 and counts only (OPS-003, PD-041)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const check = async () => {
+      const res = await request(server).get('/v1/health/jobs');
+      expect([200, 503]).toContain(res.status);
+      assertMatchesContract(doc, 'get', '/v1/health/jobs', res.status, res.body);
+      expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.status === 200).toBe(res.body.status === 'ok');
+      expect(res.body.status === 'ok').toBe(res.body.checks.holdExpiry.ok && res.body.checks.outbox.ok);
+      return res;
+    };
+    await check();
+    // An overdue hold older than the threshold makes the endpoint degraded.
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'OPS003', name: 'Job health', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'OPS003-R', name: 'Job room', capacity: 4 }).expect(201)).body;
+    const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'ops003-hold')
+      .send({ roomId: room.id, channel: 'OPS003', startAt: '2047-04-01T12:00:00Z', durationMinutes: 90 }).expect(201)).body;
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '2 days' WHERE id=$1`, [hold.id]);
+    const degraded = await check();
+    expect(degraded.status).toBe(503);
+    expect(degraded.body.checks.holdExpiry).toMatchObject({ ok: false, thresholdMinutes: 1560 });
+    expect(degraded.body.checks.holdExpiry.oldestOverdueMinutes).toBeGreaterThanOrEqual(2880);
+    expect(JSON.stringify(degraded.body)).not.toContain(hold.id);
+    await pool.query(`UPDATE booking_holds SET status='EXPIRED' WHERE id=$1`, [hold.id]);
+    await pool.query(`UPDATE room_occupancy SET status='RELEASED' WHERE source_id=$1`, [hold.id]);
+    expect((await check()).body.checks.holdExpiry.oldestOverdueMinutes ?? 0).toBeLessThan(2880);
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

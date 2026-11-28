@@ -6,9 +6,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
+**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
 
-**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **49/49** (sau BKG-011), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
+**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **50/50** (sau OPS-003), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
 
@@ -24,6 +24,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
+
+---
+
+## 2026-11-28 — Luồng BE: giám sát job nền (OPS-003, PD-041)
+
+- PO chọn cảnh báo bằng dịch vụ uptime miễn phí. `GET /v1/health/jobs` (công khai, chỉ số đếm/tuổi, `no-store`): 200 khi ổn, 503 khi hold quá hạn lâu nhất hoặc outbox chờ lâu nhất vượt ngưỡng (mặc định 1560 phút vì cron Hobby chạy hằng ngày) hoặc có outbox `DEAD`. Ngưỡng chỉnh bằng `JOB_HOLD_EXPIRY_MAX_LAG_MINUTES`, `JOB_OUTBOX_MAX_LAG_MINUTES`.
+- Kiểm chứng: unit 67/67, E2E 50/50 (200/503 theo hold quá hạn 2 ngày, contract cả hai mã). Không migration.
+- Local: worker tắt nên DB local có thể trả 503 — bình thường. OPS-009 (người dùng đăng ký monitor) `READY`.
 
 ---
 

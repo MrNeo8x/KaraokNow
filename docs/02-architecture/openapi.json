@@ -70,6 +70,38 @@
         ]
       }
     },
+    "/v1/health/jobs": {
+      "get": {
+        "operationId": "JobHealthController_jobs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All checks within thresholds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobHealthDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "At least one check is over its threshold",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobHealthDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Background job backlog for uptime monitoring (counts only)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/v1/auth/login": {
       "post": {
         "description": "Also sets the HttpOnly refresh cookie `kn_refresh` (path /v1/auth, SameSite=Strict) so the browser keeps the session across reloads (FE-012)",
@@ -6177,6 +6209,102 @@
         "required": [
           "status",
           "dependencies"
+        ]
+      },
+      "HoldExpiryCheckDto": {
+        "type": "object",
+        "properties": {
+          "overdue": {
+            "type": "number",
+            "description": "HELD holds past their TTL that no job or request has expired yet"
+          },
+          "oldestOverdueMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minutes since the oldest overdue hold expired"
+          },
+          "thresholdMinutes": {
+            "type": "number"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "overdue",
+          "oldestOverdueMinutes",
+          "thresholdMinutes",
+          "ok"
+        ]
+      },
+      "OutboxCheckDto": {
+        "type": "object",
+        "properties": {
+          "due": {
+            "type": "number",
+            "description": "PENDING events already due"
+          },
+          "oldestDueMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Minutes the oldest due event has been waiting"
+          },
+          "dead": {
+            "type": "number",
+            "description": "Events that exhausted retries (DEAD)"
+          },
+          "thresholdMinutes": {
+            "type": "number"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "due",
+          "oldestDueMinutes",
+          "dead",
+          "thresholdMinutes",
+          "ok"
+        ]
+      },
+      "JobChecksDto": {
+        "type": "object",
+        "properties": {
+          "holdExpiry": {
+            "$ref": "#/components/schemas/HoldExpiryCheckDto"
+          },
+          "outbox": {
+            "$ref": "#/components/schemas/OutboxCheckDto"
+          }
+        },
+        "required": [
+          "holdExpiry",
+          "outbox"
+        ]
+      },
+      "JobHealthDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "checks": {
+            "$ref": "#/components/schemas/JobChecksDto"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "status",
+          "checks",
+          "checkedAt"
         ]
       },
       "LoginDto": {

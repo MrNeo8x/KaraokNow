@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-040` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-041` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -137,6 +137,13 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H4 | Cashier, Branch Manager | Để một hold đã thu cọc hết hạn; mở danh sách "cọc chờ xử lý"; Quản lý ghi hoàn một phần với lý do | Hold hiện trong danh sách; hoàn vượt cọc bị chặn; sau khi ghi, hold biến khỏi danh sách và báo số giữ lại | PD-036 | | |
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
+
+### M. Giữ chỗ quá hạn và giám sát (BKG-011, PD-041)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| M1 | Khách | Giữ chỗ trên web rồi bỏ đi; chờ quá thời gian giữ (15 phút); khách khác tìm cùng khung giờ | Phòng hiện trống và giữ chỗ được, không phải chờ tới hôm sau | BKG-011 | | |
+| M2 | Người dùng | Mở `/v1/health/jobs` trên production; kiểm tra email cảnh báo của dịch vụ uptime | 200 `status: ok` khi bình thường; dịch vụ uptime báo khi 503 | PD-041 | | |
 
 ### L. Quản lý user của Platform (PD-040)
 

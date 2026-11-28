@@ -3,6 +3,7 @@ import { OperationsController } from './operations.controller';
 import { RequestMetricsService } from './request-metrics.service';
 import { shutdownTelemetry } from '../instrumentation';
 import { ClientIpDiagController } from './client-ip-diag.controller';
+import { JobHealthController } from './job-health.controller';
 
 @Injectable()
 class TelemetryLifecycle implements OnApplicationShutdown {
@@ -12,7 +13,7 @@ class TelemetryLifecycle implements OnApplicationShutdown {
 }
 
 @Module({
-  controllers: [OperationsController, ClientIpDiagController],
+  controllers: [OperationsController, ClientIpDiagController, JobHealthController],
   providers: [RequestMetricsService, TelemetryLifecycle],
   exports: [RequestMetricsService]
 })
