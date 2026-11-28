@@ -79,6 +79,7 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Phiên hỗ trợ Super Admin (PD-045) đi qua `TenantGuard`: `actor.support` ⇒ chỉ GET/HEAD, che `customerPhone`/`customerEmail`/`email` bằng `SupportMaskInterceptor`. Endpoint GET mới không được có tác dụng phụ nghiệp vụ (Super Admin đọc được mọi GET của merchant); trường liên hệ cá nhân mới phải đặt tên khớp danh sách che hoặc bổ sung vào `MASKED_KEYS`.
 - Backup (PD-047): `be/scripts/ops/db-backup.sh` / `db-restore-drill.sh`; bản backup có PII — chỉ để trong `be/backups/` (gitignore) hoặc thư mục tạm, xoá sau khi thử, không bao giờ in `DATABASE_URL`. Thêm bảng mới không cần sửa script (đếm dòng tự động mọi bảng `public`).
 - Thao tác của Platform Admin không thuộc tenant ghi vào `platform_audit_logs` (`audit_logs.tenant_id` bắt buộc). Platform sửa membership qua `MembershipService` với `MembershipHooks` (`start`/`beforeCommit`) để kiểm tra và ghi audit trong cùng transaction; không tự thao tác lên tài khoản của mình, merchant luôn còn ≥ 1 Owner ACTIVE.
+- Commit có migration có thể bị người dùng push ngay sau khi commit: khi commit migration mới, ghi rõ trong work log/`deploy-vercel.md` §10 rằng phải áp lên Prisma **trước** push, và báo người dùng trong câu trả lời (vụ `c4de3f1` được push trước khi có nhật ký áp `20261124090000`).
 - Git index dùng chung giữa các session: chạy `git diff --cached --name-only` ngay trước `git commit` — file người khác đã stage sẽ lọt vào commit của mình.
 
 ## Trạng thái task
