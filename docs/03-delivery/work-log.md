@@ -12,7 +12,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`), frontend `:3100` có REC-003. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu. Mỗi lượt `npm run e2e` dùng ~6 giữ chỗ công khai trên hạn mức 20/IP/15 phút.
 
-**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay; deploy `73deaec` (12:55) có trước PAY-007 nên production **chắc chắn chưa** có migration `20261124040000_cash_reconciliation` và code OPS-004/API-004/PAY-007, cũng chưa có REC-003; chưa kiểm được production đã áp `20261124030000_overtime_recording` hay chưa — việc của session triển khai, cần người dùng xác nhận trước khi đụng production.
+**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay. Production đã có 25 migration (đến `20261124030000_overtime_recording`), **chỉ thiếu** `20261124040000_cash_reconciliation`; deploy `73deaec` (12:55) có trước PAY-007 nên chưa có code OPS-004/API-004/PAY-007/OPS-007 và REC-003. Người dùng giao session triển khai đưa lên theo `docs/03-delivery/deploy-vercel.md` và runbook `docs/03-delivery/ops-007-client-ip-runbook.md`.
 
 **Đang dở (working tree, chưa commit):** không có của Luồng FE sau commit này. Luồng BE: không có.
 
@@ -22,7 +22,8 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (gồm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008; xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
 - *Luồng FE:* **FE-014** màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt"; QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
-- *Luồng BE:* OPS-007 chờ người dùng xác nhận migrate + deploy production để đo IP (code đã xong); BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
+- *Session triển khai:* chạy runbook OPS-007: migrate `20261124040000`, push `main`, đo IP qua endpoint chẩn đoán, đặt `CLIENT_IP_HEADER` (hoặc secret chuyển tiếp), redeploy, ghi kết quả.
+- *Luồng BE:* chờ kết quả đo OPS-007 để chốt; BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
 
@@ -43,7 +44,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Bối cảnh: production chạy trình duyệt → FE Vercel → Next.js rewrite → BE Vercel, preset NestJS của Vercel chạy `src/main.ts`; production chưa đặt `TRUST_PROXY_HOPS` nên `req.ip` là địa chỉ nội bộ — nhiều khả năng mọi khách đang chung một hạn mức giữ chỗ (20/15 phút) và tra cứu (60/15 phút).
 - `be/src/platform/http/client-ip.ts` + unit test; `public-booking.controller.ts` dùng `resolveClientIp`; env `CLIENT_IP_HEADER`, `CLIENT_IP_PROXY_SECRET` (kiểm tra khi khởi động, `.env.example`); chẩn đoán `GET /v1/internal/diag/client-ip` (`be/src/operations/client-ip-diag.controller.ts`, guard `CRON_SECRET` dùng lại từ `be/src/jobs/`).
 - Kiểm chứng: unit 57/57, E2E 45/45.
-- **Chưa làm trên production** (cần người dùng xác nhận): máy này không có Vercel CLI và không có `DATABASE_URL` production; `main` local đi trước `origin` nhiều commit (gồm PAY-007 cần migration `20261124040000`) — push trước khi migrate sẽ làm lỗi API cọc. Quy trình bắt buộc ở `docs/03-delivery/deploy-vercel.md` (đang được session triển khai viết, chưa commit). Session triển khai cần cập nhật dòng `TRUST_PROXY_HOPS`/`CLIENT_IP_HEADER` trong tài liệu đó sau khi đo.
+- **Chưa làm trên production** — người dùng giao session triển khai, runbook `docs/03-delivery/ops-007-client-ip-runbook.md` (production có 25 migration, chỉ thiếu `20261124040000`): máy này không có Vercel CLI và không có `DATABASE_URL` production; `main` local đi trước `origin` nhiều commit (gồm PAY-007 cần migration `20261124040000`) — push trước khi migrate sẽ làm lỗi API cọc. Quy trình bắt buộc ở `docs/03-delivery/deploy-vercel.md` (đang được session triển khai viết, chưa commit). Session triển khai cần cập nhật dòng `TRUST_PROXY_HOPS`/`CLIENT_IP_HEADER` trong tài liệu đó sau khi đo.
 
 ---
 
