@@ -2,26 +2,26 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau rà soát Master Plan)
+## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau VEN-006)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `5135bdd` (tài liệu Merchant Feature Plan). Production chạy `e0daab2` (FE-021) — gồm toàn bộ BE tới IAM-009/010 và OPS-002. **Chưa push:** `16549c2`, `d0c53f9`, `a0bfb53` (tài liệu) và commit VEN-006 thư viện ảnh (**migration `20261124100000_venue_photos` — áp lên Prisma trước push**, OpenAPI đổi → push cùng FE-022).
+**Code trên `main`:** `origin/main` = `a0bfb53` (tài liệu; code chạy giống `e0daab2` — FE-021, BE tới IAM-009/010 và OPS-002). **Chưa push:** `eb9e128` BE VEN-006 thư viện ảnh merchant/chi nhánh (**migration `20261124100000_venue_photos` — áp lên Prisma trước push**; OpenAPI đổi → push cùng commit FE-022 đã `types:generate`, nếu không Frontend CI đỏ) và commit tài liệu này.
 
 **Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **58/58** (sau VEN-006); diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` **32 migration** (đến `20261124100000_venue_photos`), seed UAT (Platform Admin UAT là Super Admin); backend `:3000` chạy commit VEN-006, `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
-**Production (Vercel):** `e0daab2`; Prisma **31 migration** (đến `20261124090000_support_sessions`, áp trước push); **2/2 Platform Admin là Super Admin** (cấp bởi operator, có `platform_audit_logs`). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Workflow backup `.github/workflows/db-backup.yml` có trên `main` nhưng **bỏ qua cho tới khi có secret** (OPS-010). Preview Vercel dùng chung DB production — chưa có staging tách biệt. Chưa kiểm bằng trình duyệt: phiên hỗ trợ Super Admin, màn báo cáo/giờ mở cửa/địa chỉ với tài khoản thật; chưa nhập địa chỉ/SĐT/link/giờ mở cửa cho `LA_KHE`, `THANH_HA` (MAJESTIC). Quy trình: `docs/03-delivery/deploy-vercel.md`.
+**Production (Vercel):** code `e0daab2` (đã redeploy theo các commit tài liệu tới `a0bfb53`); Prisma **31 migration** (đến `20261124090000_support_sessions`, áp trước push); **2/2 Platform Admin là Super Admin** (cấp bởi operator, có `platform_audit_logs`). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Workflow backup `.github/workflows/db-backup.yml` có trên `main` nhưng **bỏ qua cho tới khi có secret** (OPS-010). Preview Vercel dùng chung DB production — chưa có staging tách biệt. Chưa kiểm bằng trình duyệt: phiên hỗ trợ Super Admin, màn báo cáo/giờ mở cửa/địa chỉ với tài khoản thật; chưa nhập địa chỉ/SĐT/link/giờ mở cửa cho `LA_KHE`, `THANH_HA` (MAJESTIC). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
 **Tài liệu kế hoạch:** `docs/KaraokeNow_Codex_Master_Plan.md` đã rà lại theo bằng chứng 2026-11-28 (bảng module, FR, mục tiêu backup, công nghệ/môi trường, mục 13.1). Khi xong tính năng lớn, cập nhật cả dòng MOD/FR và 13.1.
 
-**Đang dở (working tree):** không có của Luồng BE.
+**Đang dở (working tree):** không có (Luồng FE chưa bắt đầu FE-022).
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm A–Q (88 ca); Owner thử upload ảnh/logo/PDF trên production (đóng OPS-008); xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB khỏi production.
-- *Session triển khai:* push các commit tài liệu khi thuận tiện; ghi nhật ký khi Owner/Super Admin thử trên production.
+- *Session triển khai:* lần push chứa `eb9e128`: áp `20261124100000_venue_photos` lên Prisma trước, chờ FE-022 commit, push cùng, smoke `GET /v1/public/branches` có `photos`/`merchantPhotos`; ghi nhật ký khi Owner/Super Admin thử trên production.
 - *Luồng FE:* **FE-022** thư viện ảnh merchant/chi nhánh (handoff "FE READY — thư viện ảnh merchant và chi nhánh"); các task FE khác `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
 - *Luồng BE:* không còn task không bị chặn — BKG-008 (chờ PO), IAM-004 (chờ ZBS), OPS-010 (chờ secret), PAY-002–004 (sau pilot). Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
