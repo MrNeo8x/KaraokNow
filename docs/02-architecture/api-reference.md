@@ -2789,7 +2789,8 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicBookingTermsResponseDto"} |
+| 200 | configured=false (terms/version null) when the merchant has not set terms yet | {"$ref":"#/components/schemas/PublicBookingTermsResponseDto"} |
+| 404 | Branch is not published | Chưa khai báo schema |
 
 ### GET /v1/merchant/catalog/logo
 

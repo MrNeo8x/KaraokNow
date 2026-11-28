@@ -8,7 +8,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Code trên `main`:** `origin/main` = `45a14e2` (đã deploy production: IAM-008/FE-017, BKG-011/AUD-002, OPS-003, FE-012, IAM-007, BKG-010/FE-016, FILE-001/FE-015). **Chưa push** (theo thứ tự): `b558901` BE VEN-004 vị trí chi nhánh (**migration `20261124070000`**), `e23d5ca` FE-011 type từ OpenAPI, `faf337e` FE sinh lại type, `98920cf` BE VEN-005 giờ mở cửa + giờ lẻ 15 phút (**migration `20261124080000`**), `3a677bf` FE-018 địa chỉ/chỉ đường, `5620f76` BE RPT-001 báo cáo, `01b91dd` tài liệu, `a8c42c5` BE RPT-002 rà soát phân quyền dữ liệu báo cáo (không đổi OpenAPI), và commit tài liệu này.
 
-**Kiểm chứng gần nhất:** BE (sau RPT-002) `npm run verify` 71/71 unit + drift OpenAPI/Markdown, `npm run test:e2e` **54/54**; migration `20261124070000`, `20261124080000` up → down → up trên Postgres 17 tạm; benchmark sau BKG-011 đạt (tìm phòng p95 24,5 ms, tranh chấp 175 ms). FE (sau FE-018) unit 58/58, `next build`, `npm run e2e` 206/206 (trên backend có VEN-004, chưa có VEN-005/RPT-001/RPT-002).
+**Kiểm chứng gần nhất:** BE (sau RPT-002) `npm run verify` 71/71 unit + drift OpenAPI/Markdown, `npm run test:e2e` **55/55**; migration `20261124070000`, `20261124080000` up → down → up trên Postgres 17 tạm; benchmark sau BKG-011 đạt (tìm phòng p95 24,5 ms, tranh chấp 175 ms). FE (sau FE-018) unit 58/58, `next build`, `npm run e2e` 206/206 (trên backend có VEN-004, chưa có VEN-005/RPT-001/RPT-002).
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` **30 migration** (đến `20261124080000_branch_opening_hours`); backend `:3000` chạy `a8c42c5`, `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường). Đã seed UAT; `uat.owner` thuộc >30 merchant thử do e2e tạo.
 
@@ -21,9 +21,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - *Người dùng / PO:* đăng ký uptime monitor (OPS-009, `deploy-vercel.md` §6a); UAT theo `docs/04-quality/uat-checklist.md` nhóm I–P; xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định có làm sạch email/lý do trong audit cũ trên production (AUD-002/RPT-002 chỉ sửa từ nay).
 - *Session triển khai:* migrate `20261124070000` + `20261124080000` → push → smoke như trên.
 - *Luồng FE:* hoàn tất FE-019, FE-020; chạy lại `npm run e2e` trên backend local `a8c42c5`; FE-020 nên ẩn mục báo cáo với Lễ tân/Thu ngân (BE trả 403) và xử lý 404/403 khi đổi chi nhánh.
-- *Luồng BE:* BKG-008 khi có PO; OPS-002 (cần quyền Prisma production); IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache (ứng viên: báo cáo nếu chậm).
+- *Luồng BE:* BKG-008 khi có PO; OPS-002 (cần quyền Prisma production); IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache (ứng viên: báo cáo nếu chậm).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường.
+
+---
+
+## 2026-11-28 — Luồng BE: hợp nhất contract điều khoản công khai
+
+- Mục treo từ 2026-11-26 trong handoff: endpoint công khai trả 404 khi chưa cấu hình điều khoản, lẫn với 404 "chi nhánh không công khai". Nay trả 200 `configured:false`; 404 chỉ cho chi nhánh không công khai. E2E mới + contract. Unit 71/71, E2E 55/55. OpenAPI thêm mô tả 404 (FE `types:generate`).
+- Endpoint chẩn đoán IP (`/v1/internal/diag/client-ip`, bảo vệ bằng `CRON_SECRET`): giữ lại để đo lại khi đổi hạ tầng proxy/CDN — không có trong OpenAPI, sai secret → 404.
 
 ---
 

@@ -103,7 +103,8 @@ export class CatalogService {
     const tenantId = await this.publishedBranchTenant(branchId);
     const row = (await this.db.query(`SELECT public_booking_terms AS terms,public_booking_terms_version::text AS version,
       public_booking_terms_updated_at AS "updatedAt" FROM tenant_public_catalog WHERE tenant_id=$1 AND public_booking_terms IS NOT NULL`, [tenantId])).rows[0];
-    if (!row) throw new NotFoundException('Public booking terms are not configured');
+    // Not configured is a normal state of a published branch (same shape as the Owner endpoint); 404 means the branch is not public.
+    if (!row) return { configured: false, terms: null, version: null, updatedAt: null };
     return { configured: true, ...row };
   }
   private async publishedBranchTenant(branchId: string): Promise<string> {

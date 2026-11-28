@@ -2291,6 +2291,18 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(Object.keys(created).sort()).toEqual(['branchId', 'bufferMinutes', 'channel', 'durationMinutes', 'expiresAt', 'reservedEndAt', 'roomId', 'startAt', 'status']);
   });
 
+  it('returns configured=false for a published branch without public terms, 404 only when not public', async () => {
+    const tenantId = randomUUID(), branchId = randomUUID();
+    await pool.query(`INSERT INTO tenants(id,code,name,status) VALUES ($1,'TERMS0','No terms','ACTIVE')`, [tenantId]);
+    await pool.query(`INSERT INTO branches(id,tenant_id,code,name,timezone,status) VALUES ($1,$2,'T0','No terms branch','Asia/Ho_Chi_Minh','ACTIVE')`, [branchId, tenantId]);
+    await request(app.getHttpServer()).get(`/v1/public/branches/${branchId}/booking-terms`).expect(404);
+    await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [tenantId, OWNER_ID]);
+    const body = (await request(app.getHttpServer()).get(`/v1/public/branches/${branchId}/booking-terms`).expect(200)).body;
+    expect(body).toEqual({ configured: false, terms: null, version: null, updatedAt: null });
+    assertMatchesContract(JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8')), 'get', '/v1/public/branches/{id}/booking-terms', 200, body);
+    await pool.query('UPDATE tenant_public_catalog SET published=false WHERE tenant_id=$1', [tenantId]);
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

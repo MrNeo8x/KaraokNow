@@ -21,7 +21,8 @@ export class PublicCatalogController {
   availability(@Param('id', ParseUUIDPipe) id: string, @Query() query: AvailabilitySearchDto) { return this.catalog.availability(id, query); }
   @Post('rooms/:id/quote') @ApiResponse({ status: 201, type: PublicQuoteResponseDto })
   quote(@Param('id', ParseUUIDPipe) id: string, @Body() dto: QuoteRequestDto) { return this.catalog.quote(id, dto); }
-  @Get('branches/:id/booking-terms') @ApiResponse({ status: 200, type: PublicBookingTermsResponseDto })
+  @Get('branches/:id/booking-terms') @ApiResponse({ status: 200, type: PublicBookingTermsResponseDto, description: 'configured=false (terms/version null) when the merchant has not set terms yet' })
+  @ApiResponse({ status: 404, description: 'Branch is not published' })
   terms(@Param('id', ParseUUIDPipe) id: string) { return this.catalog.publicTerms(id); }
 }
 

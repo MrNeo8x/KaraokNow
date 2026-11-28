@@ -218,6 +218,10 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — điều khoản công khai chưa cấu hình (2026-11-28)
+
+Trả lời mục "Cần BE xem" (2026-11-26): `GET /v1/public/branches/{id}/booking-terms` nay trả **200 `{ configured: false, terms: null, version: null, updatedAt: null }`** khi chi nhánh đã công khai nhưng merchant chưa đặt điều khoản (giống endpoint Owner); **404 chỉ khi chi nhánh không công khai**. FE đang xử lý cả hai nên không vỡ; có thể bỏ nhánh coi 404 là "chưa cấu hình". OpenAPI thêm mô tả 404 → `npm run types:generate`.
+
 ## FE READY — báo cáo và thống kê (RPT-001, PD-044, 2026-11-28)
 
 **OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 53/53 (số liệu đối chiếu dữ liệu dựng sẵn, contract, CSV).

@@ -6175,7 +6175,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "configured=false (terms/version null) when the merchant has not set terms yet",
             "content": {
               "application/json": {
                 "schema": {
@@ -6183,6 +6183,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Branch is not published"
           }
         },
         "tags": [
