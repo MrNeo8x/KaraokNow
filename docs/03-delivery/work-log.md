@@ -18,11 +18,18 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); quyết định Thu ngân có được thấy SĐT khách khi đọc hold/booking (API-003); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
+- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn) và BKG-008 (không cọc theo trường hợp); xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
 - *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
 - *Luồng BE:* PAY-007/BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-28 — Luồng BE: PO chốt các giả định (PD-032…PD-035)
+
+- PD-032 Thu ngân giữ quyền đọc SĐT/email khách ở hold/booking chi nhánh được cấp; PD-033 quy tắc cọc (FIXED tối đa bằng tổng, PERCENT làm tròn lên đến đồng, không ghi vượt); PD-034 overtime quá ân hạn tính toàn bộ phút trễ; PD-035 publish lại giữ trạng thái đã duyệt. Cả bốn xác nhận cách đang cài — **không đổi code**.
+- Đã gỡ nhãn "giả định chờ PO" trong decision log (PD-030), RBAC matrix, handoff, checklist UAT (B1, D2, E3), task board.
 
 ---
 
@@ -134,7 +141,7 @@ Migration mới: `20261124000000_hold_deposits`, `20261124010000_platform_listin
 - **PD-028** check-in/out: Owner/Branch Manager/Receptionist; hủy/no-show: Owner/Branch Manager.
 - **PD-029** Platform Admin tạo merchant thủ công (mở rộng UAT-PD-009/010); không có tự đăng ký, khoá merchant, reset mật khẩu Owner.
 
-### Giả định đang chờ PO xác nhận
+### Giả định đang chờ PO xác nhận (đã chốt 2026-11-28: PD-033, PD-035; xem thêm PD-032, PD-034)
 
 - Cọc FIXED lớn hơn tổng tiền → bằng tổng tiền; PERCENT làm tròn lên đến đồng; không cho ghi cọc vượt số còn thiếu.
 - Merchant tự gỡ publish rồi publish lại vẫn giữ trạng thái đã duyệt.

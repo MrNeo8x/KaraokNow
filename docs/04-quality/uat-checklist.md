@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-031` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-035` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -71,7 +71,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
 |---|---|---|---|---|---|---|
-| B1 | Owner | Ngừng publish; khách tải lại; publish lại | Khi ngừng, khách không thấy UAT; publish lại thấy ngay (vẫn đã duyệt) | UAT-PD-009 | | Giả định chờ PO: publish lại giữ trạng thái duyệt |
+| B1 | Owner | Ngừng publish; khách tải lại; publish lại | Khi ngừng, khách không thấy UAT; publish lại thấy ngay (vẫn đã duyệt) | UAT-PD-009 | | Đã chốt PD-035: publish lại giữ trạng thái duyệt |
 | B2 | Owner, Khách | Khách mở điều khoản (version 1) nhưng chưa giữ chỗ; Owner sửa điều khoản; khách bấm giữ chỗ | Owner thấy version 2; khách bị báo điều khoản đã thay đổi, phải đọc và đồng ý lại | UAT-PD-005 | | |
 | B3 | Owner | Đổi giá quy tắc VIP; báo giá lại trên web | Báo giá mới theo giá mới | PD-011/019 | | Trả lại 150.000 đ sau khi thử |
 | B4 | Owner | Xem cấu hình cọc, không cọc, thời gian giữ theo kênh | Đúng dữ liệu mẫu; sửa được và có trong nhật ký | PD-003/004/005 | | |
@@ -100,7 +100,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
 |---|---|---|---|---|---|---|
 | D1 | Receptionist | Mở danh sách hold, mở hold ở C5, ghi nhận đã gọi xác minh | Thấy SĐT khách, giá đã chốt, điều khoản khách đã đồng ý; ghi nhận xác minh thành công | UAT-PD-001 | | |
-| D2 | Receptionist, Cashier | Receptionist thử xác nhận khi chưa có cọc; Cashier ghi cọc 100.000 đ; ghi 50.000 đ rồi 40.000 đ; Receptionist xác nhận | Chưa đủ cọc: không xác nhận được; 100.000 đ bị chặn vì vượt số còn thiếu; sau 90.000 đ xác nhận thành công | UAT-PD-002 | | Giả định chờ PO: không cho ghi vượt |
+| D2 | Receptionist, Cashier | Receptionist thử xác nhận khi chưa có cọc; Cashier ghi cọc 100.000 đ; ghi 50.000 đ rồi 40.000 đ; Receptionist xác nhận | Chưa đủ cọc: không xác nhận được; 100.000 đ bị chặn vì vượt số còn thiếu; sau 90.000 đ xác nhận thành công | UAT-PD-002 | | Đã chốt PD-033: không cho ghi vượt |
 | D3 | Receptionist | Tạo hold kênh PHONE, nhập SĐT, xác minh, xác nhận | Xác nhận được không cần cọc | PD-005 | | |
 | D4 | Owner, Receptionist | Có một hold WEB đã nhập thông tin (cọc 30%); Owner đổi cọc WEB thành không cọc; mở lại hold | Hold cũ vẫn yêu cầu cọc 30% (đã chụp lúc tạo); hold mới mới áp dụng cấu hình mới | UAT-PD-002 | | Trả lại cọc 30% sau khi thử |
 | D5 | Receptionist | Tạo hold, đợi quá 15 phút (worker `holds:expire` đang chạy), thử xác nhận | Hold chuyển hết hạn, không xác nhận được, phòng trống lại | UAT-PD-011 | | |
@@ -113,7 +113,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 |---|---|---|---|---|---|---|
 | E1 | Receptionist | Check-in một booking của ngày mai | Cho phép (không giới hạn khung giờ) | PD-026 | | |
 | E2 | Receptionist, Khách | Tạo booking PHONE có giờ bắt đầu đã qua (ví dụ đầu giờ hiện tại, 2 giờ), check-in rồi check-out ngay; khách tìm phòng ở khung giờ còn lại | Ghi giờ trả phòng thực tế; phòng mở lại sau giờ trả + 15 phút dọn phòng | PD-025 | | Check-out trước giờ bắt đầu không rút ngắn thời gian giữ phòng |
-| E3 | Receptionist | Check-out một booking đã quá giờ kết thúc hơn 10 phút; check-out một booking khác trễ dưới 10 phút | Cả hai ghi giờ thực tế và số phút trễ; booking trễ quá ân hạn có overtime = toàn bộ số phút trễ, booking trong ân hạn có overtime 0; không tính tiền, không kéo dài giờ giữ phòng | PD-025, PD-030 | | Giả định chờ PO: quá ân hạn thì tính toàn bộ phút trễ |
+| E3 | Receptionist | Check-out một booking đã quá giờ kết thúc hơn 10 phút; check-out một booking khác trễ dưới 10 phút | Cả hai ghi giờ thực tế và số phút trễ; booking trễ quá ân hạn có overtime = toàn bộ số phút trễ, booking trong ân hạn có overtime 0; không tính tiền, không kéo dài giờ giữ phòng | PD-025, PD-030 | | Đã chốt PD-034: quá ân hạn thì tính toàn bộ phút trễ |
 | E4 | Receptionist | Thử check-out booking chưa check-in; check-in booking đã hoàn tất | Đều bị chặn | FR-009/010 | | |
 | E5 | Owner, Cashier | Owner đổi thời gian ân hạn overtime (ví dụ 0 hoặc 30 phút); Cashier thử đổi | Owner/Branch Manager đổi được và có trong nhật ký; Cashier chỉ xem; check-out sau đó dùng ân hạn mới, booking đã check-out giữ ân hạn cũ | PD-030 | | |
 
@@ -146,7 +146,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 - 100% ca nhóm C, D, F và G đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
 - Lỗi Trung bình/Thấp còn mở có hướng xử lý và được PO chấp nhận bằng văn bản.
-- Các giả định chờ PO (B1, D2 và mục "Giả định đang chờ PO" trong `docs/03-delivery/work-log.md`) đã được xác nhận hoặc đổi thành yêu cầu sửa.
+- Các giả định trước đây (B1, D2, E3) đã được PO chốt ngày 2026-11-28 (PD-033…PD-035); nếu UAT cho thấy cần đổi, ghi thành yêu cầu sửa và quyết định mới.
 - Kết quả, người thực hiện và ngày được ghi vào bảng; task board cập nhật UAT-001 và các task `VERIFY` liên quan.
 
 | Vai trò ký nhận | Họ tên | Ngày | Kết luận |

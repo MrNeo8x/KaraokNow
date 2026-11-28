@@ -29,4 +29,4 @@ JWT proves the user identity. `X-Tenant-ID` selects the working tenant, but acce
 
 Password reset, email verification and external identity providers are not implemented. MFA is explicitly deferred until after the pilot (PD-018); password rate-limit and lockout controls remain in place.
 
-Cashier read access to holds and bookings (API-003, 2026-11-26) was added so cashiers can reach the hold/booking they record deposits and CASH against; it grants no create, confirm, check-in/out or outcome rights. Revisit with PO/security if cashiers must not see customer phone numbers.
+Cashier read access to holds and bookings (API-003, 2026-11-26) was added so cashiers can reach the hold/booking they record deposits and CASH against; it grants no create, confirm, check-in/out or outcome rights. Cashiers seeing customer phone and email was confirmed by PO on 2026-11-28 (PD-032).

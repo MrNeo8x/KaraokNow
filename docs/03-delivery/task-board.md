@@ -132,7 +132,7 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 
 ## Hàng đợi thực hiện
 
-Cập nhật 2026-11-26. Lịch sử phiên và giả định đang chờ: [`work-log.md`](work-log.md).
+Cập nhật 2026-11-28. Lịch sử phiên: [`work-log.md`](work-log.md). Các giả định trước đây đã được PO chốt (PD-032…PD-035).
 
 **Luồng FE**
 
