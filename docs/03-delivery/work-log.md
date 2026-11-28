@@ -29,6 +29,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: migration support sessions và Super Admin đầu tiên (IAM-009)
+
+- Kiểm tra worktree sạch tại `f431918`: BE verify 73/73, E2E 57/57; FE 67/67, `tsc`, `build`. **FE `types:check` lệch** (`c4de3f1` đổi `openapi.json`, chưa sinh lại `api-types.gen.ts`) — Luồng FE chạy `npm run types:generate` trước khi push để CI không đỏ.
+- Áp `20261124090000_support_sessions` lên Prisma (cột `platform_admins.super_admin` NOT NULL default false + bảng `support_sessions` — tương thích ngược). Production 31 migration, health 200. **Chưa push** (`c4de3f1`, `d987b96`, `f431918`).
+- PD-045 "Super Admin đầu tiên do người vận hành đặt": theo yêu cầu người dùng, cấp Super Admin cho **cả hai** Platform Admin hiện có trên production — một transaction, cùng advisory lock `platform-admins` như `setSuperAdmin`, mỗi người một bản ghi `platform_audit_logs` `SUPER_ADMIN_GRANTED` (actor NULL = operator, reason "Operator bootstrap… (PD-045)"). Local không đổi.
+
+---
+
 ## 2026-11-28 — Luồng BE: backup và diễn tập khôi phục (OPS-002, PD-047)
 
 - PO chọn GitHub Actions hằng đêm, mã hoá, giữ 30 ngày → PD-047 (RPO ≤ 24 h, RTO ≤ 1 h).
