@@ -44,7 +44,7 @@ cd fe
 npm test && npx tsc --noEmit && npm run build
 ```
 
-Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger `/docs`, tắt bằng `SWAGGER_ENABLED=false`), frontend `:3100`. **Container backend không tự chạy migration** — chạy `npm run db:migrate` từ host hoặc `docker compose --profile tools run --rm migrate` trước `docker compose up -d --build backend`. Worker chỉ chạy khi bật `docker compose --profile workers up -d` (hoặc `npm run holds:expire` / `npm run outbox:work` từ host); nếu không, hold chỉ hết hạn khi có request chạm vào nó.
+Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger `/docs`, tắt bằng `SWAGGER_ENABLED=false`), frontend `:3100`. **Container backend không tự chạy migration** — chạy `npm run db:migrate` từ host hoặc `docker compose --profile tools run --rm migrate` trước `docker compose up -d --build backend`. Worker chỉ chạy khi bật `docker compose --profile workers up -d` (hoặc `npm run holds:expire` / `npm run outbox:work` từ host); nếu không, hold chỉ hết hạn khi có request chạm vào nó. Container backend không có token Blob nên file upload (PD-037) nằm ở `/app/.storage` trong container và **mất khi rebuild**.
 
 ## Quy ước backend
 

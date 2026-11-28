@@ -6,20 +6,20 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, và commit FILE-001 này). Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
+**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage). Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
 
 **Kiểm chứng gần nhất:** BE (2026-11-28, sau FILE-001) `npm run verify` 62/62 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-014) `npm test` 46/46, `next build`, `npm run e2e` 157/157.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (chưa có FILE-001 — cần `npm run db:migrate` rồi `docker compose up -d --build backend`; container không có token Blob nên ghi file vào `STORAGE_LOCAL_DIR` trong container, mất khi rebuild), frontend `:3100` có FE-014. Đã seed UAT. Worker tắt.
+**Môi trường local** (`be/compose.yaml`, rebuild 2026-11-28): Postgres `:5433` đã áp 27 migration (đến `20261124050000_file_storage`); backend `:3000` chạy `1205321` (có FILE-001), health ready 200. Container không có token Blob → file ghi vào `/app/.storage` trong container (đã kiểm ghi được), **mất khi rebuild** — chỉ để thử. Ảnh public đọc qua `/v1/files/public/…` (FE rewrite). Frontend `:3100` có FE-014 (chưa có FE-015). Đã seed UAT. Worker tắt.
 
 **Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** không có của Luồng BE sau commit này. `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Luồng FE đang làm FE-015 (`fe/src/components/merchant-documents.tsx`, `merchant-logo.tsx`, `room-media.tsx`, `fe/src/lib/image-compress.ts`, `open-pdf.ts`… chưa commit). `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
-- *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload).
+- *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
 - *Luồng FE:* FE-015 (màn ảnh phòng, logo, giấy tờ; nén ảnh trước khi upload — xem handoff "FE READY — lưu ảnh và giấy tờ"); FE-011; QA-003 phần còn lại; FE-012.
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
@@ -52,6 +52,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: rebuild backend local sau FILE-001
+
+- `npm run db:migrate` áp `20261124050000_file_storage` vào Postgres `:5433`; `docker compose up -d --build backend` → `1205321`, `/v1/health/ready` 200, Swagger có `media/upload`, `/v1/files/public/…` 404 cho file không tồn tại.
+- Container không có biến `BLOB_*` → backend LOCAL, thư mục `/app/.storage` (ghi được, mất khi rebuild). Muốn giữ file local qua các lần rebuild thì thêm volume cho `STORAGE_LOCAL_DIR` — chưa làm.
+- Chưa chạy lại E2E FE trên container này.
 
 ---
 
