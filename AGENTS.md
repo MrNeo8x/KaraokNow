@@ -74,6 +74,10 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 
 `DONE` (xong hẳn) · `VERIFY` (code + test tự động xong, chỉ chờ kiểm thử trình duyệt QA-003/UAT-001) · `IN_PROGRESS` (đang code hoặc code chưa commit — giữ ít) · `READY` · `BLOCKED` (chờ PO/điều kiện ngoài) · `BACKLOG`. Còn việc dở trong task gần xong thì **tách task mới** với trạng thái đúng thực tế, không giữ task cũ ở `IN_PROGRESS`. Task board viết bằng tiếng Việt; mã trạng thái và mã task giữ nguyên.
 
+## Triển khai production (Vercel)
+
+**Push lên `main` = deploy production ngay** cho FE (`vn-karaoke-now`) và BE (`vn-karaoke-now-api`); Vercel không chờ CI. Trước mọi lần push `main`, chạy migration hay thay đổi env/dependency/cron của `be/`, **đọc và làm đúng `docs/03-delivery/deploy-vercel.md`**. Tóm tắt: kiểm tra local pass trước khi push; migration chạy tay lên Prisma Postgres **trước** push và phải tương thích ngược; preview dùng chung DB production; dependency runtime `be/` phải có bản CommonJS; không deploy bằng CLI từ working tree; không seed production; smoke test sau deploy và ghi work log.
+
 ## Definition of Done
 
 Code + migration (có down) + unit/E2E phù hợp + `npm run verify` + `npm run test:e2e` pass; OpenAPI/Markdown sinh lại; quyền và audit đúng; task board, handoff (FE READY), traceability, Master Plan cập nhật; `work-log.md` có mục nhật ký mới và mục "Trạng thái hiện tại" được viết lại; quyết định PO mới ghi vào decision log. Commit chỉ khi người dùng yêu cầu; không push nếu không được bảo.
