@@ -2,6 +2,7 @@ import { Global, Injectable, Module, OnApplicationShutdown } from '@nestjs/commo
 import { OperationsController } from './operations.controller';
 import { RequestMetricsService } from './request-metrics.service';
 import { shutdownTelemetry } from '../instrumentation';
+import { ClientIpDiagController } from './client-ip-diag.controller';
 
 @Injectable()
 class TelemetryLifecycle implements OnApplicationShutdown {
@@ -11,7 +12,7 @@ class TelemetryLifecycle implements OnApplicationShutdown {
 }
 
 @Module({
-  controllers: [OperationsController],
+  controllers: [OperationsController, ClientIpDiagController],
   providers: [RequestMetricsService, TelemetryLifecycle],
   exports: [RequestMetricsService]
 })

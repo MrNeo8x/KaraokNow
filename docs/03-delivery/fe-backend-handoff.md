@@ -204,6 +204,14 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 44/44 (re
 - `GET /v1/merchant/branches/{branchId}/cash-report?date=YYYY-MM-DD` (Owner, Branch Manager, Cashier): ngày theo múi giờ chi nhánh; `totals` và `byRecorder[]` gồm `depositsVnd, bookingCashVnd, cashReversalsVnd, refundsVnd, netCashVnd, surchargesVnd`. Ngày không hợp lệ → 422.
 - **Thay đổi hành vi hiện có:** `GET .../holds/{id}/deposits` mỗi khoản có thêm `reversed`, `totalRecordedVnd` là số ròng sau đảo; xác nhận có cọc và giới hạn tiền hoàn khi hủy đều tính theo số ròng. `GET .../manual-payments/summary` vẫn là tổng thô (chưa trừ đảo) — dùng `account` để hiển thị phải thu/đã thu.
 
+## Chờ đo production — IP khách qua rewrite (OPS-007, 2026-11-28)
+
+Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy Vercel rewrite làm mất IP gốc của trình duyệt.
+
+- BE đã hỗ trợ IP do proxy chuyển tiếp: header `X-KN-Client-IP: <ip trình duyệt>` + `X-KN-Proxy-Secret: <CLIENT_IP_PROXY_SECRET>` (≥ 16 ký tự, env bí mật ở cả FE và BE). Thiếu/sai secret thì BE bỏ qua header này, nên khách không giả mạo được.
+- Nếu cần, FE thêm middleware Next.js cho `/v1/*` đặt hai header trên từ IP mà Vercel giao cho FE (`x-real-ip`/`x-forwarded-for` tại edge FE), không để lộ secret ra trình duyệt.
+- Luồng BE sẽ ghi kết quả đo và cấu hình chọn vào đây khi có.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

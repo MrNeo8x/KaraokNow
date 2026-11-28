@@ -1,4 +1,5 @@
 import { validateDbSettings } from '../platform/database/pool-config';
+import { validateClientIpSettings } from '../platform/http/client-ip';
 
 const DEFAULT_PORT = 3000;
 
@@ -45,6 +46,7 @@ export function validateEnvironment(config: Record<string, unknown>): Record<str
   }
 
   errors.push(...validateDbSettings(config));
+  errors.push(...validateClientIpSettings(config));
 
   if (errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);

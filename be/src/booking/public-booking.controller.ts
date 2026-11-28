@@ -3,6 +3,7 @@ import { ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CreatePublicHoldDto, PublicBookingLookupDto, PublicBookingStatusDto, PublicHoldResponseDto } from './public-booking.dto';
 import { PublicBookingService } from './public-booking.service';
+import { resolveClientIp } from '../platform/http/client-ip';
 
 @ApiTags('public booking') @Controller('public/booking')
 export class PublicBookingController {
@@ -14,7 +15,7 @@ export class PublicBookingController {
   @ApiResponse({ status: 409, description: 'Occupancy, price, terms version or idempotency conflict' })
   @ApiResponse({ status: 429, description: 'IP or phone rate limit exceeded' })
   create(@Req() req: Request, @Headers('idempotency-key') key: string, @Body() dto: CreatePublicHoldDto) {
-    return this.booking.create(req.ip ?? req.socket.remoteAddress ?? 'unknown', key, dto);
+    return this.booking.create(resolveClientIp(req).ip, key, dto);
   }
 
   @Post('lookup') @HttpCode(200)
@@ -22,6 +23,6 @@ export class PublicBookingController {
   @ApiResponse({ status: 404, description: 'Generic response for an invalid phone/code pair' })
   @ApiResponse({ status: 429, description: 'IP or phone rate limit exceeded' })
   lookup(@Req() req: Request, @Body() dto: PublicBookingLookupDto) {
-    return this.booking.lookup(req.ip ?? req.socket.remoteAddress ?? 'unknown', dto);
+    return this.booking.lookup(resolveClientIp(req).ip, dto);
   }
 }

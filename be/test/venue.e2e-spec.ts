@@ -1722,6 +1722,32 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Ledger plan', status: 'INACTIVE' }).expect(200);
   }, 30000);
 
+  it('resolves the public client IP from the configured platform header for per-IP limits, with a guarded diagnostic (OPS-007)', async () => {
+    const previous = { cron: process.env.CRON_SECRET, header: process.env.CLIENT_IP_HEADER };
+    process.env.CRON_SECRET = 'ops-007-cron-secret-for-e2e';
+    process.env.CLIENT_IP_HEADER = 'x-real-ip';
+    try {
+      await request(app.getHttpServer()).get('/v1/internal/diag/client-ip').set('x-real-ip', '203.0.113.10').expect(404);
+      await request(app.getHttpServer()).get('/v1/internal/diag/client-ip').set('Authorization', 'Bearer wrong').expect(404);
+      await request(app.getHttpServer()).get('/v1/internal/diag/client-ip').set('Authorization', 'Bearer ops-007-cron-secret-for-e2e')
+        .set('x-real-ip', '203.0.113.10').set('x-forwarded-for', '198.51.100.99').expect(200)
+        .expect(({ body }) => expect(body).toMatchObject({
+          resolved: { ip: '203.0.113.10', source: 'platform-header' }, config: { clientIpHeader: 'x-real-ip', proxySecretConfigured: false },
+          headers: { 'x-real-ip': '203.0.113.10', 'x-forwarded-for': '198.51.100.99' } }));
+      const ipBuckets = async () => Number((await pool.query(`SELECT count(*) FROM public_rate_limit_buckets WHERE scope='PUBLIC_LOOKUP_IP'`)).rows[0].count);
+      const lookup = (ip: string, phone: string) => request(app.getHttpServer()).post('/v1/public/booking/lookup').set('x-real-ip', ip)
+        .send({ phone, bookingCode: '0'.repeat(32) }).expect(404);
+      const before = await ipBuckets();
+      await lookup('203.0.113.21', '0911000201');
+      await lookup('203.0.113.22', '0911000202');
+      await lookup('203.0.113.21', '0911000203');
+      expect(await ipBuckets()).toBe(before + 2);
+    } finally {
+      if (previous.cron === undefined) delete process.env.CRON_SECRET; else process.env.CRON_SECRET = previous.cron;
+      if (previous.header === undefined) delete process.env.CLIENT_IP_HEADER; else process.env.CLIENT_IP_HEADER = previous.header;
+    }
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

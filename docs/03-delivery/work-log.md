@@ -22,7 +22,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (gồm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008; xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
 - *Luồng FE:* **FE-014** màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt"; QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
-- *Luồng BE:* BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS. Không có contract nào FE đang phải chờ.
+- *Luồng BE:* OPS-007 chờ người dùng xác nhận migrate + deploy production để đo IP (code đã xong); BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
 
@@ -35,6 +35,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: IP khách cho giới hạn theo IP (OPS-007, phần code)
+
+- Bối cảnh: production chạy trình duyệt → FE Vercel → Next.js rewrite → BE Vercel, preset NestJS của Vercel chạy `src/main.ts`; production chưa đặt `TRUST_PROXY_HOPS` nên `req.ip` là địa chỉ nội bộ — nhiều khả năng mọi khách đang chung một hạn mức giữ chỗ (20/15 phút) và tra cứu (60/15 phút).
+- `be/src/platform/http/client-ip.ts` + unit test; `public-booking.controller.ts` dùng `resolveClientIp`; env `CLIENT_IP_HEADER`, `CLIENT_IP_PROXY_SECRET` (kiểm tra khi khởi động, `.env.example`); chẩn đoán `GET /v1/internal/diag/client-ip` (`be/src/operations/client-ip-diag.controller.ts`, guard `CRON_SECRET` dùng lại từ `be/src/jobs/`).
+- Kiểm chứng: unit 57/57, E2E 45/45.
+- **Chưa làm trên production** (cần người dùng xác nhận): máy này không có Vercel CLI và không có `DATABASE_URL` production; `main` local đi trước `origin` nhiều commit (gồm PAY-007 cần migration `20261124040000`) — push trước khi migrate sẽ làm lỗi API cọc. Quy trình bắt buộc ở `docs/03-delivery/deploy-vercel.md` (đang được session triển khai viết, chưa commit). Session triển khai cần cập nhật dòng `TRUST_PROXY_HOPS`/`CLIENT_IP_HEADER` trong tài liệu đó sau khi đo.
 
 ---
 
