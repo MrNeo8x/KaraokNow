@@ -115,6 +115,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **IAM-008** (PD-040, quản lý user của Platform): **migration `20261124060000_platform_user_management` phải áp lên Prisma trước khi push** (bảng `platform_audit_logs`, cột nullable ở `users`/`platform_admins`, index — tương thích ngược, code cũ không đụng tới). Smoke: Platform Admin `GET /v1/platform/users?limit=1` → 200; user thường → 403.
+
 - **IAM-007 + FE-012** (PD-039, giữ phiên qua F5): không migration, không env mới (để trống `AUTH_COOKIE_SECURE` → cookie Secure). Push cùng lúc hoặc BE trước (BE vẫn nhận refresh token trong body). Smoke sau deploy: đăng nhập trên `vn-karaoke-now.vercel.app`, DevTools → cookie `kn_refresh` thuộc host FE, `HttpOnly`, `Secure`, path `/v1/auth` (xác nhận rewrite Next.js chuyển tiếp `Set-Cookie`); F5 vẫn đăng nhập.
 - **Redis `redis-byzantium-mirror`** (người dùng cho phép dùng làm cache khi cần, 2026-11-28): **chưa dùng** — phiên, hạn mức và khoá đều ở PostgreSQL trong transaction. Chỉ thêm khi có số đo cho thấy cần cache (ví dụ catalog công khai), qua một service bọc riêng; không đưa trạng thái tiền/booking vào Redis.
 

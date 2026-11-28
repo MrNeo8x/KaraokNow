@@ -1914,6 +1914,112 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(server).post('/v1/auth/logout').send({}).expect(204);
   });
 
+  it('lets a Platform Admin manage users and merchant memberships with audit and self-protection (PD-040)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const mkUser = async (email: string, password: string) => {
+      const id = randomUUID();
+      await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,$2,$3,$4,'ACTIVE')`, [id, email, await hash(password, 4), email.split('@')[0]]);
+      return id;
+    };
+    const login = async (email: string, password: string) => (await request(server).post('/v1/auth/login').send({ email, password }).expect(200)).body;
+    const adminId = await mkUser('pu-admin@example.com', 'Pu-admin-pass-1');
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const admin = (await login('pu-admin@example.com', 'Pu-admin-pass-1')).accessToken;
+    const as = (token: string) => ({
+      get: (path: string) => request(server).get(path).set('Authorization', `Bearer ${token}`),
+      post: (path: string) => request(server).post(path).set('Authorization', `Bearer ${token}`),
+      patch: (path: string) => request(server).patch(path).set('Authorization', `Bearer ${token}`)
+    });
+    const A = as(admin);
+
+    // Merchant with an Owner and a branch, created directly.
+    const tenantId = randomUUID(), branchId = randomUUID(), ownerId = await mkUser('pu-owner@example.com', 'Pu-owner-pass-1');
+    await pool.query(`INSERT INTO tenants(id,code,name,status) VALUES ($1,'PU','PU Karaoke','ACTIVE')`, [tenantId]);
+    await pool.query(`INSERT INTO branches(id,tenant_id,code,name,timezone,status) VALUES ($1,$2,'PU-1','PU Q1','Asia/Ho_Chi_Minh','ACTIVE')`, [branchId, tenantId]);
+    const ownerMembership = randomUUID();
+    await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES ($1,$2,$3,'ACTIVE')`, [ownerMembership, tenantId, ownerId]);
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES ($1,'OWNER')`, [ownerMembership]);
+
+    await request(server).get('/v1/platform/users').set('Authorization', `Bearer ${ownerToken}`).expect(403);
+    const list = (await A.get('/v1/platform/users?q=PU-OWNER&limit=10').expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/users', 200, list);
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]).toMatchObject({ id: ownerId, status: 'ACTIVE', platformAdmin: false, lastLoginAt: null,
+      memberships: [{ membershipId: ownerMembership, tenantId, tenantName: 'PU Karaoke', status: 'ACTIVE', roles: ['OWNER'], branchIds: [] }] });
+    expect((await A.get('/v1/platform/users?q=%25').expect(200)).body.items).toHaveLength(0); // LIKE wildcards are literal
+    expect((await A.get('/v1/platform/users?platformAdmin=true&limit=100').expect(200)).body.items.map((u: { id: string }) => u.id)).toContain(adminId);
+
+    // Disable: sessions die immediately, login refused; enable restores.
+    const ownerSession = await login('pu-owner@example.com', 'Pu-owner-pass-1');
+    await A.post(`/v1/platform/users/${adminId}/disable`).send({ reason: 'self' }).expect(403);
+    await A.post(`/v1/platform/users/${ownerId}/disable`).send({ reason: ' ' }).expect(400);
+    const disabled = (await A.post(`/v1/platform/users/${ownerId}/disable`).send({ reason: 'Báo mất điện thoại' }).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/platform/users/{id}/disable', 200, disabled);
+    expect(disabled).toMatchObject({ status: 'DISABLED', disabledReason: 'Báo mất điện thoại' });
+    await request(server).get('/v1/me/tenants').set('Authorization', `Bearer ${ownerSession.accessToken}`).expect(401);
+    await request(server).post('/v1/auth/login').send({ email: 'pu-owner@example.com', password: 'Pu-owner-pass-1' }).expect(401);
+    await A.post(`/v1/platform/users/${ownerId}/disable`).send({ reason: 'again' }).expect(200);
+    await A.post(`/v1/platform/users/${ownerId}/temporary-password`).send({ reason: 'quên mật khẩu' }).expect(409);
+    expect((await A.post(`/v1/platform/users/${ownerId}/enable`).send({ reason: 'Đã xác minh' }).expect(200)).body).toMatchObject({ status: 'ACTIVE', disabledReason: null });
+    expect((await A.get(`/v1/platform/users/${ownerId}`).expect(200)).body.lastLoginAt).not.toBeNull();
+
+    // Temporary password: shown once, forces a change, old password and sessions stop working.
+    const fresh = await login('pu-owner@example.com', 'Pu-owner-pass-1');
+    const temp = await A.post(`/v1/platform/users/${ownerId}/temporary-password`).send({ reason: 'Gọi tổng đài quên mật khẩu' }).expect(200);
+    expect(temp.headers['cache-control']).toBe('no-store');
+    assertMatchesContract(doc, 'post', '/v1/platform/users/{id}/temporary-password', 200, temp.body);
+    expect(temp.body.temporaryPassword).toMatch(/^[A-HJ-NP-Za-km-z2-9]{16}$/);
+    expect(temp.body.user.mustChangePassword).toBe(true);
+    await request(server).get('/v1/me/tenants').set('Authorization', `Bearer ${fresh.accessToken}`).expect(401);
+    await request(server).post('/v1/auth/login').send({ email: 'pu-owner@example.com', password: 'Pu-owner-pass-1' }).expect(401);
+    expect((await login('pu-owner@example.com', temp.body.temporaryPassword)).mustChangePassword).toBe(true);
+
+    // Platform Admin grant/revoke.
+    const helperId = await mkUser('pu-helper@example.com', 'Pu-helper-pass-1');
+    expect((await A.post(`/v1/platform/users/${helperId}/platform-admin`).send({ reason: 'Nhân sự vận hành mới' }).expect(200)).body.platformAdmin).toBe(true);
+    const helper = (await login('pu-helper@example.com', 'Pu-helper-pass-1')).accessToken;
+    await as(helper).get('/v1/platform/users').expect(200);
+    await as(helper).post(`/v1/platform/users/${helperId}/platform-admin/revoke`).send({ reason: 'self' }).expect(403);
+    expect((await A.post(`/v1/platform/users/${helperId}/platform-admin/revoke`).send({ reason: 'Hết nhiệm vụ' }).expect(200)).body.platformAdmin).toBe(false);
+    await as(helper).get('/v1/platform/users').expect(403);
+    await A.post(`/v1/platform/users/${randomUUID()}/disable`).send({ reason: 'x' }).expect(404);
+
+    // Memberships of a merchant.
+    const members = (await A.get(`/v1/platform/merchants/${tenantId}/memberships`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/merchants/{tenantId}/memberships', 200, members);
+    const branches = (await A.get(`/v1/platform/merchants/${tenantId}/branches`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/merchants/{tenantId}/branches', 200, branches);
+    expect(branches).toEqual([{ id: branchId, name: 'PU Q1', status: 'ACTIVE' }]);
+    await A.get(`/v1/platform/merchants/${randomUUID()}/memberships`).expect(404);
+    const cashier = (await A.post(`/v1/platform/merchants/${tenantId}/memberships`).send({ email: 'pu-cashier@example.com', displayName: 'PU Cashier',
+      temporaryPassword: 'Pu-cashier-temp-1', roles: ['CASHIER'], branchIds: [branchId], reason: 'Owner nghỉ phép, nhờ thêm thu ngân' }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/platform/merchants/{tenantId}/memberships', 201, cashier);
+    await A.post(`/v1/platform/merchants/${tenantId}/memberships`).send({ email: 'pu-cashier@example.com', displayName: 'x', temporaryPassword: 'Pu-cashier-temp-1', roles: ['CASHIER'], branchIds: [branchId] }).expect(400);
+    await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${ownerMembership}`).send({ roles: ['CASHIER'], branchIds: [branchId], reason: 'thử' }).expect(409);
+    await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${ownerMembership}`).send({ status: 'INACTIVE', reason: 'thử' }).expect(409);
+    await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${cashier.id}`).send({ reason: 'không đổi gì' }).expect(400);
+    const promoted = (await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${cashier.id}`).send({ roles: ['OWNER'], reason: 'Owner cũ nghỉ việc' }).expect(200)).body;
+    assertMatchesContract(doc, 'patch', '/v1/platform/merchants/{tenantId}/memberships/{membershipId}', 200, promoted);
+    expect(promoted.roles).toEqual(['OWNER']);
+    await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${ownerMembership}`).send({ status: 'INACTIVE', reason: 'Owner cũ nghỉ việc' }).expect(200);
+    const merchantAudit = await pool.query(`SELECT action,actor_user_id FROM audit_logs WHERE tenant_id=$1 ORDER BY occurred_at`, [tenantId]);
+    expect(merchantAudit.rows.map(r => r.action)).toEqual(['MEMBERSHIP_CREATED', 'MEMBERSHIP_UPDATED', 'MEMBERSHIP_UPDATED']);
+    expect(merchantAudit.rows.every(r => r.actor_user_id === adminId)).toBe(true);
+
+    // Admin who belongs to the merchant cannot edit its memberships.
+    await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES (gen_random_uuid(),$1,$2,'ACTIVE')`, [tenantId, adminId]);
+    await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${cashier.id}`).send({ roles: ['OWNER', 'CASHIER'], branchIds: [branchId], reason: 'x' }).expect(403);
+
+    const platformAudit = await pool.query(`SELECT action,actor_user_id,tenant_id,before_data,after_data FROM platform_audit_logs WHERE actor_user_id=$1 ORDER BY occurred_at`, [adminId]);
+    expect(platformAudit.rows.map(r => r.action)).toEqual(['USER_DISABLED', 'USER_ENABLED', 'USER_TEMPORARY_PASSWORD_ISSUED', 'PLATFORM_ADMIN_GRANTED', 'PLATFORM_ADMIN_REVOKED',
+      'PLATFORM_MEMBERSHIP_CREATED', 'PLATFORM_MEMBERSHIP_UPDATED', 'PLATFORM_MEMBERSHIP_UPDATED']);
+    expect(platformAudit.rows[0].after_data).toEqual({ status: 'DISABLED', reason: 'Báo mất điện thoại' });
+    const auditText = JSON.stringify(platformAudit.rows);
+    expect(auditText).not.toContain(temp.body.temporaryPassword);
+    expect(auditText).not.toContain('@example.com');
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

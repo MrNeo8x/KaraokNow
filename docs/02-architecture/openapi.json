@@ -723,6 +723,570 @@
         ]
       }
     },
+    "/v1/platform/users": {
+      "get": {
+        "operationId": "PlatformUsersController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive match on email or display name",
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISABLED",
+                "ALL"
+              ]
+            }
+          },
+          {
+            "name": "platformAdmin",
+            "required": false,
+            "in": "query",
+            "description": "true = only Platform Admins",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserListDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller is not a Platform Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}": {
+      "get": {
+        "operationId": "PlatformUsersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/disable": {
+      "post": {
+        "description": "Disables the account everywhere and revokes all its sessions immediately. Idempotent",
+        "operationId": "PlatformUsersController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the action targets the caller's own account"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/enable": {
+      "post": {
+        "operationId": "PlatformUsersController_enable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the action targets the caller's own account"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/temporary-password": {
+      "post": {
+        "description": "Support path for forgotten passwords (PD-014/PD-040): returns a temporary password once, forces a change at next login, revokes all sessions and clears the login lock",
+        "operationId": "PlatformUsersController_temporaryPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPasswordDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the action targets the caller's own account"
+          },
+          "409": {
+            "description": "User is disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/platform-admin": {
+      "post": {
+        "operationId": "PlatformUsersController_grantAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Platform Admin granted. Idempotent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "User is disabled"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/platform-admin/revoke": {
+      "post": {
+        "operationId": "PlatformUsersController_revokeAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Platform Admin revoked. Idempotent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the action targets the caller's own account"
+          },
+          "409": {
+            "description": "Would leave no active Platform Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/memberships": {
+      "get": {
+        "operationId": "PlatformMembershipsController_list",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Merchant not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      },
+      "post": {
+        "description": "Adds a member (creates the user with the temporary password when the email is new). Audited in the merchant and platform logs",
+        "operationId": "PlatformMembershipsController_create",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformCreateMembershipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the admin belongs to the merchant"
+          },
+          "409": {
+            "description": "Already a member"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/branches": {
+      "get": {
+        "operationId": "PlatformMembershipsController_branches",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branches to choose from when granting branch-scoped roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformBranchDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/memberships/{membershipId}": {
+      "patch": {
+        "description": "Changes roles, branches or status of a member. The merchant must keep at least one active Owner",
+        "operationId": "PlatformMembershipsController_update",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "membershipId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformUpdateMembershipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the admin belongs to the merchant"
+          },
+          "409": {
+            "description": "Would leave the merchant without an active Owner"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
     "/v1/merchant/branches": {
       "post": {
         "operationId": "VenueController_createBranch",
@@ -6005,6 +6569,292 @@
         "required": [
           "file",
           "title"
+        ]
+      },
+      "PlatformUserMembershipDto": {
+        "type": "object",
+        "properties": {
+          "membershipId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "tenantStatus": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OWNER",
+                "BRANCH_MANAGER",
+                "RECEPTIONIST",
+                "CASHIER"
+              ]
+            }
+          },
+          "branchIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "membershipId",
+          "tenantId",
+          "tenantName",
+          "tenantStatus",
+          "status",
+          "roles",
+          "branchIds"
+        ]
+      },
+      "PlatformUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "DISABLED"
+            ]
+          },
+          "mustChangePassword": {
+            "type": "boolean"
+          },
+          "platformAdmin": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "disabledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "disabledReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Reason given when the account was disabled"
+          },
+          "memberships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserMembershipDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "displayName",
+          "status",
+          "mustChangePassword",
+          "platformAdmin",
+          "createdAt",
+          "lastLoginAt",
+          "disabledAt",
+          "disabledReason",
+          "memberships"
+        ]
+      },
+      "PlatformUserListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "PlatformReasonDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Justification stored in the platform audit record"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "TemporaryPasswordDto": {
+        "type": "object",
+        "properties": {
+          "temporaryPassword": {
+            "type": "string",
+            "description": "Shown once. The user must change it at next login; all their sessions were revoked"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PlatformUserDto"
+          }
+        },
+        "required": [
+          "temporaryPassword",
+          "user"
+        ]
+      },
+      "PlatformBranchDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
+        ]
+      },
+      "PlatformCreateMembershipDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "temporaryPassword": {
+            "type": "string",
+            "minLength": 12
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OWNER",
+                "BRANCH_MANAGER",
+                "RECEPTIONIST",
+                "CASHIER"
+              ]
+            }
+          },
+          "branchIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "temporaryPassword",
+          "roles",
+          "reason"
+        ]
+      },
+      "PlatformUpdateMembershipDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OWNER",
+                "BRANCH_MANAGER",
+                "RECEPTIONIST",
+                "CASHIER"
+              ]
+            }
+          },
+          "branchIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
         ]
       },
       "CreateBranchDto": {

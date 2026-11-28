@@ -30,6 +30,17 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Luồng BE: quản lý user của Platform Admin (IAM-008, PD-040)
+
+- Người dùng: "Admin nền tảng chưa có tính năng quản lý user". PO chọn đủ bốn nhóm (tìm/xem, khoá/mở khoá, mật khẩu tạm, cấp/thu hồi Platform Admin) và cho Platform Admin **sửa** thành viên merchant → PD-040.
+- Code: `be/src/platform-users/` (service, controller, DTO); `MembershipService` thêm hook `start`/`beforeCommit` để kiểm tra (khoá theo merchant, ≥ 1 Owner, admin không thuộc merchant) và ghi audit trong cùng transaction. Migration `20261124060000_platform_user_management`: `platform_audit_logs` (audit_logs bắt buộc tenant nên không dùng được), `users.disabled_at/by/reason`, `platform_admins.granted_by/revoked_by`.
+- Bảo vệ: không tự khoá/tự đặt mật khẩu tạm/tự thu hồi admin; mật khẩu tạm 16 ký tự dễ đọc, `Cache-Control: no-store`, không vào audit; khoá user thu hồi mọi phiên (AuthGuard kiểm phiên + trạng thái nên có hiệu lực ngay).
+- Kiểm chứng: unit 67/67, E2E 48/48, migration up → down → up trên Postgres 17 tạm.
+- Ghi chú: audit `MEMBERSHIP_CREATED` có sẵn từ trước vẫn chứa email (lệch quy tắc "audit không PII") — chưa sửa, để task riêng nếu PO muốn.
+- Production đã có `84aa397` (gồm BKG-010 + FE-016 cùng lần, IAM-007). IAM-008 cần migrate trước push. FE-017 `READY`.
+
+---
+
 ## 2026-11-28 — Luồng FE: ảnh/logo/giấy tờ (FE-015) và mã đặt phòng 6 ký tự (FE-016)
 
 - FE-016 (`VERIFY`): mã 6 ký tự PD-038 trên trang khách, vẫn nhận mã cũ 32 hex; phải deploy cùng BKG-010.

@@ -218,6 +218,18 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — quản lý user của Platform (IAM-008, PD-040, 2026-11-28)
+
+Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 48/48 (contract cho các route dưới). Mọi route: Bearer của Platform Admin, **không** `X-Tenant-ID`; user thường → 403. Mọi thao tác ghi cần `reason` (1–500 ký tự, không chỉ khoảng trắng → 400).
+
+- `GET /v1/platform/users?q=&status=ACTIVE|DISABLED|ALL&platformAdmin=true|false&limit=1..100&offset=` → `{ items, limit, offset, hasMore }`. Item `PlatformUserDto`: `id, email, displayName, status (ACTIVE|DISABLED), mustChangePassword, platformAdmin, createdAt, lastLoginAt|null, disabledAt|null, disabledReason|null, memberships[{ membershipId, tenantId, tenantName, tenantStatus, status, roles[], branchIds[] }]`. `q` khớp email hoặc tên (không phân biệt hoa thường). `GET /v1/platform/users/{id}` → một item (404).
+- `POST /v1/platform/users/{id}/disable` / `enable` `{ reason }` → 200 user; khoá thì user bị đăng xuất ngay mọi nơi. Thao tác lên chính mình → 403.
+- `POST /v1/platform/users/{id}/temporary-password` `{ reason }` → 200 `{ temporaryPassword, user }` (`Cache-Control: no-store`). **Hiện mật khẩu một lần** (nút sao chép), không lưu, không log; user bị đăng xuất, lần đăng nhập sau phải đổi mật khẩu. User đang khoá → 409; chính mình → 403.
+- `POST /v1/platform/users/{id}/platform-admin` `{ reason }` cấp; `POST …/platform-admin/revoke` `{ reason }` thu hồi (chính mình → 403; không còn admin nào → 409). User bị khoá không cấp được (409).
+- Thành viên merchant: `GET /v1/platform/merchants/{tenantId}/memberships` (như `MembershipResponseDto` của Owner), `GET …/branches` → `[{ id, name, status }]` để chọn chi nhánh. `POST …/memberships` body như `CreateMembershipDto` của Owner + `reason` → 201 (email mới thì tạo user với mật khẩu tạm nhập vào; đã là thành viên → 409). `PATCH …/memberships/{membershipId}` `{ status?, roles?, branchIds?, reason }` → 200; không có gì đổi → 400; làm merchant mất Owner ACTIVE cuối cùng → 409; admin là thành viên của merchant đó → 403.
+- Gợi ý UI: mục "Người dùng" trong khu Platform (ô tìm, lọc trạng thái/admin, phân trang), trang chi tiết user (merchant + vai trò, các nút có hộp thoại nhập lý do), tab "Thành viên" trong chi tiết merchant.
+- Production: cần migration `20261124060000_platform_user_management` trước khi push (OPS — xem `deploy-vercel.md` §10).
+
 ## FE READY — giữ phiên qua F5 và chọn merchant (IAM-007, PD-039, 2026-11-28)
 
 Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 47/47 (có contract `/v1/me/tenants`). Không đổi body của login/refresh.

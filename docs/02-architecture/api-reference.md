@@ -444,6 +444,279 @@ Response được khai báo:
 |---|---|---|
 | 200 | PDF bytes | Chưa khai báo schema |
 
+### GET /v1/platform/users
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `q` | Không | string — Case-insensitive match on email or display name |
+| query | `status` | Không | string |
+| query | `platformAdmin` | Không | boolean — true = only Platform Admins |
+| query | `limit` | Không | number |
+| query | `offset` | Không | number |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformUserListDto"} |
+| 403 | Caller is not a Platform Admin | Chưa khai báo schema |
+
+### GET /v1/platform/users/{id}
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 404 | User not found | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/disable
+
+Nhóm: platform users
+
+Disables the account everywhere and revokes all its sessions immediately. Idempotent
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 403 | Not a Platform Admin, or the action targets the caller's own account | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/enable
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 403 | Not a Platform Admin, or the action targets the caller's own account | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/temporary-password
+
+Nhóm: platform users
+
+Support path for forgotten passwords (PD-014/PD-040): returns a temporary password once, forces a change at next login, revokes all sessions and clears the login lock
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/TemporaryPasswordDto"} |
+| 403 | Not a Platform Admin, or the action targets the caller's own account | Chưa khai báo schema |
+| 409 | User is disabled | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/platform-admin
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Platform Admin granted. Idempotent | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 409 | User is disabled | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/platform-admin/revoke
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Platform Admin revoked. Idempotent | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 403 | Not a Platform Admin, or the action targets the caller's own account | Chưa khai báo schema |
+| 409 | Would leave no active Platform Admin | Chưa khai báo schema |
+
+### GET /v1/platform/merchants/{tenantId}/memberships
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/MembershipResponseDto"}} |
+| 404 | Merchant not found | Chưa khai báo schema |
+
+### POST /v1/platform/merchants/{tenantId}/memberships
+
+Nhóm: platform users
+
+Adds a member (creates the user with the temporary password when the email is new). Audited in the merchant and platform logs
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformCreateMembershipDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/MembershipResponseDto"} |
+| 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
+| 409 | Already a member | Chưa khai báo schema |
+
+### GET /v1/platform/merchants/{tenantId}/branches
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Branches to choose from when granting branch-scoped roles | {"type":"array","items":{"$ref":"#/components/schemas/PlatformBranchDto"}} |
+
+### PATCH /v1/platform/merchants/{tenantId}/memberships/{membershipId}
+
+Nhóm: platform users
+
+Changes roles, branches or status of a member. The merchant must keep at least one active Owner
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+| path | `membershipId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformUpdateMembershipDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/MembershipResponseDto"} |
+| 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
+| 409 | Would leave the merchant without an active Owner | Chưa khai báo schema |
+
 ### POST /v1/merchant/branches
 
 Nhóm: merchant venues
@@ -3110,6 +3383,332 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "file",
     "title"
+  ]
+}
+```
+
+### PlatformUserMembershipDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "membershipId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantName": {
+      "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "branchIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "membershipId",
+    "tenantId",
+    "tenantName",
+    "tenantStatus",
+    "status",
+    "roles",
+    "branchIds"
+  ]
+}
+```
+
+### PlatformUserDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "email": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "DISABLED"
+      ]
+    },
+    "mustChangePassword": {
+      "type": "boolean"
+    },
+    "platformAdmin": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastLoginAt": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "disabledAt": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "disabledReason": {
+      "type": "string",
+      "nullable": true,
+      "description": "Reason given when the account was disabled"
+    },
+    "memberships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PlatformUserMembershipDto"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "email",
+    "displayName",
+    "status",
+    "mustChangePassword",
+    "platformAdmin",
+    "createdAt",
+    "lastLoginAt",
+    "disabledAt",
+    "disabledReason",
+    "memberships"
+  ]
+}
+```
+
+### PlatformUserListDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PlatformUserDto"
+      }
+    },
+    "limit": {
+      "type": "number"
+    },
+    "offset": {
+      "type": "number"
+    },
+    "hasMore": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "items",
+    "limit",
+    "offset",
+    "hasMore"
+  ]
+}
+```
+
+### PlatformReasonDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Justification stored in the platform audit record"
+    }
+  },
+  "required": [
+    "reason"
+  ]
+}
+```
+
+### TemporaryPasswordDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "temporaryPassword": {
+      "type": "string",
+      "description": "Shown once. The user must change it at next login; all their sessions were revoked"
+    },
+    "user": {
+      "$ref": "#/components/schemas/PlatformUserDto"
+    }
+  },
+  "required": [
+    "temporaryPassword",
+    "user"
+  ]
+}
+```
+
+### PlatformBranchDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "status"
+  ]
+}
+```
+
+### PlatformCreateMembershipDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "temporaryPassword": {
+      "type": "string",
+      "minLength": 12
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "branchIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "email",
+    "displayName",
+    "temporaryPassword",
+    "roles",
+    "reason"
+  ]
+}
+```
+
+### PlatformUpdateMembershipDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "branchIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "reason"
   ]
 }
 ```

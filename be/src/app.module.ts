@@ -19,6 +19,7 @@ import { ListingApprovalModule } from './listing-approval/listing-approval.modul
 import { JobsModule } from './jobs/jobs.module';
 import { StorageModule } from './platform/storage/storage.module';
 import { MerchantDocumentsModule } from './merchant-documents/merchant-documents.module';
+import { PlatformUsersModule } from './platform-users/platform-users.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { MerchantDocumentsModule } from './merchant-documents/merchant-documents
     MembershipModule,
     StorageModule,
     MerchantDocumentsModule,
+    PlatformUsersModule,
     VenueModule,
     AuditModule,
     AvailabilityModule,

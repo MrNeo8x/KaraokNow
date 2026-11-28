@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-039` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-040` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -138,6 +138,16 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
 
+### L. Quản lý user của Platform (PD-040)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| L1 | Platform Admin | Tìm user theo email/tên | Thấy trạng thái, merchant và vai trò, lần đăng nhập gần nhất | PD-040 | | |
+| L2 | Platform Admin, Lễ tân | Khoá tài khoản Lễ tân đang đăng nhập (ghi lý do); mở lại | Lễ tân bị đẩy ra ngay, không đăng nhập được; mở lại thì đăng nhập được | PD-040 | | |
+| L3 | Platform Admin, Owner | Cấp mật khẩu tạm cho Owner quên mật khẩu | Mật khẩu hiện một lần; Owner đăng nhập bằng nó và bị bắt đổi mật khẩu; mật khẩu cũ hết dùng | PD-040, PD-014 | | |
+| L4 | Platform Admin | Cấp quyền Platform Admin cho user khác rồi thu hồi; thử tự khoá/tự thu hồi chính mình | Cấp/thu hồi có hiệu lực; tự thao tác lên mình bị từ chối | PD-040 | | |
+| L5 | Platform Admin | Thêm Owner mới cho merchant, sau đó vô hiệu Owner cũ; thử vô hiệu Owner cuối cùng | Owner mới vào được merchant; không cho merchant mất hết Owner | PD-040 | | |
+
 ### K. Phiên đăng nhập (PD-039)
 
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
@@ -182,7 +192,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 ## 6. Tiêu chí kết thúc
 
-- 100% ca nhóm C, D, F, G, H, I, J và K đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
+- 100% ca nhóm C, D, F, G, H, I, J, K và L đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
 - Lỗi Trung bình/Thấp còn mở có hướng xử lý và được PO chấp nhận bằng văn bản.
 - Các giả định trước đây (B1, D2, E3) đã được PO chốt ngày 2026-11-28 (PD-033…PD-035); nếu UAT cho thấy cần đổi, ghi thành yêu cầu sửa và quyết định mới.
 - Kết quả, người thực hiện và ngày được ghi vào bảng; task board cập nhật UAT-001 và các task `VERIFY` liên quan.

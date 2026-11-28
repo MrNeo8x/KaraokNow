@@ -6,6 +6,12 @@ import type { Actor, Role } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
 import { CreateMembershipDto, UpdateMembershipDto } from './membership.dto';
 
+/** Lets a caller (Platform user management, PD-040) add checks and audit inside the same transaction. */
+export interface MembershipHooks {
+  start?(client: PoolClient): Promise<void>;
+  beforeCommit?(client: PoolClient, membershipId: string, before: MembershipRow | null, after: MembershipRow): Promise<void>;
+}
+
 export interface MembershipRow {
   id: string; userId: string; email: string; displayName: string; status: string;
   roles: Role[]; branchIds: string[];
@@ -19,12 +25,13 @@ export class MembershipService {
     return (await this.db.query<MembershipRow>(this.selectSql(), [tenantId])).rows;
   }
 
-  async create(actor: Actor, dto: CreateMembershipDto): Promise<MembershipRow> {
+  async create(actor: Actor, dto: CreateMembershipDto, hooks: MembershipHooks = {}): Promise<MembershipRow> {
     const tenantId = actor.tenantId!;
     this.validateRoleBranches(dto.roles, dto.branchIds);
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
+      await hooks.start?.(client);
       await this.assertBranches(client, tenantId, dto.branchIds);
       let user = await client.query<{ id: string }>('SELECT id FROM users WHERE lower(email)=lower($1)', [dto.email]);
       let userId: string;
@@ -48,6 +55,7 @@ export class MembershipService {
       await this.replaceGrants(client, membershipId, tenantId, dto.roles, dto.branchIds);
       await this.audit(client, actor, 'MEMBERSHIP_CREATED', 'MEMBERSHIP', membershipId, null,
         { email: dto.email.toLowerCase(), roles: dto.roles, branchIds: dto.branchIds, status: 'ACTIVE' });
+      await hooks.beforeCommit?.(client, membershipId, null, { id: membershipId, userId, email: dto.email.toLowerCase(), displayName: dto.displayName, status: 'ACTIVE', roles: dto.roles, branchIds: dto.branchIds });
       await client.query('COMMIT');
       const created = (await this.list(tenantId)).find((item) => item.id === membershipId);
       if (!created) throw new NotFoundException('Membership not found after creation');
@@ -58,11 +66,12 @@ export class MembershipService {
     } finally { client.release(); }
   }
 
-  async update(actor: Actor, membershipId: string, dto: UpdateMembershipDto): Promise<MembershipRow> {
+  async update(actor: Actor, membershipId: string, dto: UpdateMembershipDto, hooks: MembershipHooks = {}): Promise<MembershipRow> {
     const tenantId = actor.tenantId!;
     const client = await this.db.connect();
     try {
       await client.query('BEGIN');
+      await hooks.start?.(client);
       const before = await this.getForUpdate(client, tenantId, membershipId);
       const roles = dto.roles ?? before.roles;
       const branchIds = dto.branchIds ?? before.branchIds;
@@ -75,6 +84,7 @@ export class MembershipService {
       if (dto.roles || dto.branchIds) await this.replaceGrants(client, membershipId, tenantId, roles, branchIds);
       const after = { ...before, status: dto.status ?? before.status, roles, branchIds };
       await this.audit(client, actor, 'MEMBERSHIP_UPDATED', 'MEMBERSHIP', membershipId, before, after);
+      await hooks.beforeCommit?.(client, membershipId, before, after);
       await client.query('COMMIT');
       return after;
     } catch (error) {
