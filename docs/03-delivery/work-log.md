@@ -53,6 +53,17 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: dữ liệu demo Karaoke Majestic (phòng, ảnh, giá, công khai)
+
+- Theo yêu cầu người dùng, ở **local và production**: mỗi chi nhánh 3 phòng `P101` "Phòng 101 – Thường" (6 khách), `V201` "Phòng VIP 201" (10), `S301` "Phòng Party 301" (20); mỗi phòng 4–5 ảnh (28 ảnh); mỗi chi nhánh 4 ảnh thư viện (VEN-006). Alt text "Ảnh minh hoạ – …".
+- Ảnh: 15 ảnh stock **Unsplash License** (miễn phí, không bắt buộc ghi nguồn), đã xem từng ảnh — loại ảnh có người, logo/thương hiệu, nội dung TV, chữ nhạy cảm. Ảnh **không phải phòng thật của Majestic**. Unsplash chặn tải từ máy này (401) → lấy URL CDN `images.unsplash.com` qua agent web-fetch.
+- Bảng giá `MAJESTIC_STD` (ACTIVE): giá/giờ Thường 150.000đ, VIP 250.000đ, Party 400.000đ (người dùng chọn); điều khoản mẫu UAT; cọc giữ mặc định NONE (chưa cấu hình). Công khai (Owner) + duyệt listing (production: Platform Admin không là thành viên merchant; local: Platform Admin UAT). Mọi bước qua service backend (validate, kiểm loại file, audit).
+- Kiểm qua API công khai production: 2 chi nhánh, 3 phòng/chi nhánh, điều khoản có, 4 ảnh chi nhánh 200, báo giá 2 giờ 300.000/500.000/800.000đ. Ảnh phòng **chưa hiển thị cho khách** (API công khai không trả) → VEN-007.
+- Áp `20261124100000_venue_photos` lên Prisma lúc ~16:18; nhưng `8830ff6` (VEN-006, đọc bảng này) đã được push và READY lúc 16:11 — **vi phạm runbook (push trước migration)**, ~6 phút catalog công khai có thể lỗi; log BE 40 phút không có 5xx. Production 32 migration.
+- Local: container backend lưu file ở `/app/.storage` **không có volume** → ảnh đã `docker cp` vào container sẽ mất khi rebuild (DB vẫn trỏ tới); chạy lại script hoặc thêm volume.
+
+---
+
 ## 2026-11-28 — Luồng BE: thư viện ảnh merchant và chi nhánh (VEN-006, PD-048)
 
 - Người dùng: "Thêm phần ảnh cho merchant và chi nhánh, tối đa 10 ảnh". Áp quy tắc ảnh phòng PD-037 (JPEG/PNG/WebP ≤ 4 MB, FE nén, store public); Owner quản lý ảnh merchant, Owner/Branch Manager được giao quản lý ảnh chi nhánh; khách thấy cả hai → PD-048.
