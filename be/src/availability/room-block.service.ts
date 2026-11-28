@@ -129,7 +129,15 @@ export class RoomBlockService {
       throw error;
     }
   }
-  private audit(client: PoolClient, actor: Actor, action: string, id: string, before: unknown, after: unknown) {
+  /** Audit keeps structured fields only: the free-text reason is replaced by a flag (no free text in audit_logs). */
+  private audit(client: PoolClient, actor: Actor, action: string, id: string, beforeBlock: RoomBlock | null, afterBlock: RoomBlock | null) {
+    const strip = (block: RoomBlock | null) => {
+      if (!block) return null;
+      const { reason: _reason, ...rest } = block;
+      return rest;
+    };
+    const before = strip(beforeBlock);
+    const after = afterBlock && { ...strip(afterBlock), ...(beforeBlock && beforeBlock.reason !== afterBlock.reason ? { reasonChanged: true } : {}) };
     return client.query(
       `INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,before_data,after_data)
        VALUES ($1,$2,$3,$4,'ROOM_BLOCK',$5,$6,$7)`,

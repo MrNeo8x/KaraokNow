@@ -6,9 +6,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
+**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
 
-**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **48/48**, migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
+**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **49/49** (sau BKG-011), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
 
@@ -24,6 +24,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
+
+---
+
+## 2026-11-28 — Luồng BE: giữ chỗ quá hạn chặn phòng (BKG-011) và audit không PII (AUD-002)
+
+- Khi xem OPS-003 phát hiện lỗi production: Vercel Hobby chạy cron `hold-expiry` mỗi ngày một lần, còn hold chỉ được dọn khi request chạm đúng hold đó. Hold khách bỏ dở vẫn giữ occupancy `HELD` → tìm phòng báo bận và giữ chỗ mới (khách lẫn nhân viên) cùng khung bị 409 tới ~24 h.
+- Sửa: `be/src/availability/occupancy-lock.ts` — `lockRoomOccupancy` sau khi lấy khoá phòng gọi `releaseOverdueHolds` (EXPIRED + RELEASED + audit `HOLD_EXPIRED`, `FOR UPDATE SKIP LOCKED`); `HoldService.expireById` dùng chung `expireOverdueHold`; `availability-search.service.ts` bỏ qua occupancy HELD của hold quá hạn. E2E BKG-011 fail khi bỏ bản sửa, pass khi có. Benchmark: tìm phòng p95 24,5 ms, tranh chấp 175 ms — đạt.
+- AUD-002: audit membership bỏ email/tên; audit khoá phòng bỏ lý do tự do (cờ `reasonChanged`). Bản ghi cũ còn nguyên — hỏi PO nếu muốn làm sạch.
+- Kiểm chứng: unit 67/67, E2E 49/49, benchmark đạt. Không migration.
+- OPS-003 chưa làm (cần chọn cách cảnh báo trên Vercel).
 
 ---
 

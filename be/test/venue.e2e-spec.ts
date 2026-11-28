@@ -1014,6 +1014,11 @@ describe('Authentication, membership, RBAC and venue API', () => {
     );
     await authorized('get', `/v1/merchant/branches/${branch.id}/room-blocks`)
       .expect(200).expect(({ body }) => expect(body).toHaveLength(2));
+    // Free-text reasons stay out of the audit log; an edit is recorded as a flag.
+    const blockAudit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE entity_id=$1 ORDER BY occurred_at`, [first.id]);
+    expect(blockAudit.rows.map(r => r.action)).toEqual(['ROOM_BLOCK_CREATED', 'ROOM_BLOCK_UPDATED', 'ROOM_BLOCK_RELEASED']);
+    expect(JSON.stringify(blockAudit.rows)).not.toMatch(/Maintenance|maintenance/);
+    expect(blockAudit.rows[1].after_data.reasonChanged).toBe(true);
   });
 
   it('manages memberships and restricts a branch manager to assigned branches', async () => {
@@ -2003,7 +2008,9 @@ describe('Authentication, membership, RBAC and venue API', () => {
     assertMatchesContract(doc, 'patch', '/v1/platform/merchants/{tenantId}/memberships/{membershipId}', 200, promoted);
     expect(promoted.roles).toEqual(['OWNER']);
     await A.patch(`/v1/platform/merchants/${tenantId}/memberships/${ownerMembership}`).send({ status: 'INACTIVE', reason: 'Owner cũ nghỉ việc' }).expect(200);
-    const merchantAudit = await pool.query(`SELECT action,actor_user_id FROM audit_logs WHERE tenant_id=$1 ORDER BY occurred_at`, [tenantId]);
+    const merchantAudit = await pool.query(`SELECT action,actor_user_id,before_data,after_data FROM audit_logs WHERE tenant_id=$1 ORDER BY occurred_at`, [tenantId]);
+    expect(JSON.stringify(merchantAudit.rows)).not.toMatch(/@example\.com|PU Cashier/); // no email or name in audit
+    expect(merchantAudit.rows[0].after_data).toEqual({ userId: cashier.userId, newUser: true, roles: ['CASHIER'], branchIds: [branchId], status: 'ACTIVE' });
     expect(merchantAudit.rows.map(r => r.action)).toEqual(['MEMBERSHIP_CREATED', 'MEMBERSHIP_UPDATED', 'MEMBERSHIP_UPDATED']);
     expect(merchantAudit.rows.every(r => r.actor_user_id === adminId)).toBe(true);
 
@@ -2018,6 +2025,29 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const auditText = JSON.stringify(platformAudit.rows);
     expect(auditText).not.toContain(temp.body.temporaryPassword);
     expect(auditText).not.toContain('@example.com');
+  });
+
+  it('frees the slot of an overdue hold without waiting for the daily cron (BKG-011)', async () => {
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'BKG011', name: 'Overdue holds', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'BKG011-R', name: 'Overdue room', capacity: 4 }).expect(201)).body;
+    const slot = { roomId: room.id, channel: 'BKG011', startAt: '2047-03-01T12:00:00Z', durationMinutes: 90 };
+    const first = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'bkg011-first').send(slot).expect(201)).body;
+    await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'bkg011-early').send(slot).expect(409);
+    const free = async () => (await authorized('get', `/v1/merchant/branches/${branch.id}/availability`)
+      .query({ startAt: slot.startAt, durationMinutes: 90 }).expect(200)).body.rooms.map((r: { id: string }) => r.id);
+    expect(await free()).not.toContain(room.id);
+
+    // TTL passes; no cron runs.
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [first.id]);
+    expect(await free()).toContain(room.id);
+    const second = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'bkg011-second').send(slot).expect(201)).body;
+    const states = await pool.query(`SELECT h.id,h.status,o.status AS occupancy FROM booking_holds h JOIN room_occupancy o ON o.id=h.occupancy_id WHERE h.id=ANY($1::uuid[])`, [[first.id, second.id]]);
+    expect(Object.fromEntries(states.rows.map(r => [r.id, [r.status, r.occupancy]]))).toEqual({ [first.id]: ['EXPIRED', 'RELEASED'], [second.id]: ['HELD', 'HELD'] });
+    const audit = await pool.query(`SELECT count(*)::int AS n FROM audit_logs WHERE action='HOLD_EXPIRED' AND entity_id=$1`, [first.id]);
+    expect(audit.rows[0].n).toBe(1);
+    // A maintenance block over an overdue hold also succeeds.
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [second.id]);
+    await authorized('post', '/v1/merchant/room-blocks').send({ roomId: room.id, startAt: '2047-03-01T12:00:00Z', endAt: '2047-03-01T14:00:00Z', reason: 'Sửa loa' }).expect(201);
   });
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {

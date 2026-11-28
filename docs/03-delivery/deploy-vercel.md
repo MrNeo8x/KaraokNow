@@ -115,6 +115,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **BKG-011** (lỗi production: giữ chỗ quá hạn chặn phòng tới lần cron hằng ngày) + **AUD-002**: không migration, không env. Nên push sớm. Smoke: tìm phòng trống `/v1/public/branches/{id}/availability` 200.
+
 - **IAM-008** (PD-040, quản lý user của Platform): **migration `20261124060000_platform_user_management` phải áp lên Prisma trước khi push** (bảng `platform_audit_logs`, cột nullable ở `users`/`platform_admins`, index — tương thích ngược, code cũ không đụng tới). Smoke: Platform Admin `GET /v1/platform/users?limit=1` → 200; user thường → 403.
 
 - **IAM-007 + FE-012** (PD-039, giữ phiên qua F5): không migration, không env mới (để trống `AUTH_COOKIE_SECURE` → cookie Secure). Push cùng lúc hoặc BE trước (BE vẫn nhận refresh token trong body). Smoke sau deploy: đăng nhập trên `vn-karaoke-now.vercel.app`, DevTools → cookie `kn_refresh` thuộc host FE, `HttpOnly`, `Secure`, path `/v1/auth` (xác nhận rewrite Next.js chuyển tiếp `Set-Cookie`); F5 vẫn đăng nhập.

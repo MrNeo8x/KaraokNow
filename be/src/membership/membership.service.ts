@@ -17,6 +17,11 @@ export interface MembershipRow {
   roles: Role[]; branchIds: string[];
 }
 
+/** Audit data keeps ids, status and grants only — never email or display name (no PII in audit_logs). */
+function auditShape(row: MembershipRow) {
+  return { userId: row.userId, status: row.status, roles: [...row.roles].sort(), branchIds: [...row.branchIds].sort() };
+}
+
 @Injectable()
 export class MembershipService {
   constructor(@Inject(PG_POOL) private readonly db: Pool) {}
@@ -35,6 +40,7 @@ export class MembershipService {
       await this.assertBranches(client, tenantId, dto.branchIds);
       let user = await client.query<{ id: string }>('SELECT id FROM users WHERE lower(email)=lower($1)', [dto.email]);
       let userId: string;
+      const newUser = !user.rowCount;
       if (user.rowCount) {
         userId = user.rows[0].id;
       } else {
@@ -54,7 +60,7 @@ export class MembershipService {
       });
       await this.replaceGrants(client, membershipId, tenantId, dto.roles, dto.branchIds);
       await this.audit(client, actor, 'MEMBERSHIP_CREATED', 'MEMBERSHIP', membershipId, null,
-        { email: dto.email.toLowerCase(), roles: dto.roles, branchIds: dto.branchIds, status: 'ACTIVE' });
+        { userId, newUser, roles: [...dto.roles].sort(), branchIds: [...dto.branchIds].sort(), status: 'ACTIVE' });
       await hooks.beforeCommit?.(client, membershipId, null, { id: membershipId, userId, email: dto.email.toLowerCase(), displayName: dto.displayName, status: 'ACTIVE', roles: dto.roles, branchIds: dto.branchIds });
       await client.query('COMMIT');
       const created = (await this.list(tenantId)).find((item) => item.id === membershipId);
@@ -83,7 +89,7 @@ export class MembershipService {
       );
       if (dto.roles || dto.branchIds) await this.replaceGrants(client, membershipId, tenantId, roles, branchIds);
       const after = { ...before, status: dto.status ?? before.status, roles, branchIds };
-      await this.audit(client, actor, 'MEMBERSHIP_UPDATED', 'MEMBERSHIP', membershipId, before, after);
+      await this.audit(client, actor, 'MEMBERSHIP_UPDATED', 'MEMBERSHIP', membershipId, auditShape(before), auditShape(after));
       await hooks.beforeCommit?.(client, membershipId, before, after);
       await client.query('COMMIT');
       return after;

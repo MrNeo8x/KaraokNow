@@ -6,7 +6,7 @@ import { PG_POOL } from '../platform/database/database.module';
 import { AttachHoldDetailsDto, CreateHoldDto, ListHoldsDto } from './hold.dto';
 import { PricingService } from '../pricing/pricing.service';
 import { snapshotDepositPolicy } from './deposit-snapshot';
-import { lockRoomOccupancy } from '../availability/occupancy-lock';
+import { expireOverdueHold, lockRoomOccupancy } from '../availability/occupancy-lock';
 
 const fields = `h.id,h.branch_id AS "branchId",h.room_id AS "roomId",h.channel,h.start_at AS "startAt",h.duration_minutes AS "durationMinutes",h.buffer_minutes AS "bufferMinutes",upper(o.occupied_range) AS "reservedEndAt",h.expires_at AS "expiresAt",h.status,h.customer_phone AS "customerPhone",h.customer_email AS "customerEmail",h.price_snapshot AS "priceSnapshot",h.phone_verified_at AS "phoneVerifiedAt",h.phone_verified_by AS "phoneVerifiedBy",h.deposit_policy_snapshot AS "depositPolicySnapshot",h.public_accepted_terms AS "publicAcceptedTerms",h.public_accepted_terms_version::text AS "publicAcceptedTermsVersion"`;
 
@@ -161,12 +161,7 @@ export class HoldService {
     finally { client.release(); }
   }
   /** Marks an overdue HELD hold EXPIRED and releases its occupancy; no-op otherwise. Caller holds the row lock. */
-  async expireById(client: PoolClient, id: string) {
-    const expired = (await client.query(`UPDATE booking_holds SET status='EXPIRED',updated_at=clock_timestamp() WHERE id=$1 AND status='HELD' AND expires_at<=clock_timestamp() RETURNING id,tenant_id,occupancy_id`, [id])).rows[0];
-    if (!expired) return;
-    await client.query(`UPDATE room_occupancy SET status='RELEASED',updated_at=clock_timestamp() WHERE id=$1 AND status='HELD'`, [expired.occupancy_id]);
-    await client.query(`INSERT INTO audit_logs(id,tenant_id,action,entity_type,entity_id,after_data) VALUES($1,$2,'HOLD_EXPIRED','BOOKING_HOLD',$3,$4)`, [randomUUID(), expired.tenant_id, id, JSON.stringify({ status: 'EXPIRED' })]);
-  }
+  async expireById(client: PoolClient, id: string) { await expireOverdueHold(client, id); }
   private async find(client: PoolClient, tenantId: string, id: string) {
     return (await client.query(`SELECT ${fields} FROM booking_holds h JOIN room_occupancy o ON o.id=h.occupancy_id WHERE h.tenant_id=$1 AND h.id=$2`, [tenantId,id])).rows[0];
   }

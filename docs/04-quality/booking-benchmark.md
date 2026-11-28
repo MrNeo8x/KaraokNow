@@ -86,6 +86,10 @@ Lần chạy thứ 3 trước khi sửa, kịch bản tranh chấp trả **198 l
 
 Sau khi đặt giới hạn pool/timeout mặc định (pool 10, chờ kết nối 5 s, câu lệnh 15 s, chờ khoá 5 s), một lần chạy cho: tìm phòng p95 48 ms, báo giá 24 ms, giữ phòng 48 ms, tranh chấp 100×10 p95 132 ms, luồng nhân viên ≤ 42 ms; 0 chồng lấn, 10/10 vòng một người thắng, không 5xx. Script nay luôn dọn container/app trong `finally` và tự tạo thư mục output.
 
+## Chạy lại sau BKG-011 (2026-11-28)
+
+`lockRoomOccupancy` giờ giải phóng các giữ chỗ quá hạn của phòng trước khi ghi, và tìm phòng bỏ qua occupancy HELD của giữ chỗ quá hạn. Một lần chạy: tìm phòng p95 24,5 ms, báo giá 19,7 ms, giữ phòng 44,2 ms, tranh chấp 100×10 p95 175 ms, luồng nhân viên ≤ 35 ms; tất cả đạt, không 5xx.
+
 ## Giới hạn và việc tiếp theo
 
 - Kết quả dao động theo tải máy: một lần chạy sau đó, khi máy đang chạy song song việc khác, cho tìm phòng p95 55 ms và tranh chấp p95 345 ms — vẫn dưới mục tiêu, đúng đắn vẫn đạt. Khi so sánh giữa các lần đo, chạy trên máy rảnh và lặp ít nhất 3 lần.

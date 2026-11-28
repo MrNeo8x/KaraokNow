@@ -58,6 +58,9 @@ export class AvailabilitySearchService {
            SELECT 1 FROM room_occupancy o
            WHERE o.tenant_id=r.tenant_id AND o.room_id=r.id
              AND o.status IN ('HELD','CONFIRMED','IN_USE','MAINTENANCE')
+             -- BKG-011: a HELD occupancy whose hold passed its TTL no longer blocks (released on the next write).
+             AND NOT (o.status='HELD' AND EXISTS (SELECT 1 FROM booking_holds h WHERE h.occupancy_id=o.id AND h.status='HELD'
+               AND h.expires_at<=clock_timestamp()))
              AND o.occupied_range && tstzrange($3::timestamptz,
                  $3::timestamptz + (($4::integer + $5::integer) * interval '1 minute'),'[)')
          )
