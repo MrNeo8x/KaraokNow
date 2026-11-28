@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-038` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-039` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -138,6 +138,15 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
 
+### K. Phiên đăng nhập (PD-039)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| K1 | Mọi vai trò | Đăng nhập, bấm F5; mở thêm một tab | Vẫn đăng nhập, không phải nhập lại; merchant đã chọn được giữ | PD-039 | | |
+| K2 | Owner của 1 merchant | Đăng nhập | Vào thẳng merchant, không phải nhập Tenant ID | PD-039 | | |
+| K3 | User thuộc ≥ 2 merchant | Đăng nhập, chọn merchant theo tên; đổi merchant | Danh sách đúng tên các merchant đang hoạt động của mình | PD-039 | | |
+| K4 | Mọi vai trò | Đăng xuất, bấm Back hoặc F5 | Về màn đăng nhập; tab khác cũng mất phiên khi làm mới | PD-039 | | |
+
 ### J. Mã đặt phòng (PD-038)
 
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
@@ -173,7 +182,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 ## 6. Tiêu chí kết thúc
 
-- 100% ca nhóm C, D, F, G, H, I và J đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
+- 100% ca nhóm C, D, F, G, H, I, J và K đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
 - Lỗi Trung bình/Thấp còn mở có hướng xử lý và được PO chấp nhận bằng văn bản.
 - Các giả định trước đây (B1, D2, E3) đã được PO chốt ngày 2026-11-28 (PD-033…PD-035); nếu UAT cho thấy cần đổi, ghi thành yêu cầu sửa và quyết định mới.
 - Kết quả, người thực hiện và ngày được ghi vào bảng; task board cập nhật UAT-001 và các task `VERIFY` liên quan.

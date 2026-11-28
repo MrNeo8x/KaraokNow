@@ -11,6 +11,9 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const FAILURE_WINDOW_MS = 15 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 5;
+/** FE-012: several tabs sharing the refresh cookie may refresh at the same moment; a token rotated this recently is not treated as reuse. */
+export const CONCURRENT_REFRESH_GRACE_SECONDS = 10;
+export { REFRESH_TTL_SECONDS };
 const DUMMY_HASH = hashSync('constant-time-dummy-password', 12);
 
 interface UserRow { id: string; password_hash: string; must_change_password: boolean }
@@ -59,7 +62,7 @@ export class AuthService {
     } finally { client.release(); }
   }
 
-  async refresh(rawToken: string): Promise<TokenPair> {
+  async refresh(rawToken: string, allowConcurrent = false): Promise<TokenPair> {
     const tokenHash = this.tokenHash(rawToken);
     const client = await this.db.connect();
     try {
@@ -72,6 +75,17 @@ export class AuthService {
          FROM auth_sessions s JOIN users u ON u.id=s.user_id
          WHERE s.refresh_token_hash=$1 AND u.status='ACTIVE' FOR UPDATE`, [tokenHash])).rows[0];
       if (!session) throw new UnauthorizedException('Invalid refresh token');
+      if (allowConcurrent && session.revoked_at && session.replaced_by) {
+        const concurrent = (await client.query(`SELECT 1 FROM auth_sessions r WHERE r.id=$1 AND r.revoked_at IS NULL
+          AND $2::timestamptz > clock_timestamp()-($3::integer*interval '1 second')`,
+        [session.replaced_by, session.revoked_at, CONCURRENT_REFRESH_GRACE_SECONDS])).rowCount;
+        if (concurrent && session.expires_at.getTime() > Date.now()) {
+          // Benign race (two tabs, same cookie): issue a sibling session in the same family; the family stays intact.
+          const pair = await this.createSession(client, session.user_id, session.family_id, session.must_change_password);
+          await client.query('COMMIT');
+          return pair;
+        }
+      }
       if (session.revoked_at) {
         await client.query('UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE family_id=$1', [session.family_id]);
         await this.securityEvent(client, session.user_id, 'REFRESH_TOKEN_REUSE');

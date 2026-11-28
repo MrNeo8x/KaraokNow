@@ -24,6 +24,10 @@ export class FilesController {
     response.setHeader('Content-Type', type);
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    response.sendFile(file);
+    // The default directory is `.storage`; express `send` refuses dot-paths unless told otherwise (was a 500 locally).
+    // Traversal is already blocked by SAFE_PATH in localPublicFile.
+    response.sendFile(file, { dotfiles: 'allow' }, (error) => {
+      if (error && !response.headersSent) response.status(404).json({ error: { code: 'NOT_FOUND', message: 'File not found' } });
+    });
   }
 }

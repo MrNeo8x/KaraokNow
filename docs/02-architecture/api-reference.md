@@ -113,6 +113,8 @@ Response được khai báo:
 
 Nhóm: authentication
 
+Also sets the HttpOnly refresh cookie `kn_refresh` (path /v1/auth, SameSite=Strict) so the browser keeps the session across reloads (FE-012)
+
 Body bắt buộc:
 
 `application/json`
@@ -133,6 +135,12 @@ Response được khai báo:
 
 Nhóm: authentication
 
+Rotates the refresh token from the body, or from the `kn_refresh` cookie when header `X-KN-Session: 1` is sent. Cookie mode only: a token rotated in the last 10 s by a concurrent request (another tab) gets a sibling session instead of revoking the family; body tokens keep strict reuse detection
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-KN-Session` | Không | string — Send `1` to use the refresh cookie instead of a body token |
+
 Body bắt buộc:
 
 `application/json`
@@ -148,13 +156,17 @@ Response được khai báo:
 | HTTP | Mô tả | Schema |
 |---|---|---|
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/TokenPairResponseDto"} |
-| 401 | Invalid, expired or reused token; reuse revokes the family | Chưa khai báo schema |
+| 401 | Missing, invalid, expired or reused token; reuse revokes the family | Chưa khai báo schema |
 
 ### POST /v1/auth/logout
 
 Nhóm: authentication
 
-Revokes the refresh-token family, including any token rotated concurrently. Unknown tokens still return 204.
+Revokes the refresh-token family (body token, or the cookie with `X-KN-Session: 1`), including any token rotated concurrently, and clears the cookie. Unknown or missing tokens still return 204.
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-KN-Session` | Không | string |
 
 Body bắt buộc:
 
@@ -307,6 +319,18 @@ Response được khai báo:
 |---|---|---|
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/MerchantMeDto"} |
 | 403 | No active membership in X-Tenant-ID | Chưa khai báo schema |
+
+### GET /v1/me/tenants
+
+Nhóm: memberships
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/MyTenantDto"}} |
 
 ### GET /v1/merchant/documents
 
@@ -2699,12 +2723,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "type": "object",
   "properties": {
     "refreshToken": {
-      "type": "string"
+      "type": "string",
+      "description": "Optional when the browser sends the HttpOnly refresh cookie together with header `X-KN-Session: 1` (FE-012)"
     }
-  },
-  "required": [
-    "refreshToken"
-  ]
+  }
 }
 ```
 
@@ -2974,6 +2996,49 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "roles",
     "branchIds",
     "platformAdmin"
+  ]
+}
+```
+
+### MyTenantDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantName": {
+      "type": "string"
+    },
+    "tenantStatus": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ],
+      "description": "INACTIVE = suspended by Platform Admin (PD-031); staff can still work on existing holds/bookings"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    }
+  },
+  "required": [
+    "tenantId",
+    "tenantName",
+    "tenantStatus",
+    "roles"
   ]
 }
 ```

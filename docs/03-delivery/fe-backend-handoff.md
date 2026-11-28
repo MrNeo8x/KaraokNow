@@ -218,6 +218,17 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — giữ phiên qua F5 và chọn merchant (IAM-007, PD-039, 2026-11-28)
+
+Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 47/47 (có contract `/v1/me/tenants`). Không đổi body của login/refresh.
+
+- `POST /v1/auth/login`: như cũ, **thêm** `Set-Cookie: kn_refresh=…; HttpOnly; Secure; SameSite=Strict; Path=/v1/auth` (local compose không có `Secure` do `AUTH_COOKIE_SECURE=false`). Body vẫn có `refreshToken` để tương thích, **FE không được lưu nó** (bỏ khỏi state lâu dài).
+- `POST /v1/auth/refresh` với body `{}` + header `X-KN-Session: 1` → dùng cookie, trả `TokenPairResponseDto` và đặt cookie mới. Thiếu header hoặc cookie → 401. 401 thì BE xoá cookie → về màn đăng nhập. 409/503 không xoá cookie → thử lại. Gọi bằng `fetch('/v1/auth/refresh', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json', 'X-KN-Session': '1' }, body: '{}' })` (cùng origin nhờ rewrite, mặc định đã gửi cookie).
+- Khi tải trang: gọi refresh như trên; 200 → có phiên, đặt hẹn giờ refresh như hiện nay (cũng dùng cookie). Nhiều tab refresh cùng lúc trong 10 s không bị coi là dùng lại token.
+- `POST /v1/auth/logout` body `{}` + `X-KN-Session: 1` → 204, thu hồi family và xoá cookie (thiếu token vẫn 204).
+- `GET /v1/me/tenants` (Bearer, **không** `X-Tenant-ID`) → `[{ tenantId, tenantName, tenantStatus: 'ACTIVE'|'INACTIVE', roles[] }]`, sắp theo tên, chỉ membership ACTIVE. 0 phần tử → báo không thuộc merchant nào (Platform Admin vẫn vào khu Platform); 1 → tự chọn; nhiều → danh sách chọn. Nhớ `tenantId` gần nhất trong localStorage (không phải bí mật) và kiểm lại với danh sách.
+- **Trả lời yêu cầu FE-015:** `GET /v1/files/public/{pathname}` hết 500 với thư mục `.storage` (`sendFile` cho phép dot-path; lỗi đọc → 404). Cần rebuild backend local.
+
 ## FE READY — mã đặt phòng 6 ký tự (BKG-010, PD-038, 2026-11-28)
 
 **Thay đổi phá vỡ phía FE — FE-016 phải lên production cùng lần deploy với BKG-010.**

@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { hash } from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { join, resolve } from 'node:path';
@@ -45,7 +46,8 @@ describe('Authentication, membership, RBAC and venue API', () => {
     postgres = await new PostgreSqlContainer('postgres:17-alpine').start();
     process.env.DATABASE_URL = postgres.getConnectionUri();
     process.env.JWT_SECRET = 'integration-test-secret-at-least-32-characters';
-    process.env.STORAGE_LOCAL_DIR = mkdtempSync(join(tmpdir(), 'karaokenow-storage-'));
+    // Dotted directory like the default `be/.storage` (regression: express send refused dot-paths → 500).
+    process.env.STORAGE_LOCAL_DIR = join(mkdtempSync(join(tmpdir(), 'karaokenow-storage-')), '.storage');
     execFileSync(resolve('node_modules/.bin/node-pg-migrate'), ['up', '-m', 'migrations'], {
       cwd: resolve('.'), env: { ...process.env }, stdio: 'pipe'
     });
@@ -1856,6 +1858,61 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(audit.rows.filter(r => r.action === 'MERCHANT_DOCUMENT_UPLOADED')).toHaveLength(10);
     expect(JSON.stringify(audit.rows)).not.toContain('0312345678');
   }, 60000);
+
+  it('keeps the staff session in an HttpOnly cookie and lists the user\'s merchants (FE-012, PD-039)', async () => {
+    const server = app.getHttpServer();
+    const userId = randomUUID(), password = 'Cookie-pass-123';
+    await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,'cookie-user@example.com',$2,'Cookie User','ACTIVE')`, [userId, await hash(password, 4)]);
+    for (const [tenantId, role, status] of [[TENANT_A, 'RECEPTIONIST', 'ACTIVE'], [TENANT_B, 'CASHIER', 'ACTIVE']] as const) {
+      const membershipId = randomUUID();
+      await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES ($1,$2,$3,$4)`, [membershipId, tenantId, userId, status]);
+      await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES ($1,$2)`, [membershipId, role]);
+    }
+    const cookieOf = (res: { headers: Record<string, unknown> }) => {
+      const raw = ([] as string[]).concat((res.headers['set-cookie'] as string[] | undefined) ?? []).find(c => c.startsWith('kn_refresh='));
+      return raw;
+    };
+    const login = await request(server).post('/v1/auth/login').send({ email: 'cookie-user@example.com', password }).expect(200);
+    const setCookie = cookieOf(login)!;
+    expect(setCookie).toMatch(/HttpOnly/i); expect(setCookie).toMatch(/SameSite=Strict/i); expect(setCookie).toMatch(/Path=\/v1\/auth/); expect(setCookie).toMatch(/Secure/);
+    const cookie = setCookie.split(';')[0];
+    expect(cookie).toBe(`kn_refresh=${login.body.refreshToken}`);
+
+    // Reload: no token in JS, only the cookie + X-KN-Session header.
+    await request(server).post('/v1/auth/refresh').set('Cookie', cookie).send({}).expect(401);
+    const refreshed = await request(server).post('/v1/auth/refresh').set('Cookie', cookie).set('X-KN-Session', '1').send({}).expect(200);
+    const rotated = cookieOf(refreshed)!.split(';')[0];
+    expect(rotated).not.toBe(cookie);
+    // Second tab refreshing with the same (now rotated) cookie within the grace window: new sibling session, family intact.
+    const sibling = await request(server).post('/v1/auth/refresh').set('Cookie', cookie).set('X-KN-Session', '1').send({}).expect(200);
+    await request(server).post('/v1/auth/refresh').set('Cookie', rotated).set('X-KN-Session', '1').send({}).expect(200);
+    await request(server).post('/v1/auth/refresh').set('Cookie', cookieOf(sibling)!.split(';')[0]).set('X-KN-Session', '1').send({}).expect(200);
+    // Outside the grace window the same reuse revokes the family (unchanged security rule).
+    await pool.query(`UPDATE auth_sessions SET revoked_at=revoked_at-interval '1 minute' WHERE user_id=$1 AND revoked_at IS NOT NULL`, [userId]);
+    const reuse = await request(server).post('/v1/auth/refresh').set('Cookie', cookie).set('X-KN-Session', '1').send({}).expect(401);
+    expect(cookieOf(reuse)).toMatch(/kn_refresh=;|Expires=Thu, 01 Jan 1970/);
+    const active = await pool.query(`SELECT count(*)::int AS n FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL`, [userId]);
+    expect(active.rows[0].n).toBe(0);
+
+    // Merchant picker
+    const again = await request(server).post('/v1/auth/login').send({ email: 'cookie-user@example.com', password }).expect(200);
+    const tenants = (await request(server).get('/v1/me/tenants').set('Authorization', `Bearer ${again.body.accessToken}`).expect(200)).body;
+    expect(tenants).toEqual([
+      { tenantId: TENANT_A, tenantName: 'Tenant A', tenantStatus: expect.any(String), roles: ['RECEPTIONIST'] },
+      { tenantId: TENANT_B, tenantName: 'Tenant B', tenantStatus: expect.any(String), roles: ['CASHIER'] }
+    ]);
+    assertMatchesContract(JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8')), 'get', '/v1/me/tenants', 200, tenants);
+    await pool.query(`UPDATE tenant_memberships SET status='INACTIVE' WHERE user_id=$1 AND tenant_id=$2`, [userId, TENANT_B]);
+    expect((await request(server).get('/v1/me/tenants').set('Authorization', `Bearer ${again.body.accessToken}`).expect(200)).body.map((x: { tenantId: string }) => x.tenantId)).toEqual([TENANT_A]);
+    await request(server).get('/v1/me/tenants').expect(401);
+
+    // Logout with the cookie revokes the family and clears the cookie.
+    const againCookie = cookieOf(again)!.split(';')[0];
+    const out = await request(server).post('/v1/auth/logout').set('Cookie', againCookie).set('X-KN-Session', '1').send({}).expect(204);
+    expect(cookieOf(out)).toMatch(/kn_refresh=;/);
+    await request(server).post('/v1/auth/refresh').set('Cookie', againCookie).set('X-KN-Session', '1').send({}).expect(401);
+    await request(server).post('/v1/auth/logout').send({}).expect(204);
+  });
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)

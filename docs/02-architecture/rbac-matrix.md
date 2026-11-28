@@ -40,4 +40,6 @@ Password reset, email verification and external identity providers are not imple
 
 Cashier read access to holds and bookings (API-003, 2026-11-26) was added so cashiers can reach the hold/booking they record deposits and CASH against; it grants no create, confirm, check-in/out or outcome rights. Cashiers seeing customer phone and email was confirmed by PO on 2026-11-28 (PD-032).
 
+Any signed-in user may list their own active merchant memberships (`GET /v1/me/tenants`: tenant name, status and their roles; no X-Tenant-ID, no other members' data) — PD-039.
+
 Platform Admins may list and download any merchant's PDF documents (`/v1/platform/merchants/{tenantId}/documents`) for listing review (PD-037).

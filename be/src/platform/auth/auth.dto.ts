@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty() @IsEmail() email!: string;
@@ -7,7 +7,8 @@ export class LoginDto {
 }
 
 export class RefreshTokenDto {
-  @ApiProperty() @IsString() @MinLength(32) refreshToken!: string;
+  @ApiPropertyOptional({ description: 'Optional when the browser sends the HttpOnly refresh cookie together with header `X-KN-Session: 1` (FE-012)' })
+  @IsOptional() @IsString() @MinLength(32) refreshToken?: string;
 }
 
 export class ChangePasswordDto {

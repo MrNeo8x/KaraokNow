@@ -28,6 +28,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Luồng BE: giữ phiên qua F5 (IAM-007, PD-039) và sửa lỗi phục vụ file local
+
+- Người dùng báo "đăng nhập xong F5 là phải đăng nhập lại": đúng thiết kế cũ (phiên chỉ trong bộ nhớ, FE-012 `BACKLOG`). PO chọn cookie HttpOnly + danh sách merchant tự chọn → PD-039.
+- Code: `be/src/platform/auth/refresh-cookie.ts`, `auth.controller.ts` (cookie `kn_refresh`, header `X-KN-Session: 1`), `auth.service.ts` (cửa sổ 10 s cho refresh trùng giữa các tab, chỉ ở chế độ cookie), `be/src/membership/my-tenants.controller.ts` (`GET /v1/me/tenants`). `compose.yaml` đặt `AUTH_COOKIE_SECURE=false` cho stack HTTP local. Không migration.
+- Sửa lỗi FILE-001 do Luồng FE báo: thư mục mặc định `be/.storage` có dấu chấm → express `send` từ chối → 500. `sendFile(..., { dotfiles: 'allow' })`, lỗi → 404; E2E giờ dùng thư mục `.storage` (đã thấy test fail khi bỏ bản sửa).
+- Redis `redis-byzantium-mirror`: người dùng cho phép dùng khi cần; **chưa cần** (ghi ở `deploy-vercel.md` §10).
+- Kiểm chứng: unit 67/67, E2E 47/47, OpenAPI/Markdown sinh lại. Chưa rebuild container local. FE-012 → `READY`.
+
+---
+
 ## 2026-11-28 — Session triển khai: merchant thật Karaoke Majestic (local + production)
 
 - Nguồn: danh thiếp `docs/merchaint/img.png`. Tạo merchant `MAJESTIC` "Karaoke Majestic" + chi nhánh `LA_KHE` "Karaoke Majestic La Khê", `THANH_HA` "Karaoke Majestic Thanh Hà" (`Asia/Ho_Chi_Minh`, ACTIVE), chưa có phòng/giá, chưa xin công khai.

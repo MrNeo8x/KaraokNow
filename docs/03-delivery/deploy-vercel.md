@@ -115,6 +115,9 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **IAM-007 + FE-012** (PD-039, giữ phiên qua F5): không migration, không env mới (để trống `AUTH_COOKIE_SECURE` → cookie Secure). Push cùng lúc hoặc BE trước (BE vẫn nhận refresh token trong body). Smoke sau deploy: đăng nhập trên `vn-karaoke-now.vercel.app`, DevTools → cookie `kn_refresh` thuộc host FE, `HttpOnly`, `Secure`, path `/v1/auth` (xác nhận rewrite Next.js chuyển tiếp `Set-Cookie`); F5 vẫn đăng nhập.
+- **Redis `redis-byzantium-mirror`** (người dùng cho phép dùng làm cache khi cần, 2026-11-28): **chưa dùng** — phiên, hạn mức và khoá đều ở PostgreSQL trong transaction. Chỉ thêm khi có số đo cho thấy cần cache (ví dụ catalog công khai), qua một service bọc riêng; không đưa trạng thái tiền/booking vào Redis.
+
 - **BKG-010 + FE-016** (PD-038, mã đặt phòng 6 ký tự): không có migration, nhưng **BE và FE phải cùng một lần push** — BE đổi định dạng mã, FE cũ chặn tra cứu với mã không phải 32 hex. Chỉ push khi FE-016 đã commit; smoke: giữ chỗ → mã 6 ký tự → tra cứu bằng chữ thường.
 
 - **OPS-008** (PD-037): nối hai store Blob vào project BE với read-write token, áp migration `20261124050000_file_storage` (chỉ thêm cột nullable và bảng mới — tương thích ngược), push, smoke upload ảnh phòng/logo/PDF rồi xoá thử.
