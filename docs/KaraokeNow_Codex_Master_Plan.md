@@ -82,8 +82,8 @@ Enforce authorization in APIs and database queries, not just UI.
 
 | ID | Module | Priority | Release | Trạng thái hiện tại |
 |---|---|---|---|---|
-| MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — auth, tenant membership, roles, branch grants; reset-code delivery còn phụ thuộc ZBS |
-| MOD-02 | Branch and room management | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — CRUD, trạng thái, tiện nghi, metadata media; FE tạm dùng ảnh phòng cố định, upload file thật được bổ sung sau |
+| MOD-01 | Tenant / merchant identity and RBAC | P0 | MVP | **NỀN TẢNG ĐÃ LÀM** — auth, tenant membership, roles, branch grants, phiên qua F5 (PD-039), quản lý user Platform (PD-040), Super Admin hỗ trợ chỉ xem (PD-045); reset-code delivery còn phụ thuộc ZBS |
+| MOD-02 | Branch and room management | P0 | MVP | **ĐÃ LÀM** — CRUD, trạng thái, tiện nghi; **upload ảnh phòng (≤ 10/phòng, FE nén trước), logo merchant, giấy tờ PDF trên Vercel Blob** (PD-037: FILE-001 `DONE`, FE-015 `VERIFY`, production OPS-008 `VERIFY` chờ Owner thử trên giao diện); địa chỉ/SĐT/vị trí Google Maps (PD-042) và giờ mở cửa (PD-043) |
 | MOD-03 | Pricing and availability | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — quote API, quản lý giá, room blocks, buffer policy và search đã có; xác nhận staff không cọc lưu snapshot giá vào booking |
 | MOD-04 | Booking engine | P0 | MVP | **ĐANG LÀM MỘT PHẦN** — staff hold, xác nhận không cọc theo kênh, lưu snapshot, đọc booking và lịch booking theo chi nhánh, tính cọc và xác nhận có cọc, check-in/check-out, hủy/no-show do nhân viên ghi nhận đã có; overtime và điều kiện theo trường hợp còn mở |
 | MOD-05 | Deposit and payment | P0 | MVP | **ĐÃ LÀM (thủ công, pilot)** — ghi CASH cho booking, cọc CASH trên hold theo chính sách đã snapshot, xác nhận khi đủ cọc, phụ thu, đảo bút toán, xử lý cọc của hold hết hạn, phải thu/đã thu theo booking và báo cáo tiền mặt theo ngày (PAY-006, PAY-007, PD-033, PD-036). Online payment ngoài pilot |
@@ -95,7 +95,7 @@ Enforce authorization in APIs and database queries, not just UI.
 | MOD-11 | Marketplace discovery | P1 | V1 | BACKLOG |
 | MOD-12 | Promotions and campaigns | P1 | V1 | BACKLOG |
 | MOD-13 | SaaS subscription and billing | P1 | V1 | BACKLOG |
-| MOD-14 | Analytics and reporting | P1 | V1 | BACKLOG — observability kỹ thuật không đồng nghĩa báo cáo kinh doanh |
+| MOD-14 | Analytics and reporting | P1 | V1 | **ĐÃ LÀM (bản đầu)** — báo cáo booking/doanh thu, công suất phòng + giờ cao điểm, kênh/chuyển đổi cho Owner/Branch Manager; tổng quan + bảng merchant cho Platform; xuất CSV (PD-044, RPT-001/002, FE-020) |
 | MOD-15 | AI recommendations | P2 | V2 | BACKLOG |
 | MOD-16 | POS/inventory integration | P2 | V2 | BACKLOG |
 
@@ -239,7 +239,7 @@ flowchart TB
 | Primary DB | PostgreSQL |
 | Cache and TTL support | Redis; never sole correctness mechanism |
 | Eventing | Transactional outbox + worker; Kafka only when justified |
-| Storage | S3-compatible object storage |
+| Storage | Vercel Blob (public: ảnh phòng, logo; private: giấy tờ PDF) qua `ObjectStorageService` — PD-037; đổi sang S3-compatible chỉ cần thay backend của service |
 | Infra | Docker first; managed services; Kubernetes only if justified |
 | Observability | OpenTelemetry, Prometheus, Grafana, structured logs |
 | External adapters | Zalo, Meta, payment provider |
