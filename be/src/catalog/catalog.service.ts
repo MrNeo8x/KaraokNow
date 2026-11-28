@@ -82,7 +82,9 @@ export class CatalogService {
       WHERE b.id=$1 AND b.status='ACTIVE' AND t.status='ACTIVE' AND c.published=true AND c.platform_approved=true`, [branchId]);
     if (!visible.rowCount) throw new NotFoundException('Published branch not found');
     const limit = query.limit ?? 50, offset = query.offset ?? 0;
-    const rows = (await this.db.query(`SELECT r.id,r.branch_id AS "branchId",r.name,r.capacity FROM rooms r
+    const rows = (await this.db.query(`SELECT r.id,r.branch_id AS "branchId",r.name,r.capacity,
+        COALESCE((SELECT json_agg(json_build_object('url',m.storage_url,'altText',m.alt_text) ORDER BY m.display_order,m.created_at,m.id)
+          FROM room_media m WHERE m.tenant_id=r.tenant_id AND m.room_id=r.id AND m.storage_url IS NOT NULL),'[]') AS photos FROM rooms r
       JOIN branches b ON b.id=r.branch_id AND b.tenant_id=r.tenant_id JOIN tenants t ON t.id=b.tenant_id JOIN tenant_public_catalog c ON c.tenant_id=t.id
       WHERE r.branch_id=$1 AND r.status='ACTIVE' AND b.status='ACTIVE' AND t.status='ACTIVE' AND c.published=true AND c.platform_approved=true
       ORDER BY r.name,r.id LIMIT $2 OFFSET $3`, [branchId,limit+1,offset])).rows;

@@ -8,7 +8,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Code trên `main`:** `origin/main` = `a0bfb53` (tài liệu; code chạy giống `e0daab2` — FE-021, BE tới IAM-009/010 và OPS-002). **Chưa push:** `eb9e128` BE VEN-006 thư viện ảnh merchant/chi nhánh (**migration `20261124100000_venue_photos` — áp lên Prisma trước push**; OpenAPI đổi → push cùng commit FE-022 đã `types:generate`, nếu không Frontend CI đỏ) và commit tài liệu này.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **58/58** (sau VEN-006); diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
+**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **59/59** (sau VEN-007); diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` **32 migration** (đến `20261124100000_venue_photos`), seed UAT (Platform Admin UAT là Super Admin); backend `:3000` chạy commit VEN-006, `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
@@ -26,6 +26,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - *Luồng BE:* không còn task không bị chặn — BKG-008 (chờ PO), IAM-004 (chờ ZBS), OPS-010 (chờ secret), PAY-002–004 (sau pilot). Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng BE: ảnh phòng hiển thị cho khách (VEN-007, PD-049)
+
+- Người dùng giao VEN-007 (session khác tạo, `BLOCKED` chờ PO). PO xác nhận hiện mọi ảnh phòng đã tải → PD-049.
+- `PublicRoomDto.photos` + truy vấn `catalog.service.ts rooms()` (json_agg từ `room_media` có `storage_url`, sắp theo `display_order`). Không migration.
+- Kiểm chứng: unit 73/73, E2E 59/59 (thứ tự, bỏ metadata không file, file mở được, contract; test catalog cũ cập nhật kỳ vọng `photos: []`).
+- FE-023 `READY` (thay ảnh SVG cố định trên trang khách).
 
 ---
 

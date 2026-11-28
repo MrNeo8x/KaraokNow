@@ -9030,13 +9030,21 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "capacity": {
       "type": "number"
+    },
+    "photos": {
+      "description": "Uploaded room photos in display order, at most 10 (VEN-007); metadata-only media without a file is omitted",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/PublicPhotoDto"
+      }
     }
   },
   "required": [
     "id",
     "branchId",
     "name",
-    "capacity"
+    "capacity",
+    "photos"
   ]
 }
 ```

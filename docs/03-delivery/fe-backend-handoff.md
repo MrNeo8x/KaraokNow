@@ -218,6 +218,10 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — ảnh phòng cho khách (VEN-007, PD-049, 2026-11-28)
+
+**OpenAPI đổi → `npm run types:generate`.** E2E 59/59. `GET /v1/public/branches/{id}/rooms` → mỗi phòng có thêm `photos: [{ url, altText }]` đã sắp theo `displayOrder` (tối đa 10), chỉ ảnh đã tải file thật; phòng chưa có ảnh → `[]` (giữ ảnh mặc định). Dùng nguyên `url`. Không migration — deploy được ngay khi FE sinh lại type.
+
 ## FE READY — thư viện ảnh merchant và chi nhánh (VEN-006, PD-048, 2026-11-28)
 
 **OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check, PostgreSQL Docker E2E 58/58.

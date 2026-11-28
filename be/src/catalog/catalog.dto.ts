@@ -63,6 +63,7 @@ export class PublicRoomDto {
   @ApiProperty({ format: 'uuid' }) branchId!: string;
   @ApiProperty() name!: string;
   @ApiProperty() capacity!: number;
+  @ApiProperty({ type: () => [PublicPhotoDto], description: 'Uploaded room photos in display order, at most 10 (VEN-007); metadata-only media without a file is omitted' }) photos!: PublicPhotoDto[];
 }
 export class PublicBranchListDto extends CatalogPageDto { @ApiProperty({ type: [PublicBranchDto] }) items!: PublicBranchDto[]; }
 export class PublicRoomListDto extends CatalogPageDto { @ApiProperty({ type: [PublicRoomDto] }) items!: PublicRoomDto[]; }

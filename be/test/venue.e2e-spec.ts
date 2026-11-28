@@ -538,7 +538,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)
       .expect(({ body }) => expect(body.items).toContainEqual(expect.objectContaining({ id: branch.id, merchantId: TENANT_A })));
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/rooms`).expect(200)
-      .expect(({ body }) => expect(body.items).toEqual([{ id: active.id, branchId: branch.id, name: 'Public room', capacity: 8 }]));
+      .expect(({ body }) => expect(body.items).toEqual([{ id: active.id, branchId: branch.id, name: 'Public room', capacity: 8, photos: [] }]));
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/booking-terms`).expect(200)
       .expect(({ body }) => expect(body).toMatchObject({ configured: true, terms: 'Khách liên hệ chi nhánh để xử lý hủy booking.', version: '1' }));
     await request(app.getHttpServer()).get(`/v1/public/branches/${branch.id}/availability`).query({ startAt: '2041-01-01T18:00:00+07:00', durationMinutes: 60 }).expect(200)
@@ -2479,6 +2479,34 @@ describe('Authentication, membership, RBAC and venue API', () => {
     const audit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE tenant_id=$1 AND entity_type='VENUE_PHOTO'`, [TENANT_A]);
     expect(audit.rows.filter(r => r.action === 'BRANCH_PHOTO_UPLOADED')).toHaveLength(10);
     expect(JSON.stringify(audit.rows)).not.toContain('Phòng VIP');
+  });
+
+  it('shows uploaded room photos in the public room list, in display order (VEN-007)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(1024, 5)]);
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'RPH-1', name: 'Room photo branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'RPH-R1', name: 'Phòng ảnh', capacity: 6 }).expect(201)).body;
+    const bare = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'RPH-R2', name: 'Phòng chưa ảnh', capacity: 4 }).expect(201)).body;
+    const upload = (order: string, alt: string) => request(server).post(`/v1/merchant/rooms/${room.id}/media/upload`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A)
+      .field('altText', alt).field('displayOrder', order).attach('file', jpeg, { filename: 'r.jpg' }).expect(201);
+    const second = (await upload('1', 'Ghế sofa')).body;
+    const first = (await upload('0', 'Màn hình lớn')).body;
+    await authorized('post', `/v1/merchant/rooms/${room.id}/media`).send({ assetRef: 'legacy-metadata-only', altText: 'không có file', displayOrder: 2 }).expect(201);
+    const catalog = (await pool.query('SELECT published,platform_approved FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=true,platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    else await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [TENANT_A, OWNER_ID]);
+    try {
+      const rooms = (await request(server).get(`/v1/public/branches/${branch.id}/rooms`).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/public/branches/{id}/rooms', 200, rooms);
+      expect(rooms.items.find((r: { id: string }) => r.id === room.id).photos).toEqual([{ url: first.url, altText: 'Màn hình lớn' }, { url: second.url, altText: 'Ghế sofa' }]);
+      expect(rooms.items.find((r: { id: string }) => r.id === bare.id).photos).toEqual([]);
+      await request(server).get(first.url).expect(200);
+    } finally {
+      if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=$2,platform_approved=$3 WHERE tenant_id=$1', [TENANT_A, catalog.published, catalog.platform_approved]);
+      else await pool.query('DELETE FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A]);
+    }
+    // Visibility rules (published + approved merchant, active branch/room) are unchanged and covered by the public catalog test.
   });
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
