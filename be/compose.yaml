@@ -30,6 +30,9 @@ services:
       OTEL_SERVICE_NAME: karaokenow-backend-uat
       # FE-012: the local stack is plain HTTP (http://localhost:3100); Safari drops Secure cookies there.
       AUTH_COOKIE_SECURE: "false"
+    volumes:
+      # PD-037 local storage: keep uploaded files across rebuilds (be/.storage is git-ignored; may contain demo/customer files).
+      - ./.storage:/app/.storage
     ports:
       - "3000:3000"
     restart: unless-stopped
