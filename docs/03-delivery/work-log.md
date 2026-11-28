@@ -14,13 +14,13 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-012. Luồng BE đang làm quản lý người dùng Platform (`be/src/platform-users/`, migration `20261124060000_platform_user_management`, OpenAPI) chưa commit; session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
+**Đang dở (working tree):** Luồng FE không có sau commit FE-012. Luồng BE đã commit IAM-008 (`693fd7b`, quản lý user cho Platform Admin; FE-017 `READY`). Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
 - *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
-- *Luồng FE:* sau deploy FE-012 kiểm tra cookie `kn_refresh` trên domain FE Vercel; FE-011 (sinh type từ OpenAPI); QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng); chờ FE READY tiếp theo của BE (quản lý người dùng Platform đang làm).
+- *Luồng FE:* **FE-017** màn quản lý user cho Platform Admin (handoff "FE READY — quản lý user của Platform"); sau deploy FE-012 kiểm tra cookie `kn_refresh` trên domain FE Vercel; FE-011; QA-003 phần còn lại.
 - *Luồng BE:* sửa `files.controller.ts` (`sendFile(file, { dotfiles: 'allow' })` hoặc thư mục mặc định không có dấu chấm; `NotFoundError` → 404); BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
