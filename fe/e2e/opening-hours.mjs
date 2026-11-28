@@ -29,7 +29,7 @@ try {
   });
 
   const guest = await ctx.newPage(); guest.setDefaultTimeout(15000);
-  await guest.goto(BASE + '/booking'); await guest.locator('.branch-option').first().waitFor();
+  await guest.goto(BASE + '/booking'); await guest.locator('.branch-option').first().waitFor(); await guest.locator('.branch-option', { hasText: 'KaraokeNow UAT Hồ Chí Minh' }).click();
   await step('Trang khách: hiện giờ mở cửa', async () => guest.getByText('Mở cửa 18:00–02:00 (qua nửa đêm)').first().innerText(), guest);
   await step('Nút giờ theo khung mở cửa: 18:00 → 00:00 (hôm sau) với 2 giờ', async () => {
     await guest.getByLabel('Ngày', { exact: true }).fill(day);

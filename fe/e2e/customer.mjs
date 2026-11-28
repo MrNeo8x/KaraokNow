@@ -10,6 +10,8 @@ for (const vp of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop'
   try {
     await page.goto(BASE + '/booking'); await page.getByRole('button', { name: 'Tìm phòng trống' }).waitFor();
     await page.locator('.branch-option').first().waitFor();
+    // Other published merchants (e.g. a real one added locally) may sort first: always book the seeded UAT branch.
+    await page.locator('.branch-option', { hasText: 'KaraokeNow UAT Hồ Chí Minh' }).click();
     const day = new Date(Date.now() + (30 + Math.floor(Math.random() * 300)) * 86400000).toISOString().slice(0, 10);
     await page.getByLabel('Ngày', { exact: true }).fill(day); await page.getByRole('group', { name: 'Giờ bắt đầu' }).getByRole('button', { name: vp.name === 'mobile' ? '19:00' : '21:00' }).click();
     await page.getByRole('button', { name: 'Tăng số khách' }).click();

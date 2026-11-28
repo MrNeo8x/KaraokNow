@@ -228,6 +228,14 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Khách: `GET /v1/public/branches` thêm `photos` (thư viện chi nhánh) và `merchantPhotos` (thư viện merchant), mỗi phần tử `{ url, altText }`, đã sắp theo `displayOrder`. Dùng nguyên `url` như ảnh phòng.
 - Production cần migration `20261124100000_venue_photos` trước khi push.
 
+
+### FE INTEGRATED — thư viện ảnh merchant và chi nhánh (FE-022, VEN-006, 2026-11-28)
+
+- `fe/src/components/venue-gallery.tsx` (một component cho cả hai `basePath`): danh sách theo `displayOrder`, tải lên multipart sau khi nén trên trình duyệt (như ảnh phòng), mô tả ≤ 300, sửa mô tả/thứ tự (0–1000), xoá có xác nhận, đếm x/10, đủ 10 thì ẩn ô tải và báo; 409 → "Tối đa 10 ảnh…", 403 → không có quyền, 503 → kho chưa sẵn sàng.
+- Ảnh merchant: mục Marketplace, quản lý khi `owner.admin`. Ảnh chi nhánh: mục Phòng hát cho chi nhánh đang chọn, quản lý khi `venue.manage` (BE vẫn kiểm chi nhánh được giao); Lễ tân/Thu ngân chỉ xem; phiên hỗ trợ chỉ xem không có nút quản lý.
+- Trang khách: dải ảnh cuộn ngang dưới thông tin chi nhánh đang chọn — `photos` trước rồi `merchantPhotos`, mô tả phủ dưới ảnh, ảnh lỗi tự ẩn.
+- Kiểm thử: e2e `fe/e2e/gallery.mjs` 11/11 (403 Lễ tân/Quản lý với ảnh merchant, 422, nén 3,9 MB → ~360 KB, sửa mô tả/thứ tự, đủ 10 + 409, trang khách đúng thứ tự, Quản lý xoá ảnh chi nhánh, Lễ tân chỉ xem, dọn ảnh). Đã `npm run types:generate`.
+
 ## FE READY — phiên hỗ trợ Super Admin (IAM-009, PD-045) và kiêm nhiệm (PD-046), 2026-11-28
 
 **OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 57/57.

@@ -29,6 +29,7 @@ import PlatformReports from './platform-reports';
 import MerchantReports from './merchant-reports';
 import MySessions from './my-sessions';
 import SupportSessions from './support-sessions';
+import VenueGallery from './venue-gallery';
 import { ApiError, request, setReadOnlyGuard } from '@/lib/api';
 import { minutesLeft, supportTenantFromSearch } from '@/lib/support';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
@@ -112,7 +113,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     return () => { window.clearTimeout(timer); window.clearTimeout(retryTimer); };
   }, [session]);
   async function changePassword(e: React.FormEvent) { e.preventDefault(); if (!session) return; setError(''); try { await request('/auth/password/change',{method:'POST',body:JSON.stringify({currentPassword:password,newPassword})},session.accessToken); setSession(null); setPassword(''); setNewPassword(''); setError('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'); } catch(err) { setError((err as Error).message); } }
-  useEffect(() => { if (!session || !activeTenant || session.mustChangePassword) return; let live=true; setLoading(true); setError(''); request<Branch[]>('/merchant/branches',{},session.accessToken,activeTenant).then(data=>{ if(live){setBranches(data);setBranch(previous=>data.some(item=>item.id===previous)?previous:data[0]?.id || '');} }).catch(err=>{if(live){setError(err.message);setBranches([]);setBranch('');}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,revision]);
+  useEffect(() => { if (!session || !activeTenant || session.mustChangePassword) return; let live=true; setLoading(true); setError(''); request<Branch[]>('/merchant/branches',{},session.accessToken,activeTenant).then(data=>{ if(live){setBranches(data);setBranch(previous=>data.some(item=>item.id===previous)?previous:data[0]?.id || '');} }).catch(err=>{if(live){setError(err instanceof ApiError && err.status === 403 && activeTenant === supportTenant ? SUPPORT_ENDED : err.message);setBranches([]);setBranch('');}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,revision]);
   useEffect(() => { if(!session || !activeTenant || !branch) {setRooms([]);return;} let live=true; setLoading(true); request<Room[]>(`/merchant/branches/${branch}/rooms`,{},session.accessToken,activeTenant).then(data=>{if(live)setRooms(data);}).catch(err=>{if(live){setRooms([]);setError(err.message);}}).finally(()=>{if(live)setLoading(false);}); return()=>{live=false;}; },[session,activeTenant,branch,revision]);
   // Merchant picker: GET /v1/me/tenants (no X-Tenant-ID). Auto-open once per session when unambiguous.
   useEffect(() => {
@@ -131,7 +132,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setMe(null); return; }
     const controller = new AbortController();
     request<Me>('/merchant/me', { signal: controller.signal }, session.accessToken, activeTenant)
-      .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError(activeTenant === supportTenant ? 'Phiên hỗ trợ của merchant này đã kết thúc hoặc hết hạn. Mở lại từ khu Platform (mục Merchant → Hỗ trợ).' : 'Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
+      .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError(activeTenant === supportTenant ? SUPPORT_ENDED : 'Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
     return () => controller.abort();
   }, [session, activeTenant, page]);
 
@@ -266,6 +267,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
             : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Tên phòng</th><th>Mã</th><th>Sức chứa</th><th>Trạng thái</th></tr></thead><tbody>{rooms.map(r => <tr key={r.id}><td data-label="Tên phòng"><strong>{r.name}</strong></td><td data-label="Mã">{r.code}</td><td data-label="Sức chứa">Tối đa {r.capacity} khách</td><td data-label="Trạng thái">{roomStatus(r.status)}</td></tr>)}</tbody></table></div>}
         </section>
         {!readOnly && <VenueActions key={`venue-actions:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} branch={currentBranch} rooms={rooms} onChanged={() => setRevision(value => value + 1)} />}
+        {currentBranch && <VenueGallery key={`branch-photos:${branchKey}`} token={session.accessToken} tenant={activeTenant} basePath={`/merchant/branches/${encodeURIComponent(branch)}/photos`} title={`Ảnh chi nhánh ${currentBranch.name}`} description="Tối đa 10 ảnh (mặt tiền, sảnh, quầy…), hiển thị cho khách khi chọn chi nhánh. Ảnh được nén trên trình duyệt trước khi tải lên." subject="chi nhánh này" canManage={!readOnly && can(roles, 'venue.manage')} />}
         <RoomAmenities key={`room-amenities:${branchKey}`} token={session.accessToken} tenant={activeTenant} rooms={rooms} />
         <RoomMedia key={`room-media:${branchKey}`} token={session.accessToken} tenant={activeTenant} rooms={rooms} />
         {currentBranch && <RoomBlocks key={`room-blocks:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}
@@ -281,6 +283,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
       {section === 'marketplace' && <>
         <CatalogPublication key={`publication:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <PublicBookingTerms key={`terms:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
+        <VenueGallery key={`merchant-photos:${activeTenant}`} token={session.accessToken} tenant={activeTenant} basePath="/merchant/catalog/photos" title="Ảnh merchant" description="Tối đa 10 ảnh giới thiệu chung (thương hiệu, không gian), hiển thị cho khách ở mọi chi nhánh. Chỉ Owner quản lý." subject="merchant" canManage={!readOnly && can(roles, 'owner.admin')} />
         <MerchantLogoCard key={`logo:${activeTenant}`} token={session.accessToken} tenant={activeTenant} onChanged={value => setLogoUrl(value.url)} />
         <MerchantDocuments key={`documents:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
       </>}
@@ -296,5 +299,6 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   </AdminShell>;
 }
 
+const SUPPORT_ENDED = 'Phiên hỗ trợ của merchant này đã kết thúc hoặc hết hạn. Mở lại từ khu Platform (mục Merchant → Hỗ trợ).';
 const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'reports', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
 const PLATFORM_IDS = ['listings', 'merchants', 'users', 'reports', 'support', 'account'];

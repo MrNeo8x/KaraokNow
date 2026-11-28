@@ -45,7 +45,7 @@ try {
 
   const guest = await ctx.newPage(); guest.setDefaultTimeout(15000);
   await step('Trang khách: địa chỉ, nút gọi và nút Chỉ đường', async () => {
-    await guest.goto(BASE + '/booking'); await guest.locator(`.branch-option`, { hasText: ADDRESS }).first().waitFor();
+    await guest.goto(BASE + '/booking'); await guest.locator(`.branch-option`, { hasText: ADDRESS }).first().click();
     const contact = guest.locator('#booking .branch-contact'); await contact.waitFor();
     const tel = await contact.locator('a[href^="tel:"]').getAttribute('href'); const text = await contact.locator('a[href^="tel:"]').innerText();
     const directions = contact.getByRole('link', { name: /Chỉ đường/ }); const href = await directions.getAttribute('href'); const target = await directions.getAttribute('target');

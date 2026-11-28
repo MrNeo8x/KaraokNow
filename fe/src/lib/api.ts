@@ -23,6 +23,7 @@ const FRIENDLY: [RegExp, string | ((match: RegExpMatchArray) => string)][] = [
   [/at least one active super admin/i, 'Phải còn ít nhất một Super Admin đang hoạt động.'],
   [/grant platform admin first/i, 'Người dùng phải là Platform Admin trước khi được cấp Super Admin.'],
   [/use your own membership/i, 'Bạn là thành viên của merchant này: mở merchant bằng tài khoản thành viên của mình, không dùng phiên hỗ trợ.'],
+  [/no active membership for tenant/i, 'Tài khoản không có quyền trong merchant này (hoặc phiên hỗ trợ đã kết thúc).'],
   [/support session not found/i, 'Không tìm thấy phiên hỗ trợ.'],
   [/merchant is suspended/i, 'Merchant đang bị Platform khoá: không nhận giữ chỗ mới. Các giữ chỗ và booking hiện có vẫn xử lý được.'],
 ];

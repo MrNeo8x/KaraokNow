@@ -9,7 +9,8 @@ import { formatPhone, telHref } from '@/lib/branch-location';
 import { DEFAULT_POLICY, calendarStart, durationOptions, fitsWindow, initialChoice, isPast, nearestDuration, openingWindow, pickTime, quickSlots, upcomingDates, type BookingPolicy } from '@/lib/booking-time';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, formatBookingCode, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
-export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null; bookingPolicy?: BookingPolicy };
+export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null; bookingPolicy?: BookingPolicy; photos?: VenuePhoto[]; merchantPhotos?: VenuePhoto[] };
+export type VenuePhoto = { url: string; altText: string | null };
 export type Room = { id: string; branchId?: string; name: string; capacity: number };
 type Page<T> = { items: T[]; hasMore: boolean };
 export type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
@@ -32,6 +33,14 @@ function durationLabel(minutes: number) { return minutes % 60 === 0 ? `${minutes
 function openingLabel(branch: Branch): string {
   if (!branch.openingTime || !branch.closingTime) return 'Mở cửa 24 giờ';
   return `Mở cửa ${branch.openingTime}–${branch.closingTime}${branch.closingTime <= branch.openingTime ? ' (qua nửa đêm)' : ''}`;
+}
+
+/** Branch photos first, then the merchant's (PD-048); hidden when there are none or every image fails to load. */
+function BranchGallery({ branch }: { branch?: Branch }) {
+  const [broken, setBroken] = useState<Record<string, boolean>>({});
+  const photos = [...(branch?.photos ?? []), ...(branch?.merchantPhotos ?? [])].filter(photo => !broken[photo.url]);
+  if (!branch || photos.length === 0) return null;
+  return <ul className="branch-gallery" aria-label={`Ảnh ${branch.merchantName} – ${branch.name}`}>{photos.map((photo, index) => <li key={`${photo.url}:${index}`}><img src={photo.url} alt={photo.altText ?? `Ảnh ${branch.name}`} loading="lazy" onError={() => setBroken(current => ({ ...current, [photo.url]: true }))} />{photo.altText && <span>{photo.altText}</span>}</li>)}</ul>;
 }
 
 function BranchContact({ branch, compact = false }: { branch?: Branch; compact?: boolean }) {
@@ -222,6 +231,7 @@ export default function CustomerBooking() {
         {loading && branches.length === 0 ? <p role="status">Đang tải danh mục…</p> : branches.length === 0 ? <div className="empty">Chưa có địa điểm được công khai.</div>
           : <div className="branch-list" role="group" aria-label="Địa điểm">{branches.map((item, index) => <button type="button" key={item.id} className="branch-option" aria-pressed={item.id === branchId} onClick={() => setBranchId(item.id)}><img src={item.merchantLogoUrl ?? fixedRoomImages[index % fixedRoomImages.length]} alt={item.merchantLogoUrl ? `Logo ${item.merchantName}` : ''} className={item.merchantLogoUrl ? 'merchant-logo' : undefined} onError={event => { const image = event.currentTarget; const fallback = fixedRoomImages[index % fixedRoomImages.length]; if (!image.src.endsWith(fallback)) { image.src = fallback; image.className = ''; image.alt = ''; } }} /><span><strong>{item.merchantName}</strong><small><MapPin size={12} aria-hidden /> {item.name}</small>{item.address && <small className="branch-option-address">{item.address}</small>}</span></button>)}</div>}
         {branch && <BranchContact branch={branch} />}
+        <BranchGallery key={branch?.id ?? 'none'} branch={branch} />
       </section>
       <form className="app-card" onSubmit={findAvailability} aria-labelledby="customer-time-title">
         <h2 id="customer-time-title"><span className="step-no">2</span>Chọn ngày &amp; giờ</h2>

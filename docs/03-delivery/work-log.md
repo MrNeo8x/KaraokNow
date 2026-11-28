@@ -16,16 +16,27 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Tài liệu kế hoạch:** `docs/KaraokeNow_Codex_Master_Plan.md` đã rà lại theo bằng chứng 2026-11-28 (bảng module, FR, mục tiêu backup, công nghệ/môi trường, mục 13.1). Khi xong tính năng lớn, cập nhật cả dòng MOD/FR và 13.1.
 
-**Đang dở (working tree):** không có (Luồng FE chưa bắt đầu FE-022).
+**Đang dở (working tree):** Luồng FE không có (FE-022 đã commit, `VERIFY`).
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm A–Q (88 ca); Owner thử upload ảnh/logo/PDF trên production (đóng OPS-008); xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB khỏi production.
 - *Session triển khai:* lần push chứa `eb9e128`: áp `20261124100000_venue_photos` lên Prisma trước, chờ FE-022 commit, push cùng, smoke `GET /v1/public/branches` có `photos`/`merchantPhotos`; ghi nhật ký khi Owner/Super Admin thử trên production.
-- *Luồng FE:* **FE-022** thư viện ảnh merchant/chi nhánh (handoff "FE READY — thư viện ảnh merchant và chi nhánh"); các task FE khác `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
+- *Luồng FE:* không còn task `READY` (FE-022 xong); các task FE `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
 - *Luồng BE:* không còn task không bị chặn — BKG-008 (chờ PO), IAM-004 (chờ ZBS), OPS-010 (chờ secret), PAY-002–004 (sau pilot). Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng FE: thư viện ảnh merchant và chi nhánh (FE-022)
+
+- Người dùng: "BE đã xong việc, FE tiếp" → FE-022 (VEN-006, PD-048). Sinh lại `api-types.gen.ts` tới `eb9e128`.
+- `venue-gallery.tsx` dùng chung: "Ảnh merchant" (Marketplace, Owner) và "Ảnh chi nhánh" (Phòng hát, Owner/Quản lý chi nhánh; vai trò khác chỉ xem), nén ảnh trên trình duyệt, mô tả/thứ tự, xoá, giới hạn 10. Trang khách: dải ảnh chi nhánh + merchant dưới thông tin chi nhánh.
+- Phiên hỗ trợ: thông báo "phiên đã kết thúc" nhất quán (403 của `/merchant/branches` không còn ghi đè bằng câu tiếng Anh); dịch `No active membership for tenant`.
+- Sửa test: `customer`, `branch-location`, `opening-hours` chọn đích danh chi nhánh UAT — merchant Majestic (session triển khai công khai trên DB local) đứng đầu danh sách nên các bộ này từng giữ chỗ nhầm chi nhánh.
+- Kiểm chứng: unit 71/71, `tsc`, `types:check`, `next build`; e2e `gallery.mjs` 11/11, `support.mjs` 16/16 (3 lần), các bộ khác đạt ở lượt đầy đủ trước khi Majestic được công khai. Lượt đầy đủ sau khi sửa chọn chi nhánh bị 429 (hết hạn mức 20 giữ chỗ/15 phút do chạy nhiều lần); lượt chạy lại đang chạy lúc commit — xem mục nhật ký sau.
+- Lưu ý: không rebuild container backend sau khi session triển khai `docker cp` ảnh Majestic (ảnh ở `/app/.storage`, mất khi rebuild); ảnh vẫn trả 200.
 
 ---
 

@@ -804,6 +804,70 @@ export interface paths {
         patch: operations["VenueController_updateRoomMedia"];
         trace?: never;
     };
+    "/v1/merchant/catalog/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MerchantPhotoController_list"];
+        put?: never;
+        post: operations["MerchantPhotoController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/catalog/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MerchantPhotoController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["MerchantPhotoController_update"];
+        trace?: never;
+    };
+    "/v1/merchant/branches/{branchId}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["BranchPhotoController_list"];
+        put?: never;
+        post: operations["BranchPhotoController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/branches/{branchId}/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["BranchPhotoController_remove"];
+        options?: never;
+        head?: never;
+        patch: operations["BranchPhotoController_update"];
+        trace?: never;
+    };
     "/v1/merchant/audit-logs": {
         parameters: {
             query?: never;
@@ -2370,6 +2434,37 @@ export interface components {
             altText?: string | null;
             displayOrder?: number;
         };
+        VenuePhotoDto: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description null = merchant gallery
+             */
+            branchId: string | null;
+            /** @description Public URL (Blob CDN on production, /v1/files/public/… locally) */
+            url: string;
+            /** @enum {string} */
+            contentType: "image/jpeg" | "image/png" | "image/webp";
+            sizeBytes: number;
+            altText: string | null;
+            displayOrder: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        UploadVenuePhotoDto: {
+            /**
+             * Format: binary
+             * @description JPEG, PNG or WebP, at most 4 MB (compress in the browser first)
+             */
+            file: string;
+            altText?: string;
+            displayOrder?: number;
+        };
+        UpdateVenuePhotoDto: {
+            altText?: string | null;
+            displayOrder?: number;
+        };
         AuditLogResponseDto: {
             /** Format: uuid */
             id: string;
@@ -3367,6 +3462,10 @@ export interface components {
             /** @description Start times must be on this minute boundary (15) */
             startStepMinutes: number;
         };
+        PublicPhotoDto: {
+            url: string;
+            altText: string | null;
+        };
         PublicBranchDto: {
             /** Format: uuid */
             id: string;
@@ -3396,6 +3495,10 @@ export interface components {
              */
             closingTime: string | null;
             bookingPolicy: components["schemas"]["PublicBookingPolicyDto"];
+            /** @description Branch gallery in display order, at most 10 (PD-048) */
+            photos: components["schemas"]["PublicPhotoDto"][];
+            /** @description Merchant gallery in display order, at most 10 (PD-048) */
+            merchantPhotos: components["schemas"]["PublicPhotoDto"][];
         };
         PublicBranchListDto: {
             limit: number;
@@ -5271,6 +5374,244 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoomMediaResponseDto"];
+                };
+            };
+        };
+    };
+    MerchantPhotoController_list: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"][];
+                };
+            };
+        };
+    };
+    MerchantPhotoController_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadVenuePhotoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"];
+                };
+            };
+            /** @description Already 10 photos */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File larger than 4 MB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a JPEG/PNG/WebP image */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MerchantPhotoController_remove: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Photo and its file removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MerchantPhotoController_update: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVenuePhotoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"];
+                };
+            };
+        };
+    };
+    BranchPhotoController_list: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"][];
+                };
+            };
+        };
+    };
+    BranchPhotoController_upload: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                branchId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["UploadVenuePhotoDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"];
+                };
+            };
+            /** @description Already 10 photos */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File larger than 4 MB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not a JPEG/PNG/WebP image */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BranchPhotoController_remove: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                branchId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Photo and its file removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BranchPhotoController_update: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                branchId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateVenuePhotoDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VenuePhotoDto"];
                 };
             };
         };
