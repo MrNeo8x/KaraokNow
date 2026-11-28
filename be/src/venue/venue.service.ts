@@ -21,10 +21,12 @@ import {
 export interface Branch {
   id: string; code: string; name: string; timezone: string; status: string;
   address: string | null; phone: string | null; latitude: number | null; longitude: number | null; mapsUrl: string | null; directionsUrl: string | null;
+  openingTime: string | null; closingTime: string | null;
 }
 /** VEN-004 / PD-042: address, public phone and Google Maps location. */
 export const BRANCH_FIELDS = `id,code,name,timezone,status,address,contact_phone AS phone,latitude::float8 AS latitude,longitude::float8 AS longitude,
-  maps_url AS "mapsUrl",CASE WHEN latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||latitude::float8||','||longitude::float8 END AS "directionsUrl"`;
+  maps_url AS "mapsUrl",CASE WHEN latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||latitude::float8||','||longitude::float8 END AS "directionsUrl",
+  to_char(opens_at,'HH24:MI') AS "openingTime",to_char(closes_at,'HH24:MI') AS "closingTime"`;
 
 /** Strips separators and normalises Vietnamese numbers to +84…; null/undefined pass through. */
 export function normalizeBranchPhone(phone: string | null | undefined): string | null | undefined {
@@ -46,13 +48,15 @@ export class VenueService {
 
   async createBranch(actor: Actor, dto: CreateBranchDto): Promise<Branch> {
     this.validateTimezone(dto.timezone);
+    this.validateHours(dto.openingTime ?? null, dto.closingTime ?? null);
     const location = dto.mapsLink ? await this.locate(dto.mapsLink) : null; // network call outside the transaction
     return this.mutate(actor, 'BRANCH_CREATED', 'BRANCH', randomUUID(), async (client, id) => {
       const result = await this.safeWrite(() => client.query<Branch>(
-        `INSERT INTO branches(id,tenant_id,code,name,timezone,status,address,contact_phone,latitude,longitude,maps_url)
-         VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,$7,$8,$9,$10)
+        `INSERT INTO branches(id,tenant_id,code,name,timezone,status,address,contact_phone,latitude,longitude,maps_url,opens_at,closes_at)
+         VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,$7,$8,$9,$10,$11::time,$12::time)
          RETURNING ${BRANCH_FIELDS}`, [id, actor.tenantId, dto.code, dto.name, dto.timezone, dto.address?.trim() ?? null,
-          normalizeBranchPhone(dto.phone) ?? null, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null]));
+          normalizeBranchPhone(dto.phone) ?? null, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null,
+          dto.openingTime ?? null, dto.closingTime ?? null]));
       return result.rows[0];
     });
   }
@@ -75,7 +79,9 @@ export class VenueService {
   async updateBranch(actor: Actor, id: string, dto: UpdateBranchDto): Promise<Branch> {
     this.assertBranchAccess(actor, id);
     if (dto.timezone) this.validateTimezone(dto.timezone);
-    // undefined = unchanged, null = clear (address, phone, location).
+    // undefined = unchanged, null = clear (address, phone, location, opening hours — the two times go together).
+    if ((dto.openingTime === undefined) !== (dto.closingTime === undefined)) throw new BadRequestException('Send openingTime and closingTime together');
+    if (dto.openingTime !== undefined) this.validateHours(dto.openingTime, dto.closingTime ?? null);
     const location = dto.mapsLink ? await this.locate(dto.mapsLink) : null;
     return this.updateEntity<Branch>(actor, 'BRANCH_UPDATED', 'BRANCH', id,
       `SELECT ${BRANCH_FIELDS} FROM branches WHERE tenant_id=$1 AND id=$2 FOR UPDATE`,
@@ -85,15 +91,22 @@ export class VenueService {
          latitude=CASE WHEN $9::boolean THEN $10::numeric ELSE latitude END,
          longitude=CASE WHEN $9::boolean THEN $11::numeric ELSE longitude END,
          maps_url=CASE WHEN $9::boolean THEN $12::varchar ELSE maps_url END,
+         opens_at=CASE WHEN $13::boolean THEN $14::time ELSE opens_at END,
+         closes_at=CASE WHEN $13::boolean THEN $15::time ELSE closes_at END,
          updated_at=now(),version=version+1
        WHERE tenant_id=$1 AND id=$2 RETURNING ${BRANCH_FIELDS}`,
       [dto.name ?? null, dto.timezone ?? null,
         dto.address !== undefined, dto.address?.trim() ?? null,
         dto.phone !== undefined, normalizeBranchPhone(dto.phone) ?? null,
-        dto.mapsLink !== undefined, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null]);
+        dto.mapsLink !== undefined, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null,
+        dto.openingTime !== undefined, dto.openingTime ?? null, dto.closingTime ?? null]);
   }
 
   private locate(mapsLink: string) { return resolveMapsLink(mapsLink); }
+  private validateHours(opening: string | null, closing: string | null) {
+    if ((opening === null) !== (closing === null)) throw new BadRequestException('openingTime and closingTime must both be set or both be null');
+    if (opening !== null && opening === closing) throw new BadRequestException('openingTime and closingTime must differ (send null for 24 h)');
+  }
 
   async setBranchStatus(actor: Actor, id: string, dto: BranchStatusDto): Promise<Branch> {
     this.assertBranchAccess(actor, id);

@@ -2121,6 +2121,49 @@ describe('Authentication, membership, RBAC and venue API', () => {
       .toMatchObject({ address: null, latitude: null, longitude: null, mapsUrl: null, directionsUrl: null });
   });
 
+  it('limits customer start times to 15-minute steps inside branch opening hours, including after midnight (PD-043)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    await authorized('post', '/v1/merchant/branches').send({ code: 'HRS-0', name: 'Half', timezone: 'Asia/Ho_Chi_Minh', openingTime: '18:00' }).expect(400);
+    await authorized('post', '/v1/merchant/branches').send({ code: 'HRS-0', name: 'Same', timezone: 'Asia/Ho_Chi_Minh', openingTime: '18:00', closingTime: '18:00' }).expect(400);
+    await authorized('post', '/v1/merchant/branches').send({ code: 'HRS-0', name: 'Bad', timezone: 'Asia/Ho_Chi_Minh', openingTime: '25:00', closingTime: '02:00' }).expect(400);
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'HRS-1', name: 'Night owl', timezone: 'Asia/Ho_Chi_Minh', openingTime: '18:00', closingTime: '02:00' }).expect(201)).body;
+    expect(branch).toMatchObject({ openingTime: '18:00', closingTime: '02:00' });
+    await authorized('patch', `/v1/merchant/branches/${branch.id}`).send({ openingTime: '17:00' }).expect(400);
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'HRS-R', name: 'Night room', capacity: 6 }).expect(201)).body;
+
+    const catalog = (await pool.query('SELECT published,platform_approved FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=true,platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    else await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [TENANT_A, OWNER_ID]);
+    try {
+      const listed = (await request(server).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/public/branches', 200, listed);
+      const policy = (await pool.query('SELECT min_duration_minutes AS min,max_duration_minutes AS max,duration_step_minutes AS step FROM tenant_booking_policies WHERE tenant_id=$1', [TENANT_A])).rows[0];
+      expect(listed.items.find((b: { id: string }) => b.id === branch.id)).toMatchObject({ openingTime: '18:00', closingTime: '02:00',
+        bookingPolicy: { minDurationMinutes: policy?.min ?? 60, maxDurationMinutes: policy?.max ?? 480, durationStepMinutes: policy?.step ?? 30, startStepMinutes: 15 } });
+      const duration = policy?.min ?? 60;
+      const search = (startAt: string, minutes = duration) => request(server).get(`/v1/public/branches/${branch.id}/availability`).query({ startAt, durationMinutes: minutes });
+      await search('2047-05-01T19:07:00+07:00').expect(422).expect(({ body }) => expect(body.error.message).toContain('15-minute'));
+      await search('2047-05-01T17:45:00+07:00').expect(422).expect(({ body }) => expect(body.error.message).toContain('18:00–02:00'));
+      await search('2047-05-01T23:45:00+07:00').expect(200).expect(({ body }) => expect(body.rooms.map((r: { id: string }) => r.id)).toContain(room.id));
+      await search('2047-05-02T00:30:00+07:00').expect(200);                       // after midnight, previous day's window
+      await search('2047-05-02T01:15:00+07:00').expect(422);                       // would end after 02:00
+      await search('2047-05-01T12:15:00Z').expect(200);                            // 19:15 local, offset given in UTC
+      await request(server).post(`/v1/public/rooms/${room.id}/quote`).send({ startAt: '2047-05-01T19:10:00+07:00', durationMinutes: duration }).expect(422);
+      await request(server).post('/v1/public/booking/holds').set('Idempotency-Key', 'hrs-hold')
+        .send({ roomId: room.id, startAt: '2047-05-01T03:00:00+07:00', durationMinutes: duration, phone: '0911000043', expectedTotalAmountVnd: '1', termsVersion: '1' }).expect(422);
+    } finally {
+      if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=$2,platform_approved=$3 WHERE tenant_id=$1', [TENANT_A, catalog.published, catalog.platform_approved]);
+      else await pool.query('DELETE FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A]);
+    }
+    // Staff holds (phone/walk-in) are not restricted by public step or opening hours.
+    const policy = (await pool.query('SELECT min_duration_minutes AS min FROM tenant_booking_policies WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'hrs-staff')
+      .send({ roomId: room.id, channel: 'PHONE', startAt: '2047-05-01T15:10:00+07:00', durationMinutes: policy?.min ?? 60 }).expect(201);
+    expect((await authorized('patch', `/v1/merchant/branches/${branch.id}`).send({ openingTime: null, closingTime: null }).expect(200)).body)
+      .toMatchObject({ openingTime: null, closingTime: null });
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

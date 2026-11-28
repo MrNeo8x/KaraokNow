@@ -218,6 +218,17 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — giờ lẻ và giờ mở cửa (VEN-005, PD-043, 2026-11-28)
+
+**OpenAPI đổi → chạy `npm run types:generate` trước, nếu không `types:check` trong CI sẽ đỏ.** Đã qua build, drift check BE, PostgreSQL Docker E2E 52/52.
+
+- Chi nhánh (merchant): `POST/PATCH /v1/merchant/branches` thêm `openingTime`, `closingTime` dạng `HH:mm` (giờ địa phương của chi nhánh). Hai trường **gửi cùng nhau**; `closingTime` ≤ `openingTime` = đóng cửa sau nửa đêm (vd `18:00`–`02:00`); cả hai `null` = mở 24 h. Thiếu một trong hai hoặc hai giờ bằng nhau → 400. `BranchResponseDto` có thêm `openingTime`, `closingTime` (nullable).
+- Khách: `GET /v1/public/branches` thêm `openingTime`, `closingTime` và `bookingPolicy: { minDurationMinutes, maxDurationMinutes, durationStepMinutes, startStepMinutes: 15 }`. Thời lượng hợp lệ = `min + k × step` ≤ `max` (thay cho 60–480/30 đang viết cứng).
+- Giờ bắt đầu: phải chia hết 15 phút; cả khoảng [bắt đầu, bắt đầu + thời lượng) nằm trong một khung mở cửa (khung qua nửa đêm tính từ ngày mở). BE trả **422** ở `/public/branches/{id}/availability`, `/public/rooms/{id}/quote`, `/public/booking/holds` với thông báo `startAt must be on a 15-minute boundary` hoặc `The booking must start and end within the branch opening hours (18:00–02:00)`.
+- Gợi ý UI: nút giờ nhanh sinh theo giờ mở cửa (mỗi giờ chẵn trong khung, kể cả sau 0:00 thuộc ngày hôm sau — gửi đúng ngày lịch thật trong `startAt`), thêm "Giờ khác" chọn giờ/phút bước 15; khi chọn giờ sau nửa đêm, nhắc rõ ngày. Ẩn hoặc vô hiệu giờ làm khoảng đặt vượt giờ đóng cửa với thời lượng đang chọn.
+- Giữ chỗ của nhân viên (`/merchant/booking/holds`) không bị giới hạn bước 15 phút hay giờ mở cửa.
+- Production cần migration `20261124080000_branch_opening_hours` trước khi push.
+
 ## FE READY — địa chỉ và vị trí chi nhánh (VEN-004, PD-042, 2026-11-28)
 
 Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 51/51 (contract cho các route dưới). Không cần Google Maps API key.

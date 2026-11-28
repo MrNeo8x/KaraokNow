@@ -6,6 +6,7 @@ import { PG_POOL } from '../platform/database/database.module';
 import { CatalogQueryDto } from './catalog.dto';
 import { AvailabilitySearchDto } from '../availability/availability-search.dto';
 import { AvailabilitySearchService } from '../availability/availability-search.service';
+import { PUBLIC_START_STEP_MINUTES, assertPublicStartAllowed } from '../venue/opening-hours';
 import { QuoteRequestDto } from '../pricing/pricing.dto';
 import { PricingService } from '../pricing/pricing.service';
 
@@ -62,9 +63,12 @@ export class CatalogService {
     const limit = query.limit ?? 50, offset = query.offset ?? 0;
     const rows = (await this.db.query(`SELECT b.id,t.id AS "merchantId",t.name AS "merchantName",l.url AS "merchantLogoUrl",b.name,b.timezone,
       b.address,b.contact_phone AS phone,b.latitude::float8 AS latitude,b.longitude::float8 AS longitude,
-      CASE WHEN b.latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||b.latitude::float8||','||b.longitude::float8 END AS "directionsUrl"
+      CASE WHEN b.latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||b.latitude::float8||','||b.longitude::float8 END AS "directionsUrl",
+      to_char(b.opens_at,'HH24:MI') AS "openingTime",to_char(b.closes_at,'HH24:MI') AS "closingTime",
+      json_build_object('minDurationMinutes',COALESCE(p.min_duration_minutes,60),'maxDurationMinutes',COALESCE(p.max_duration_minutes,480),
+        'durationStepMinutes',COALESCE(p.duration_step_minutes,30),'startStepMinutes',${PUBLIC_START_STEP_MINUTES}) AS "bookingPolicy"
       FROM branches b JOIN tenants t ON t.id=b.tenant_id JOIN tenant_public_catalog c ON c.tenant_id=t.id
-      LEFT JOIN merchant_logos l ON l.tenant_id=t.id
+      LEFT JOIN merchant_logos l ON l.tenant_id=t.id LEFT JOIN tenant_booking_policies p ON p.tenant_id=t.id
       WHERE c.published=true AND c.platform_approved=true AND t.status='ACTIVE' AND b.status='ACTIVE'
       ORDER BY b.name,b.id LIMIT $1 OFFSET $2`, [limit+1,offset])).rows;
     return { items: rows.slice(0,limit), limit, offset, hasMore: rows.length > limit };
@@ -82,11 +86,13 @@ export class CatalogService {
   }
   async availability(branchId: string, query: AvailabilitySearchDto) {
     const tenantId = await this.publishedBranchTenant(branchId);
+    await assertPublicStartAllowed(this.db, branchId, query.startAt, query.durationMinutes);
     const result = await this.availabilitySearch.search(this.publicActor(tenantId), branchId, query);
     return { ...result, rooms: result.rooms.map(({ code: _code, ...room }) => room) };
   }
   async quote(roomId: string, dto: QuoteRequestDto) {
-    const tenantId = await this.publishedRoomTenant(roomId);
+    const { tenantId, branchId: roomBranchId } = await this.publishedRoomTenant(roomId);
+    await assertPublicStartAllowed(this.db, roomBranchId, dto.startAt, dto.durationMinutes);
     const { priceSnapshot } = await this.pricing.quote(this.publicActor(tenantId), roomId, dto);
     const { branchId, timezone, startAt, endAt, durationMinutes, currency, totalAmountVnd, bookingDurationPolicy } = priceSnapshot;
     return { branchId, roomId, timezone, startAt, endAt, durationMinutes, currency, totalAmountVnd,
@@ -107,12 +113,12 @@ export class CatalogService {
     if (!row) throw new NotFoundException('Published branch not found');
     return row.tenantId;
   }
-  private async publishedRoomTenant(roomId: string): Promise<string> {
-    const row = (await this.db.query(`SELECT r.tenant_id AS "tenantId" FROM rooms r JOIN branches b ON b.id=r.branch_id AND b.tenant_id=r.tenant_id
+  private async publishedRoomTenant(roomId: string): Promise<{ tenantId: string; branchId: string }> {
+    const row = (await this.db.query(`SELECT r.tenant_id AS "tenantId",r.branch_id AS "branchId" FROM rooms r JOIN branches b ON b.id=r.branch_id AND b.tenant_id=r.tenant_id
       JOIN tenants t ON t.id=b.tenant_id JOIN tenant_public_catalog c ON c.tenant_id=t.id
       WHERE r.id=$1 AND r.status='ACTIVE' AND b.status='ACTIVE' AND t.status='ACTIVE' AND c.published=true AND c.platform_approved=true`, [roomId])).rows[0];
     if (!row) throw new NotFoundException('Published room not found');
-    return row.tenantId;
+    return row;
   }
   private publicActor(tenantId: string): Actor {
     return { userId: '00000000-0000-4000-8000-000000000000', tenantId, roles: ['OWNER'], branchIds: [] };

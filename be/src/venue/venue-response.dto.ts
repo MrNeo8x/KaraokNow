@@ -12,6 +12,8 @@ export class BranchResponseDto {
   @ApiProperty({ nullable: true, type: Number }) longitude!: number | null;
   @ApiProperty({ nullable: true, type: String, description: 'Link the Owner pasted' }) mapsUrl!: string | null;
   @ApiProperty({ nullable: true, type: String, description: 'Google Maps directions to the coordinates' }) directionsUrl!: string | null;
+  @ApiProperty({ nullable: true, type: String, example: '09:00', description: 'Opening time HH:mm; null = open 24 h (PD-043)' }) openingTime!: string | null;
+  @ApiProperty({ nullable: true, type: String, example: '02:00', description: 'Closing time HH:mm; ≤ openingTime means after midnight' }) closingTime!: string | null;
 }
 
 export class ResolvedLocationDto {

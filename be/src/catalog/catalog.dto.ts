@@ -30,6 +30,12 @@ class CatalogPageDto {
   @ApiProperty() offset!: number;
   @ApiProperty() hasMore!: boolean;
 }
+export class PublicBookingPolicyDto {
+  @ApiProperty() minDurationMinutes!: number;
+  @ApiProperty() maxDurationMinutes!: number;
+  @ApiProperty({ description: 'Allowed durations: min + k × step, up to max' }) durationStepMinutes!: number;
+  @ApiProperty({ description: 'Start times must be on this minute boundary (15)' }) startStepMinutes!: number;
+}
 export class PublicBranchDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) merchantId!: string;
@@ -42,6 +48,9 @@ export class PublicBranchDto {
   @ApiProperty({ nullable: true, type: Number }) latitude!: number | null;
   @ApiProperty({ nullable: true, type: Number }) longitude!: number | null;
   @ApiProperty({ nullable: true, type: String, description: 'Google Maps directions link; null when the branch has no location' }) directionsUrl!: string | null;
+  @ApiProperty({ nullable: true, type: String, example: '09:00', description: 'Opening time HH:mm in the branch timezone; null = open 24 h (PD-043)' }) openingTime!: string | null;
+  @ApiProperty({ nullable: true, type: String, example: '02:00', description: 'Closing time HH:mm; ≤ openingTime means after midnight' }) closingTime!: string | null;
+  @ApiProperty({ type: PublicBookingPolicyDto }) bookingPolicy!: PublicBookingPolicyDto;
 }
 export class PublicRoomDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

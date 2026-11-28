@@ -6,9 +6,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit VEN-004 (vị trí chi nhánh, **có migration `20261124070000`**), commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
+**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit VEN-005 (giờ lẻ/giờ mở cửa, **có migration `20261124080000`**), commit VEN-004 (vị trí chi nhánh, **có migration `20261124070000`**), commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
 
-**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **51/51** (sau VEN-004), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
+**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **52/52** (sau VEN-005), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
 
@@ -27,6 +27,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 
 
+
+---
+
+## 2026-11-28 — Luồng BE: giờ lẻ 15 phút và giờ mở cửa chi nhánh (VEN-005, PD-043)
+
+- Người dùng: "Khi đặt phòng ngoài khung giờ cố định cho phép chọn giờ". Trang khách đang chỉ có nút 09:00…23:00 và thời lượng viết cứng. PO chọn bước 15 phút, giới hạn theo giờ mở cửa chi nhánh, thời lượng theo chính sách merchant → PD-043.
+- Code: migration `20261124080000_branch_opening_hours`; `be/src/venue/opening-hours.ts` (`assertPublicStartAllowed`, SQL theo múi giờ chi nhánh, xét khung của ngày đó và ngày trước cho giờ sau nửa đêm); áp ở catalog availability/quote và public hold; branch DTO/service; catalog thêm `openingTime`, `closingTime`, `bookingPolicy`.
+- Kiểm chứng: unit 70/70, E2E 52/52 (18:00–02:00: 19:07 → 422, 17:45 → 422, 23:45 và 00:30 → 200, 01:15 + thời lượng vượt 02:00 → 422, offset UTC đúng; giữ chỗ nhân viên 15:10 vẫn 201), migration up → down → up. Các test public cũ vẫn đạt (chi nhánh không đặt giờ = 24 h).
+- Lưu ý: FE-011 sinh type từ OpenAPI → FE phải `types:generate`. FE-019 `READY`.
 
 ---
 

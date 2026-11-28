@@ -11,6 +11,10 @@ export class CreateBranchDto {
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/^\+?[0-9][0-9 .()-]{7,19}$/) phone?: string | null;
   @ApiProperty({ required: false, nullable: true, type: String, maxLength: 500, description: 'Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location' })
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500) mapsLink?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '09:00', description: 'Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) openingTime?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '02:00', description: 'Closing time HH:mm; earlier than or equal to openingTime = closes after midnight' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) closingTime?: string | null;
 }
 
 export class ResolveLocationDto {
@@ -33,6 +37,10 @@ export class UpdateBranchDto {
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/^\+?[0-9][0-9 .()-]{7,19}$/) phone?: string | null;
   @ApiProperty({ required: false, nullable: true, type: String, maxLength: 500, description: 'Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location' })
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500) mapsLink?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '09:00', description: 'Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) openingTime?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '02:00', description: 'Closing time HH:mm; earlier than or equal to openingTime = closes after midnight' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) closingTime?: string | null;
 }
 export class BranchStatusDto {
   @ApiProperty({ enum: ['ACTIVE', 'INACTIVE'] }) @IsEnum(['ACTIVE', 'INACTIVE']) status!: 'ACTIVE' | 'INACTIVE';

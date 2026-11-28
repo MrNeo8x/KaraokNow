@@ -3900,6 +3900,18 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "nullable": true,
       "maxLength": 500,
       "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
+    },
+    "openingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "09:00",
+      "description": "Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h"
+    },
+    "closingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "02:00",
+      "description": "Closing time HH:mm; earlier than or equal to openingTime = closes after midnight"
     }
   },
   "required": [
@@ -3964,6 +3976,18 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "type": "string",
       "nullable": true,
       "description": "Google Maps directions to the coordinates"
+    },
+    "openingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "09:00",
+      "description": "Opening time HH:mm; null = open 24 h (PD-043)"
+    },
+    "closingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "02:00",
+      "description": "Closing time HH:mm; ≤ openingTime means after midnight"
     }
   },
   "required": [
@@ -3977,7 +4001,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "latitude",
     "longitude",
     "mapsUrl",
-    "directionsUrl"
+    "directionsUrl",
+    "openingTime",
+    "closingTime"
   ]
 }
 ```
@@ -4057,6 +4083,18 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "nullable": true,
       "maxLength": 500,
       "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
+    },
+    "openingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "09:00",
+      "description": "Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h"
+    },
+    "closingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "02:00",
+      "description": "Closing time HH:mm; earlier than or equal to openingTime = closes after midnight"
     }
   }
 }
@@ -7682,6 +7720,36 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### PublicBookingPolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "minDurationMinutes": {
+      "type": "number"
+    },
+    "maxDurationMinutes": {
+      "type": "number"
+    },
+    "durationStepMinutes": {
+      "type": "number",
+      "description": "Allowed durations: min + k × step, up to max"
+    },
+    "startStepMinutes": {
+      "type": "number",
+      "description": "Start times must be on this minute boundary (15)"
+    }
+  },
+  "required": [
+    "minDurationMinutes",
+    "maxDurationMinutes",
+    "durationStepMinutes",
+    "startStepMinutes"
+  ]
+}
+```
+
 ### PublicBranchDto
 
 ```json
@@ -7732,6 +7800,21 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "type": "string",
       "nullable": true,
       "description": "Google Maps directions link; null when the branch has no location"
+    },
+    "openingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "09:00",
+      "description": "Opening time HH:mm in the branch timezone; null = open 24 h (PD-043)"
+    },
+    "closingTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "02:00",
+      "description": "Closing time HH:mm; ≤ openingTime means after midnight"
+    },
+    "bookingPolicy": {
+      "$ref": "#/components/schemas/PublicBookingPolicyDto"
     }
   },
   "required": [
@@ -7745,7 +7828,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "phone",
     "latitude",
     "longitude",
-    "directionsUrl"
+    "directionsUrl",
+    "openingTime",
+    "closingTime",
+    "bookingPolicy"
   ]
 }
 ```

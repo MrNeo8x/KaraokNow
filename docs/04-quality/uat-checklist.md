@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-042` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-043` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -137,6 +137,15 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H4 | Cashier, Branch Manager | Để một hold đã thu cọc hết hạn; mở danh sách "cọc chờ xử lý"; Quản lý ghi hoàn một phần với lý do | Hold hiện trong danh sách; hoàn vượt cọc bị chặn; sau khi ghi, hold biến khỏi danh sách và báo số giữ lại | PD-036 | | |
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
+
+### O. Giờ lẻ và giờ mở cửa (PD-043)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| O1 | Owner | Đặt giờ mở cửa 18:00–02:00 cho chi nhánh | Lưu được; trang khách hiện giờ mở cửa | PD-043 | | |
+| O2 | Khách | Chọn giờ lẻ 19:45, 00:30; thử 01:30 với 1 giờ | 19:45 và 00:30 tìm phòng được; 01:30 bị báo vượt giờ đóng cửa | PD-043 | | |
+| O3 | Khách | Đổi thời lượng | Chỉ chọn được các mức theo chính sách merchant (tối thiểu/bước/tối đa) | PD-043 | | |
+| O4 | Lễ tân | Tạo giữ chỗ qua điện thoại lúc 15:10 (ngoài giờ mở cửa) | Vẫn tạo được | PD-043 | | |
 
 ### N. Địa chỉ và chỉ đường (PD-042)
 

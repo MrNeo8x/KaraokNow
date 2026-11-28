@@ -8,6 +8,7 @@ import { PricingService } from '../pricing/pricing.service';
 import { normalizePhone } from './phone';
 import { snapshotDepositPolicy } from './deposit-snapshot';
 import { lockRoomOccupancy } from '../availability/occupancy-lock';
+import { assertPublicStartAllowed } from '../venue/opening-hours';
 import { CreatePublicHoldDto, PublicBookingLookupDto } from './public-booking.dto';
 import { bookingCodeHash, deriveBookingCode } from './booking-code';
 
@@ -50,6 +51,7 @@ export class PublicBookingService {
         JOIN tenant_public_catalog c ON c.tenant_id=t.id WHERE r.id=$1 AND r.status='ACTIVE' AND b.status='ACTIVE'
         AND t.status='ACTIVE' AND c.published=true AND c.platform_approved=true FOR SHARE OF r,b,t,c`, [dto.roomId])).rows[0];
       if (!room) throw new NotFoundException('Published room not found');
+      await assertPublicStartAllowed(client, room.branchId, dto.startAt, dto.durationMinutes);
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`public-hold:${room.tenantId}:${phoneHash}:${key}`]);
       const existing = (await client.query(`SELECT id,request_hash FROM booking_holds WHERE tenant_id=$1 AND created_by IS NULL
         AND public_phone_hash=$2 AND idempotency_key=$3 FOR UPDATE`, [room.tenantId, phoneHash, key])).rows[0];

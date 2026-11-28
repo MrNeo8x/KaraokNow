@@ -55,6 +55,7 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Snapshot bất biến: giá + chính sách cọc chụp khi gắn thông tin khách/tạo public hold; điều khoản hủy chụp khi xác nhận. Đổi chính sách sau đó không ảnh hưởng hold/booking đã có.
 - Occupancy: `room_occupancy` với `tstzrange [)` và exclusion GiST trên trạng thái `HELD/CONFIRMED/IN_USE/MAINTENANCE`; buffer dọn phòng cộng **sau** giờ kết thúc (PD-024).
 - Migration mới: `be/migrations/<YYYYMMDDHHMMSS>_<tên>.cjs`, có `down`. Kiểm up → down → up trên Postgres tạm khi thêm/sửa ràng buộc.
+- FE sinh type từ `docs/02-architecture/openapi.json` (FE-011) và CI kiểm drift (`fe: npm run types:check`): mọi thay đổi OpenAPI của BE làm check này đỏ tới khi Luồng FE chạy `npm run types:generate` — ghi rõ trong mục FE READY.
 - Sau khi đổi API: regenerate OpenAPI + Markdown, cập nhật `rbac-matrix.md` nếu đổi quyền, thêm marker FE READY.
 
 ## Bẫy đã gặp
