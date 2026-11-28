@@ -180,6 +180,13 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
 - Câu lệnh quá `PG_STATEMENT_TIMEOUT_MS` (15 s) hoặc không lấy được kết nối trong `PG_CONNECTION_TIMEOUT_MS` (5 s) trả **503** `SERVICE_UNAVAILABLE` với message mới `The service is temporarily busy; retry shortly`. FE nên hiển thị "Hệ thống đang bận, vui lòng thử lại" và không tự retry liên tục.
 - Không đổi contract endpoint nào.
 
+## FE READY — OpenAPI đầy đủ response schema (API-004, 2026-11-28)
+
+- Cả 102 operation trong `docs/02-architecture/openapi.json` (77 path) nay có response schema (trước đây thiếu 43: chi nhánh, phòng, tiện nghi, media, membership, audit, khoá bảo trì, buffer, bảng giá/quy tắc/ngày đặc biệt, phiên đăng nhập, health). `/v1/metrics` khai báo `text/plain`.
+- **Sửa kiểu sai trong contract cũ** (24 property `string|null`/`number|null` từng bị sinh thành `object`): `HoldResponseDto.customerPhone/customerEmail/phoneVerifiedAt/phoneVerifiedBy`, `PublicBookingTermsResponseDto.updatedAt`, các trường tuỳ chọn của `Create/UpdatePriceRuleDto`, `Create/UpdatePricePlanDto`, `UpdateDepositPolicyDto`, `UpdateRoomMediaDto.altText`. Type FE viết tay theo kiểu cũ cần đối chiếu lại.
+- E2E mới đối chiếu response thật với schema (thiếu trường, sai kiểu, sai enum/định dạng, **trường không khai báo**) cho toàn bộ nhóm trên và đường booking chính — FE-011 có thể sinh type từ file này.
+- Không đổi hành vi endpoint.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

@@ -1,5 +1,6 @@
 import { Controller, DefaultValuePipe, Get, ParseIntPipe, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AuditLogResponseDto } from './audit-response.dto';
 import type { AuthenticatedRequest } from '../platform/auth/auth.types';
 import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
@@ -12,6 +13,7 @@ import { AuditService } from './audit.service';
 @Controller('merchant/audit-logs')
 export class AuditController {
   constructor(private readonly audit: AuditService) {}
+@ApiResponse({ status: 200, type: [AuditLogResponseDto] })
   @Get()
   list(@Req() req: AuthenticatedRequest,
        @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,

@@ -22,3 +22,11 @@ export class TokenPairResponseDto {
   @ApiProperty({ description: 'Refresh token lifetime in seconds' }) refreshExpiresIn!: number;
   @ApiProperty() mustChangePassword!: boolean;
 }
+
+export class SessionResponseDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'date-time' }) createdAt!: string;
+  @ApiProperty({ nullable: true, format: 'date-time', type: String }) lastUsedAt!: string | null;
+  @ApiProperty({ format: 'date-time' }) expiresAt!: string;
+  @ApiProperty() revoked!: boolean;
+}

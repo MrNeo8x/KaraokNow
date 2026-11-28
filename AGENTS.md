@@ -59,6 +59,7 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 ## Bẫy đã gặp
 
 - `@ValidateNested()` bỏ qua `undefined` → thiếu object lồng nhau gây 500; luôn kèm `@IsDefined()`.
+- Property `string | null` / `number | null` trong DTO phải ghi rõ `type: String` / `type: Number` trong `@ApiProperty`; thiếu thì Swagger sinh `object` và FE sinh type sai. Mọi route phải có `@ApiResponse({ status, type })`; E2E `returns responses that match the published OpenAPI contract` (`be/test/openapi-contract.ts`) bắt response lệch contract, kể cả trường không khai báo — thêm endpoint mới vào test này.
 - PostgreSQL lưu micro giây, `Date` JS chỉ mili giây: so sánh/đặt lịch sát biên `upper(occupied_range)` có thể chồng lấn 1µs.
 - E2E dùng chung một database theo thứ tự: test trước đổi chính sách tenant A (duration min 90/bước 45, buffer 10, deposit WEB…). **Thêm test mới ở cuối file** (trước helper `authorized`), tự tạo branch/room/plan/kênh riêng, đọc giá trị thực từ response thay vì giả định mặc định. Test `limits manual payment access…` dùng `bookings LIMIT 1`.
 - Cột thời gian của `audit_logs` là `occurred_at`.

@@ -86,7 +86,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Process is alive | Chưa khai báo schema |
+| 200 | Process is alive | {"$ref":"#/components/schemas/HealthLiveDto"} |
 
 ### GET /v1/health/ready
 
@@ -96,7 +96,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Service and database are ready | Chưa khai báo schema |
+| 200 | Service and database are ready | {"$ref":"#/components/schemas/HealthReadyDto"} |
 | 503 | Database is unavailable | Chưa khai báo schema |
 
 ### GET /v1/metrics
@@ -204,7 +204,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/SessionResponseDto"}} |
 
 ### DELETE /v1/auth/sessions/{id}
 
@@ -236,7 +236,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/MembershipResponseDto"}} |
 
 ### POST /v1/merchant/memberships
 
@@ -262,7 +262,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/MembershipResponseDto"} |
 
 ### PATCH /v1/merchant/memberships/{id}
 
@@ -289,7 +289,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/MembershipResponseDto"} |
 
 ### GET /v1/merchant/me
 
@@ -332,7 +332,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/BranchResponseDto"} |
 
 ### GET /v1/merchant/branches
 
@@ -348,7 +348,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/BranchResponseDto"}} |
 
 ### GET /v1/merchant/branches/{id}
 
@@ -365,7 +365,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BranchResponseDto"} |
 
 ### PATCH /v1/merchant/branches/{id}
 
@@ -392,7 +392,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BranchResponseDto"} |
 
 ### PATCH /v1/merchant/branches/{id}/status
 
@@ -419,7 +419,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/BranchResponseDto"} |
 
 ### POST /v1/merchant/rooms
 
@@ -445,7 +445,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/RoomResponseDto"} |
 
 ### GET /v1/merchant/branches/{branchId}/rooms
 
@@ -462,7 +462,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/RoomResponseDto"}} |
 
 ### GET /v1/merchant/rooms/{id}
 
@@ -479,7 +479,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomResponseDto"} |
 
 ### PATCH /v1/merchant/rooms/{id}
 
@@ -506,7 +506,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomResponseDto"} |
 
 ### PATCH /v1/merchant/rooms/{id}/status
 
@@ -533,7 +533,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomResponseDto"} |
 
 ### GET /v1/merchant/rooms/{id}/amenities
 
@@ -550,7 +550,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/RoomAmenityResponseDto"}} |
 
 ### POST /v1/merchant/rooms/{id}/amenities
 
@@ -577,7 +577,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/RoomAmenityResponseDto"} |
 
 ### PATCH /v1/merchant/rooms/{id}/amenities/{amenityId}
 
@@ -605,7 +605,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomAmenityResponseDto"} |
 
 ### DELETE /v1/merchant/rooms/{id}/amenities/{amenityId}
 
@@ -640,7 +640,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/RoomMediaResponseDto"}} |
 
 ### POST /v1/merchant/rooms/{id}/media
 
@@ -667,7 +667,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/RoomMediaResponseDto"} |
 
 ### PATCH /v1/merchant/rooms/{id}/media/{mediaId}
 
@@ -695,7 +695,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomMediaResponseDto"} |
 
 ### DELETE /v1/merchant/rooms/{id}/media/{mediaId}
 
@@ -731,7 +731,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/AuditLogResponseDto"}} |
 
 ### GET /v1/merchant/branches/{branchId}/availability
 
@@ -776,7 +776,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/RoomBlockResponseDto"} |
 
 ### GET /v1/merchant/branches/{branchId}/room-blocks
 
@@ -793,7 +793,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/RoomBlockResponseDto"}} |
 
 ### GET /v1/merchant/room-blocks/{id}
 
@@ -810,7 +810,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomBlockResponseDto"} |
 
 ### PATCH /v1/merchant/room-blocks/{id}
 
@@ -837,7 +837,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomBlockResponseDto"} |
 
 ### POST /v1/merchant/room-blocks/{id}/release
 
@@ -854,7 +854,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/RoomBlockResponseDto"} |
 
 ### GET /v1/merchant/availability/buffer-policy
 
@@ -870,7 +870,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/AvailabilityPolicyResponseDto"} |
 
 ### PATCH /v1/merchant/availability/buffer-policy
 
@@ -896,7 +896,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/AvailabilityPolicyResponseDto"} |
 
 ### GET /v1/merchant/notifications/outbox/backlog
 
@@ -929,7 +929,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/PriceRuleResponseDto"}} |
 
 ### GET /v1/merchant/pricing/rules/{id}
 
@@ -946,7 +946,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PriceRuleResponseDto"} |
 
 ### PATCH /v1/merchant/pricing/rules/{id}
 
@@ -973,7 +973,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PriceRuleResponseDto"} |
 
 ### POST /v1/merchant/pricing/rules
 
@@ -999,7 +999,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/PriceRuleResponseDto"} |
 
 ### GET /v1/merchant/pricing/special-dates
 
@@ -1015,7 +1015,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/SpecialDateResponseDto"}} |
 
 ### POST /v1/merchant/pricing/special-dates
 
@@ -1041,7 +1041,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/SpecialDateResponseDto"} |
 
 ### GET /v1/merchant/pricing/special-dates/{id}
 
@@ -1058,7 +1058,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/SpecialDateResponseDto"} |
 
 ### PATCH /v1/merchant/pricing/special-dates/{id}
 
@@ -1085,7 +1085,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/SpecialDateResponseDto"} |
 
 ### GET /v1/merchant/pricing/plans
 
@@ -1101,7 +1101,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/PricePlanResponseDto"}} |
 
 ### POST /v1/merchant/pricing/plans
 
@@ -1127,7 +1127,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 201 | Chưa mô tả | Chưa khai báo schema |
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/PricePlanResponseDto"} |
 
 ### GET /v1/merchant/pricing/plans/{id}
 
@@ -1144,7 +1144,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PricePlanResponseDto"} |
 
 ### PATCH /v1/merchant/pricing/plans/{id}
 
@@ -1171,7 +1171,7 @@ Response được khai báo:
 
 | HTTP | Mô tả | Schema |
 |---|---|---|
-| 200 | Chưa mô tả | Chưa khai báo schema |
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/PricePlanResponseDto"} |
 
 ### GET /v1/merchant/pricing/duration-policy
 
@@ -2236,6 +2236,67 @@ Response được khai báo:
 
 Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là các trường bắt buộc.
 
+### HealthLiveDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok"
+      ]
+    }
+  },
+  "required": [
+    "status"
+  ]
+}
+```
+
+### HealthDependenciesDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "database": {
+      "type": "string",
+      "enum": [
+        "ok"
+      ]
+    }
+  },
+  "required": [
+    "database"
+  ]
+}
+```
+
+### HealthReadyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok"
+      ]
+    },
+    "dependencies": {
+      "$ref": "#/components/schemas/HealthDependenciesDto"
+    }
+  },
+  "required": [
+    "status",
+    "dependencies"
+  ]
+}
+```
+
 ### LoginDto
 
 ```json
@@ -2323,6 +2384,102 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   "required": [
     "currentPassword",
     "newPassword"
+  ]
+}
+```
+
+### SessionResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastUsedAt": {
+      "type": "string",
+      "nullable": true,
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revoked": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "createdAt",
+    "lastUsedAt",
+    "expiresAt",
+    "revoked"
+  ]
+}
+```
+
+### MembershipResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "userId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "email": {
+      "type": "string"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "branchIds": {
+      "description": "Granted branch UUIDs",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "userId",
+    "email",
+    "displayName",
+    "status",
+    "roles",
+    "branchIds"
   ]
 }
 ```
@@ -2505,6 +2662,45 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### BranchResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "timezone": {
+      "type": "string",
+      "example": "Asia/Ho_Chi_Minh",
+      "description": "IANA timezone"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "name",
+    "timezone",
+    "status"
+  ]
+}
+```
+
 ### UpdateBranchDto
 
 ```json
@@ -2569,6 +2765,48 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### RoomResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "capacity": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "branchId",
+    "code",
+    "name",
+    "capacity",
+    "status"
+  ]
+}
+```
+
 ### UpdateRoomDto
 
 ```json
@@ -2606,6 +2844,37 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### RoomAmenityResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "label": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "roomId",
+    "label",
+    "createdAt"
+  ]
+}
+```
+
 ### CreateRoomAmenityDto
 
 ```json
@@ -2637,6 +2906,42 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   },
   "required": [
     "label"
+  ]
+}
+```
+
+### RoomMediaResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "assetRef": {
+      "type": "string",
+      "description": "Storage reference only; binary upload/fetch is out of scope"
+    },
+    "altText": {
+      "type": "string",
+      "nullable": true
+    },
+    "displayOrder": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "roomId",
+    "assetRef",
+    "altText",
+    "displayOrder"
   ]
 }
 ```
@@ -2682,7 +2987,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "description": "Opaque asset reference, not a URL; this API does not upload or fetch the asset"
     },
     "altText": {
-      "type": "object",
+      "type": "string",
       "maxLength": 200,
       "nullable": true,
       "description": "Pass null to clear this metadata"
@@ -2693,6 +2998,61 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "maximum": 10000
     }
   }
+}
+```
+
+### AuditLogResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "actorUserId": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid",
+      "description": "Null for system actions (workers, public requests)"
+    },
+    "action": {
+      "type": "string"
+    },
+    "entityType": {
+      "type": "string"
+    },
+    "entityId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "beforeData": {
+      "type": "object",
+      "nullable": true,
+      "additionalProperties": true,
+      "description": "Structure depends on action; never contains customer PII or free-text notes"
+    },
+    "afterData": {
+      "type": "object",
+      "nullable": true,
+      "additionalProperties": true
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "actorUserId",
+    "action",
+    "entityType",
+    "entityId",
+    "beforeData",
+    "afterData",
+    "occurredAt"
+  ]
 }
 ```
 
@@ -2808,6 +3168,55 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### RoomBlockResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "branchId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "RELEASED"
+      ]
+    },
+    "startAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "branchId",
+    "roomId",
+    "reason",
+    "status",
+    "startAt",
+    "endAt"
+  ]
+}
+```
+
 ### UpdateRoomBlockDto
 
 ```json
@@ -2824,6 +3233,31 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "type": "string"
     }
   }
+}
+```
+
+### AvailabilityPolicyResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "bufferEnabled": {
+      "type": "boolean"
+    },
+    "bufferMinutes": {
+      "type": "number",
+      "description": "Cleanup minutes added after each booking end (PD-024)"
+    },
+    "version": {
+      "type": "string",
+      "description": "Absent until the merchant saves a value (defaults apply)"
+    }
+  },
+  "required": [
+    "bufferEnabled",
+    "bufferMinutes"
+  ]
 }
 ```
 
@@ -2884,6 +3318,119 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### PriceRuleResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "pricePlanId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "specialDateId": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
+    },
+    "roomId": {
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "number",
+      "description": "Higher wins; ties are rejected at quote time"
+    },
+    "weekdays": {
+      "description": "0 = Sunday … 6 = Saturday; empty = every day",
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "startTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "18:00:00"
+    },
+    "endTime": {
+      "type": "string",
+      "nullable": true,
+      "example": "23:00:00"
+    },
+    "minDurationMinutes": {
+      "type": "number",
+      "nullable": true
+    },
+    "maxDurationMinutes": {
+      "type": "number",
+      "nullable": true
+    },
+    "amountVnd": {
+      "type": "string",
+      "description": "Integer VND as decimal string"
+    },
+    "amountUnit": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "PER_HOUR",
+        "PER_BOOKING"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "version": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "pricePlanId",
+    "specialDateId",
+    "roomId",
+    "code",
+    "name",
+    "priority",
+    "weekdays",
+    "startTime",
+    "endTime",
+    "minDurationMinutes",
+    "maxDurationMinutes",
+    "amountVnd",
+    "amountUnit",
+    "status",
+    "version",
+    "createdAt",
+    "updatedAt"
+  ]
+}
+```
+
 ### CreatePriceRuleDto
 
 ```json
@@ -2921,31 +3468,33 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       }
     },
     "roomId": {
-      "type": "object",
-      "nullable": true
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
     },
     "specialDateId": {
-      "type": "object",
-      "nullable": true
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
     },
     "startTime": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "18:00:00"
     },
     "endTime": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "02:00:00"
     },
     "minDurationMinutes": {
-      "type": "object",
+      "type": "number",
       "nullable": true,
       "minimum": 1,
       "maximum": 1440
     },
     "maxDurationMinutes": {
-      "type": "object",
+      "type": "number",
       "nullable": true,
       "minimum": 1,
       "maximum": 1440
@@ -3005,31 +3554,33 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       }
     },
     "roomId": {
-      "type": "object",
-      "nullable": true
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
     },
     "specialDateId": {
-      "type": "object",
-      "nullable": true
+      "type": "string",
+      "nullable": true,
+      "format": "uuid"
     },
     "startTime": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "18:00:00"
     },
     "endTime": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "02:00:00"
     },
     "minDurationMinutes": {
-      "type": "object",
+      "type": "number",
       "nullable": true,
       "minimum": 1,
       "maximum": 1440
     },
     "maxDurationMinutes": {
-      "type": "object",
+      "type": "number",
       "nullable": true,
       "minimum": 1,
       "maximum": 1440
@@ -3048,6 +3599,59 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "amountUnit",
     "amountVnd",
     "status"
+  ]
+}
+```
+
+### SpecialDateResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "endDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "name",
+    "startDate",
+    "endDate",
+    "status",
+    "createdAt",
+    "updatedAt"
   ]
 }
 ```
@@ -3116,6 +3720,67 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### PricePlanResponseDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "code": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "ACTIVE",
+        "INACTIVE"
+      ]
+    },
+    "effectiveFrom": {
+      "type": "string",
+      "nullable": true,
+      "format": "date"
+    },
+    "effectiveTo": {
+      "type": "string",
+      "nullable": true,
+      "format": "date"
+    },
+    "version": {
+      "type": "string",
+      "description": "Optimistic version as decimal string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "code",
+    "name",
+    "status",
+    "effectiveFrom",
+    "effectiveTo",
+    "version",
+    "createdAt",
+    "updatedAt"
+  ]
+}
+```
+
 ### CreatePricePlanDto
 
 ```json
@@ -3129,13 +3794,15 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "type": "string"
     },
     "effectiveFrom": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
+      "format": "date",
       "example": "2030-01-01"
     },
     "effectiveTo": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
+      "format": "date",
       "example": "2030-12-31"
     }
   },
@@ -3164,13 +3831,15 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       ]
     },
     "effectiveFrom": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
+      "format": "date",
       "example": "2030-01-01"
     },
     "effectiveTo": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
+      "format": "date",
       "example": "2030-12-31"
     }
   },
@@ -3647,12 +4316,12 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       ]
     },
     "customerPhone": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "description": "Only present in individual hold responses"
     },
     "customerEmail": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "description": "Only present in individual hold responses"
     },
@@ -3667,13 +4336,13 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       ]
     },
     "phoneVerifiedAt": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "format": "date-time",
       "description": "Time staff recorded a successful verification call; individual responses only"
     },
     "phoneVerifiedBy": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "format": "uuid",
       "description": "Staff user who recorded the verification call; individual responses only"
@@ -3973,13 +4642,13 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       ]
     },
     "fixedAmountVnd": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "150000",
       "description": "VND integer string; required only for FIXED"
     },
     "percent": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "example": "25.0000",
       "description": "Percentage as decimal string with up to four fractional digits; required only for PERCENT"
@@ -4956,7 +5625,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
       "description": "Opaque version that must be submitted when accepting these terms"
     },
     "updatedAt": {
-      "type": "object",
+      "type": "string",
       "nullable": true,
       "format": "date-time"
     }

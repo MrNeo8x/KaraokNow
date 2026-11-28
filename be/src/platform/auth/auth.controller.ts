@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import type { AuthenticatedRequest } from './auth.types';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto, RefreshTokenDto, TokenPairResponseDto } from './auth.dto';
+import { ChangePasswordDto, LoginDto, RefreshTokenDto, TokenPairResponseDto, SessionResponseDto } from './auth.dto';
 import { AllowDuringPasswordChange } from './password-change.decorator';
 
 @ApiTags('authentication') @Controller('auth')
@@ -25,6 +25,7 @@ export class AuthController {
     return this.auth.changePassword(req.actor.userId, dto);
   }
   @ApiBearerAuth() @UseGuards(AuthGuard) @AllowDuringPasswordChange()
+  @ApiResponse({ status: 200, type: [SessionResponseDto] })
   @Get('sessions') listSessions(@Req() req: AuthenticatedRequest) { return this.auth.listSessions(req.actor.userId); }
   @ApiBearerAuth() @UseGuards(AuthGuard) @AllowDuringPasswordChange()
   @Delete('sessions/:id') @HttpCode(HttpStatus.NO_CONTENT)

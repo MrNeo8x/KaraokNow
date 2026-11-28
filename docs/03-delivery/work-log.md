@@ -8,7 +8,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `caa8de3` API-003 (điều khoản đã chấp nhận trên hold WEB, quyền đọc Thu ngân, `GET /merchant/me`) + OPS-005 (image `tools`, compose `--profile tools|workers`, `SWAGGER_ENABLED`); BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031); FE `c6663d7` thiết kế tím/admin shell; BE `7796a6d` benchmark + sửa deadlock + UAT.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 47/47 unit, `npm run test:e2e` 42/42, benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
+**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 47/47 unit, `npm run test:e2e` 43/43 (gồm contract OpenAPI), benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration. Backend container chạy code `caa8de3` (smoke: Thu ngân `GET /merchant/me` → `CASHIER`, đọc danh sách hold chi nhánh → 200). Frontend container chưa có phần FE đang dở. Worker tắt; bật bằng `docker compose --profile workers up -d` trong `be/`.
 
@@ -20,9 +20,18 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (đã thêm A8–A9 khoá merchant, E3/E5 overtime) và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn), BKG-008 (không cọc theo trường hợp); quyết định Thu ngân có được thấy SĐT khách khi đọc hold/booking (API-003); xác nhận các giả định: cọc FIXED tối đa bằng tổng, PERCENT làm tròn lên, không ghi vượt; giữ duyệt khi publish lại; **overtime quá ân hạn tính toàn bộ phút trễ**; quy mô bộ dữ liệu benchmark.
 - *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
-- *Luồng BE:* bổ sung response schema OpenAPI cho 43 operation còn thiếu (hỗ trợ FE-011); PAY-007/BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
+- *Luồng BE:* PAY-007/BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+
+---
+
+## 2026-11-28 — Luồng BE: response schema OpenAPI đầy đủ và kiểm thử contract (API-004)
+
+- Thêm response DTO cho 43 operation còn thiếu (`venue-response.dto.ts`, `membership-response.dto.ts`, `audit-response.dto.ts`, `pricing-response.dto.ts`, `RoomBlockResponseDto`, `AvailabilityPolicyResponseDto`, `SessionResponseDto`, health); `/v1/metrics` khai báo `text/plain`. Nay 102/102 operation có schema.
+- Phát hiện nhờ test contract: 24 property `string|null`/`number|null` thiếu `type` nên Swagger sinh thành `object` (vd. `HoldResponseDto.customerPhone`) — đã thêm `type`. Bẫy đã ghi vào `AGENTS.md`.
+- `be/test/openapi-contract.ts`: validator tối giản (`$ref`, `allOf`, `nullable`, `required`, enum, uuid/date-time/date, chặn trường không khai báo). Không thêm `ajv` vì lệnh cài devDependency bị chặn ở môi trường này; ajv chỉ có sẵn gián tiếp qua `@nestjs/cli`. Đã thử validator bắt đủ 5 loại lỗi.
+- Kiểm chứng: unit 47/47, E2E 43/43 (test contract mới), `npm run verify` (OpenAPI/Markdown khớp).
 
 ---
 

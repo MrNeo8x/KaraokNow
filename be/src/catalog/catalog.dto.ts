@@ -19,7 +19,7 @@ export class PublicBookingTermsResponseDto {
   @ApiProperty() configured!: boolean;
   @ApiProperty({ nullable: true, type: String }) terms!: string | null;
   @ApiProperty({ nullable: true, type: String, description: 'Opaque version that must be submitted when accepting these terms' }) version!: string | null;
-  @ApiPropertyOptional({ nullable: true, format: 'date-time' }) updatedAt?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time' }) updatedAt?: string | null;
 }
 export class CatalogQueryDto {
   @ApiPropertyOptional({ default: 50, minimum: 1, maximum: 100 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;

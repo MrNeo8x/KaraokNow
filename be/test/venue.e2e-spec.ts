@@ -13,6 +13,8 @@ import { NOTIFICATION_ADAPTER, NotificationAdapter, NotificationRequest } from '
 import { OutboxService } from '../src/outbox/outbox.service';
 import { OutboxWorker } from '../src/outbox/outbox.worker';
 import { HoldService } from '../src/booking/hold.service';
+import { readFileSync } from 'node:fs';
+import { assertMatchesContract } from './openapi-contract';
 
 const TENANT_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TENANT_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -1532,6 +1534,78 @@ describe('Authentication, membership, RBAC and venue API', () => {
     } finally { await blocker.query('ROLLBACK'); blocker.release(); }
     await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'lock-timeout-hold-retry')
       .send({ roomId: room.id, channel: 'LOCK_TEST', startAt: '2046-01-01T12:00:00Z', durationMinutes: 90 }).expect(201);
+  }, 30000);
+
+  it('returns responses that match the published OpenAPI contract (FE-011 support)', async () => {
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const check = async (method: 'get' | 'post' | 'patch', template: string, actual: string, status: number, body?: object, headers: Record<string, string> = {}) => {
+      let req = authorized(method, actual);
+      for (const [name, value] of Object.entries(headers)) req = req.set(name, value);
+      const response = await (body === undefined ? req : req.send(body)).expect(status);
+      assertMatchesContract(doc, method, template, status, response.body);
+      return response.body;
+    };
+    // Health and sessions
+    assertMatchesContract(doc, 'get', '/v1/health/live', 200, (await request(app.getHttpServer()).get('/v1/health/live').expect(200)).body);
+    assertMatchesContract(doc, 'get', '/v1/health/ready', 200, (await request(app.getHttpServer()).get('/v1/health/ready').expect(200)).body);
+    assertMatchesContract(doc, 'get', '/v1/auth/sessions', 200, (await request(app.getHttpServer()).get('/v1/auth/sessions').set('Authorization', `Bearer ${ownerToken}`).expect(200)).body);
+    // Venue
+    const branch = await check('post', '/v1/merchant/branches', '/v1/merchant/branches', 201, { code: 'CONTRACT', name: 'Contract', timezone: 'Asia/Ho_Chi_Minh' });
+    await check('get', '/v1/merchant/branches', '/v1/merchant/branches', 200);
+    await check('get', '/v1/merchant/branches/{id}', `/v1/merchant/branches/${branch.id}`, 200);
+    await check('patch', '/v1/merchant/branches/{id}', `/v1/merchant/branches/${branch.id}`, 200, { name: 'Contract branch', timezone: 'Asia/Ho_Chi_Minh' });
+    const room = await check('post', '/v1/merchant/rooms', '/v1/merchant/rooms', 201, { branchId: branch.id, code: 'CONTRACT-R', name: 'Contract room', capacity: 6 });
+    await check('get', '/v1/merchant/branches/{branchId}/rooms', `/v1/merchant/branches/${branch.id}/rooms`, 200);
+    await check('get', '/v1/merchant/rooms/{id}', `/v1/merchant/rooms/${room.id}`, 200);
+    await check('patch', '/v1/merchant/rooms/{id}', `/v1/merchant/rooms/${room.id}`, 200, { name: 'Contract room 2', capacity: 8 });
+    const amenity = await check('post', '/v1/merchant/rooms/{id}/amenities', `/v1/merchant/rooms/${room.id}/amenities`, 201, { label: 'Micro không dây' });
+    await check('get', '/v1/merchant/rooms/{id}/amenities', `/v1/merchant/rooms/${room.id}/amenities`, 200);
+    await check('patch', '/v1/merchant/rooms/{id}/amenities/{amenityId}', `/v1/merchant/rooms/${room.id}/amenities/${amenity.id}`, 200, { label: 'Micro' });
+    const media = await check('post', '/v1/merchant/rooms/{id}/media', `/v1/merchant/rooms/${room.id}/media`, 201, { assetRef: 'rooms/contract.jpg', displayOrder: 1 });
+    await check('get', '/v1/merchant/rooms/{id}/media', `/v1/merchant/rooms/${room.id}/media`, 200);
+    await check('patch', '/v1/merchant/rooms/{id}/media/{mediaId}', `/v1/merchant/rooms/${room.id}/media/${media.id}`, 200, { assetRef: 'rooms/contract-2.jpg', altText: 'Ảnh', displayOrder: 2 });
+    // Memberships and audit
+    await check('get', '/v1/merchant/memberships', '/v1/merchant/memberships', 200);
+    const membership = await check('post', '/v1/merchant/memberships', '/v1/merchant/memberships', 201, { email: 'contract.staff@example.com', displayName: 'Contract', temporaryPassword: 'Contract-password-123', roles: ['RECEPTIONIST'], branchIds: [branch.id] });
+    await check('patch', '/v1/merchant/memberships/{id}', `/v1/merchant/memberships/${membership.id}`, 200, { status: 'INACTIVE' });
+    await check('get', '/v1/merchant/audit-logs', '/v1/merchant/audit-logs?limit=20', 200);
+    // Availability and room blocks
+    await check('get', '/v1/merchant/availability/buffer-policy', '/v1/merchant/availability/buffer-policy', 200);
+    const block = await check('post', '/v1/merchant/room-blocks', '/v1/merchant/room-blocks', 201, { roomId: room.id, startAt: '2047-01-01T10:00:00Z', endAt: '2047-01-01T12:00:00Z', reason: 'Bảo trì' });
+    await check('get', '/v1/merchant/branches/{branchId}/room-blocks', `/v1/merchant/branches/${branch.id}/room-blocks`, 200);
+    await check('get', '/v1/merchant/room-blocks/{id}', `/v1/merchant/room-blocks/${block.id}`, 200);
+    await check('patch', '/v1/merchant/room-blocks/{id}', `/v1/merchant/room-blocks/${block.id}`, 200, { reason: 'Bảo trì loa' });
+    await check('post', '/v1/merchant/room-blocks/{id}/release', `/v1/merchant/room-blocks/${block.id}/release`, 200);
+    // Pricing
+    const plan = await check('post', '/v1/merchant/pricing/plans', '/v1/merchant/pricing/plans', 201, { code: 'CONTRACT-PLAN', name: 'Contract plan' });
+    await check('get', '/v1/merchant/pricing/plans', '/v1/merchant/pricing/plans', 200);
+    await check('get', '/v1/merchant/pricing/plans/{id}', `/v1/merchant/pricing/plans/${plan.id}`, 200);
+    await check('patch', '/v1/merchant/pricing/plans/{id}', `/v1/merchant/pricing/plans/${plan.id}`, 200, { name: 'Contract plan', status: 'ACTIVE' });
+    const special = await check('post', '/v1/merchant/pricing/special-dates', '/v1/merchant/pricing/special-dates', 201, { code: 'CONTRACT-SD', name: 'Lễ', startDate: '2047-04-30', endDate: '2047-05-01' });
+    await check('get', '/v1/merchant/pricing/special-dates', '/v1/merchant/pricing/special-dates', 200);
+    await check('get', '/v1/merchant/pricing/special-dates/{id}', `/v1/merchant/pricing/special-dates/${special.id}`, 200);
+    await check('patch', '/v1/merchant/pricing/special-dates/{id}', `/v1/merchant/pricing/special-dates/${special.id}`, 200, { name: 'Lễ 30/4', startDate: '2047-04-30', endDate: '2047-05-01', status: 'ACTIVE' });
+    const rule = await check('post', '/v1/merchant/pricing/rules', '/v1/merchant/pricing/rules', 201, { pricePlanId: plan.id, code: 'CONTRACT-RULE', name: 'Giá', priority: 995, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id });
+    await check('get', '/v1/merchant/pricing/plans/{id}/rules', `/v1/merchant/pricing/plans/${plan.id}/rules`, 200);
+    await check('get', '/v1/merchant/pricing/rules/{id}', `/v1/merchant/pricing/rules/${rule.id}`, 200);
+    // Booking path (previously documented): hold, details, deposits, confirm, booking, calendar, /me
+    await authorized('patch', '/v1/merchant/booking/no-deposit-confirmation/CONTRACT').send({ allowed: true }).expect(200);
+    const hold = await check('post', '/v1/merchant/booking/holds', '/v1/merchant/booking/holds', 201, { roomId: room.id, channel: 'CONTRACT', startAt: '2047-02-01T12:00:00Z', durationMinutes: 90 }, { 'Idempotency-Key': 'contract-hold' });
+    await check('post', '/v1/merchant/booking/holds/{id}/details', `/v1/merchant/booking/holds/${hold.id}/details`, 200, { phone: '0912345678', expectedTotalAmountVnd: '100000' });
+    await check('post', '/v1/merchant/booking/holds/{id}/phone-verification', `/v1/merchant/booking/holds/${hold.id}/phone-verification`, 200);
+    await check('get', '/v1/merchant/booking/holds/{id}', `/v1/merchant/booking/holds/${hold.id}`, 200);
+    await check('get', '/v1/merchant/booking/holds/{id}/deposits', `/v1/merchant/booking/holds/${hold.id}/deposits`, 200);
+    const booking = await check('post', '/v1/merchant/booking/holds/{id}/confirm', `/v1/merchant/booking/holds/${hold.id}/confirm`, 200, { cancellationTerms: 'Liên hệ cơ sở.' });
+    await check('get', '/v1/merchant/booking/bookings/{id}', `/v1/merchant/booking/bookings/${booking.id}`, 200);
+    await check('get', '/v1/merchant/branches/{branchId}/booking/bookings', `/v1/merchant/branches/${branch.id}/booking/bookings?from=2047-01-01T00:00:00Z&to=2048-01-01T00:00:00Z`, 200);
+    await check('get', '/v1/merchant/branches/{branchId}/booking/holds', `/v1/merchant/branches/${branch.id}/booking/holds?from=2047-01-01T00:00:00Z&to=2048-01-01T00:00:00Z`, 200);
+    await check('post', '/v1/merchant/booking/bookings/{id}/check-in', `/v1/merchant/booking/bookings/${booking.id}/check-in`, 200);
+    await check('post', '/v1/merchant/booking/bookings/{id}/check-out', `/v1/merchant/booking/bookings/${booking.id}/check-out`, 200);
+    await check('get', '/v1/merchant/me', '/v1/merchant/me', 200);
+    await check('get', '/v1/merchant/booking/overtime-policy', '/v1/merchant/booking/overtime-policy', 200);
+    await check('get', '/v1/merchant/catalog/publication', '/v1/merchant/catalog/publication', 200);
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Contract plan', status: 'INACTIVE' }).expect(200);
+    await pool.query(`DELETE FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel='CONTRACT'`, [TENANT_A]);
   }, 30000);
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {

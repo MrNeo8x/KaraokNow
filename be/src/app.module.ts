@@ -16,6 +16,7 @@ import { PricingModule } from './pricing/pricing.module';
 import { BookingModule } from './booking/booking.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ListingApprovalModule } from './listing-approval/listing-approval.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { ListingApprovalModule } from './listing-approval/listing-approval.modul
     OperationsModule,
     PricingModule,
     BookingModule,
-    CatalogModule, ListingApprovalModule
+    CatalogModule, ListingApprovalModule, JobsModule
   ]
 })
 export class AppModule implements NestModule {

@@ -7,7 +7,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Process is alive"
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthLiveDto"
+                }
+              }
+            }
           }
         },
         "summary": "Check whether the process is alive",
@@ -22,7 +29,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Service and database are ready"
+            "description": "Service and database are ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthReadyDto"
+                }
+              }
+            }
           },
           "503": {
             "description": "Database is unavailable"
@@ -40,7 +54,14 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Prometheus text exposition"
+            "description": "Prometheus text exposition",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         },
         "summary": "Expose process-local HTTP metrics in Prometheus text format",
@@ -175,7 +196,17 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -231,7 +262,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -267,7 +308,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -313,7 +361,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -389,7 +444,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -415,7 +477,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BranchResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -451,7 +523,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -495,7 +574,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -541,7 +627,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -579,7 +672,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -615,7 +715,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -651,7 +761,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -695,7 +812,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -741,7 +865,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -777,7 +908,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomAmenityResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -821,7 +962,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomAmenityResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -875,7 +1023,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomAmenityResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -953,7 +1108,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomMediaResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -997,7 +1162,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomMediaResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1051,7 +1223,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomMediaResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1137,7 +1316,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditLogResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1239,7 +1428,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1275,7 +1471,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomBlockResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1311,7 +1517,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1355,7 +1568,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1391,7 +1611,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomBlockResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1419,7 +1646,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityPolicyResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1455,7 +1689,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityPolicyResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1526,7 +1767,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PriceRuleResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1562,7 +1813,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceRuleResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1606,7 +1864,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceRuleResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1644,7 +1909,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceRuleResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1672,7 +1944,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SpecialDateResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1708,7 +1990,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDateResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1744,7 +2033,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDateResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1788,7 +2084,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecialDateResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1816,7 +2119,17 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PricePlanResponseDto"
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1852,7 +2165,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1888,7 +2208,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1932,7 +2259,14 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanResponseDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4421,6 +4755,52 @@
       }
     },
     "schemas": {
+      "HealthLiveDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "HealthDependenciesDto": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "database"
+        ]
+      },
+      "HealthReadyDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "dependencies": {
+            "$ref": "#/components/schemas/HealthDependenciesDto"
+          }
+        },
+        "required": [
+          "status",
+          "dependencies"
+        ]
+      },
       "LoginDto": {
         "type": "object",
         "properties": {
@@ -4490,6 +4870,92 @@
         "required": [
           "currentPassword",
           "newPassword"
+        ]
+      },
+      "SessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "lastUsedAt",
+          "expiresAt",
+          "revoked"
+        ]
+      },
+      "MembershipResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "OWNER",
+                "BRANCH_MANAGER",
+                "RECEPTIONIST",
+                "CASHIER"
+              ]
+            }
+          },
+          "branchIds": {
+            "description": "Granted branch UUIDs",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "email",
+          "displayName",
+          "status",
+          "roles",
+          "branchIds"
         ]
       },
       "CreateMembershipDto": {
@@ -4650,6 +5116,40 @@
           "timezone"
         ]
       },
+      "BranchResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Ho_Chi_Minh",
+            "description": "IANA timezone"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "timezone",
+          "status"
+        ]
+      },
       "UpdateBranchDto": {
         "type": "object",
         "properties": {
@@ -4699,6 +5199,43 @@
           "capacity"
         ]
       },
+      "RoomResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "code",
+          "name",
+          "capacity",
+          "status"
+        ]
+      },
       "UpdateRoomDto": {
         "type": "object",
         "properties": {
@@ -4726,6 +5263,32 @@
           "status"
         ]
       },
+      "RoomAmenityResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "label",
+          "createdAt"
+        ]
+      },
       "CreateRoomAmenityDto": {
         "type": "object",
         "properties": {
@@ -4749,6 +5312,37 @@
         },
         "required": [
           "label"
+        ]
+      },
+      "RoomMediaResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "assetRef": {
+            "type": "string",
+            "description": "Storage reference only; binary upload/fetch is out of scope"
+          },
+          "altText": {
+            "type": "string",
+            "nullable": true
+          },
+          "displayOrder": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "assetRef",
+          "altText",
+          "displayOrder"
         ]
       },
       "CreateRoomMediaDto": {
@@ -4784,7 +5378,7 @@
             "description": "Opaque asset reference, not a URL; this API does not upload or fetch the asset"
           },
           "altText": {
-            "type": "object",
+            "type": "string",
             "maxLength": 200,
             "nullable": true,
             "description": "Pass null to clear this metadata"
@@ -4795,6 +5389,56 @@
             "maximum": 10000
           }
         }
+      },
+      "AuditLogResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorUserId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "Null for system actions (workers, public requests)"
+          },
+          "action": {
+            "type": "string"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "beforeData": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Structure depends on action; never contains customer PII or free-text notes"
+          },
+          "afterData": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorUserId",
+          "action",
+          "entityType",
+          "entityId",
+          "beforeData",
+          "afterData",
+          "occurredAt"
+        ]
       },
       "AvailableRoomResponseDto": {
         "type": "object",
@@ -4893,6 +5537,50 @@
           "reason"
         ]
       },
+      "RoomBlockResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "RELEASED"
+            ]
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "roomId",
+          "reason",
+          "status",
+          "startAt",
+          "endAt"
+        ]
+      },
       "UpdateRoomBlockDto": {
         "type": "object",
         "properties": {
@@ -4906,6 +5594,26 @@
             "type": "string"
           }
         }
+      },
+      "AvailabilityPolicyResponseDto": {
+        "type": "object",
+        "properties": {
+          "bufferEnabled": {
+            "type": "boolean"
+          },
+          "bufferMinutes": {
+            "type": "number",
+            "description": "Cleanup minutes added after each booking end (PD-024)"
+          },
+          "version": {
+            "type": "string",
+            "description": "Absent until the merchant saves a value (defaults apply)"
+          }
+        },
+        "required": [
+          "bufferEnabled",
+          "bufferMinutes"
+        ]
       },
       "UpdateAvailabilityPolicyDto": {
         "type": "object",
@@ -4954,6 +5662,114 @@
           "oldestReadySeconds"
         ]
       },
+      "PriceRuleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pricePlanId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "specialDateId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "number",
+            "description": "Higher wins; ties are rejected at quote time"
+          },
+          "weekdays": {
+            "description": "0 = Sunday … 6 = Saturday; empty = every day",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "startTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "18:00:00"
+          },
+          "endTime": {
+            "type": "string",
+            "nullable": true,
+            "example": "23:00:00"
+          },
+          "minDurationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "maxDurationMinutes": {
+            "type": "number",
+            "nullable": true
+          },
+          "amountVnd": {
+            "type": "string",
+            "description": "Integer VND as decimal string"
+          },
+          "amountUnit": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "PER_HOUR",
+              "PER_BOOKING"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "pricePlanId",
+          "specialDateId",
+          "roomId",
+          "code",
+          "name",
+          "priority",
+          "weekdays",
+          "startTime",
+          "endTime",
+          "minDurationMinutes",
+          "maxDurationMinutes",
+          "amountVnd",
+          "amountUnit",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CreatePriceRuleDto": {
         "type": "object",
         "properties": {
@@ -4988,31 +5804,33 @@
             }
           },
           "roomId": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "specialDateId": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "startTime": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "18:00:00"
           },
           "endTime": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "02:00:00"
           },
           "minDurationMinutes": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "minimum": 1,
             "maximum": 1440
           },
           "maxDurationMinutes": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "minimum": 1,
             "maximum": 1440
@@ -5067,31 +5885,33 @@
             }
           },
           "roomId": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "specialDateId": {
-            "type": "object",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           },
           "startTime": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "18:00:00"
           },
           "endTime": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "02:00:00"
           },
           "minDurationMinutes": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "minimum": 1,
             "maximum": 1440
           },
           "maxDurationMinutes": {
-            "type": "object",
+            "type": "number",
             "nullable": true,
             "minimum": 1,
             "maximum": 1440
@@ -5110,6 +5930,54 @@
           "amountUnit",
           "amountVnd",
           "status"
+        ]
+      },
+      "SpecialDateResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "startDate",
+          "endDate",
+          "status",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CreateSpecialDateDto": {
@@ -5166,6 +6034,62 @@
           "status"
         ]
       },
+      "PricePlanResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "effectiveTo": {
+            "type": "string",
+            "nullable": true,
+            "format": "date"
+          },
+          "version": {
+            "type": "string",
+            "description": "Optimistic version as decimal string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "effectiveFrom",
+          "effectiveTo",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CreatePricePlanDto": {
         "type": "object",
         "properties": {
@@ -5176,13 +6100,15 @@
             "type": "string"
           },
           "effectiveFrom": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
+            "format": "date",
             "example": "2030-01-01"
           },
           "effectiveTo": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
+            "format": "date",
             "example": "2030-12-31"
           }
         },
@@ -5206,13 +6132,15 @@
             ]
           },
           "effectiveFrom": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
+            "format": "date",
             "example": "2030-01-01"
           },
           "effectiveTo": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
+            "format": "date",
             "example": "2030-12-31"
           }
         },
@@ -5624,12 +6552,12 @@
             ]
           },
           "customerPhone": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Only present in individual hold responses"
           },
           "customerEmail": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Only present in individual hold responses"
           },
@@ -5644,13 +6572,13 @@
             ]
           },
           "phoneVerifiedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time",
             "description": "Time staff recorded a successful verification call; individual responses only"
           },
           "phoneVerifiedBy": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "uuid",
             "description": "Staff user who recorded the verification call; individual responses only"
@@ -5905,13 +6833,13 @@
             ]
           },
           "fixedAmountVnd": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "150000",
             "description": "VND integer string; required only for FIXED"
           },
           "percent": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "example": "25.0000",
             "description": "Percentage as decimal string with up to four fractional digits; required only for PERCENT"
@@ -6773,7 +7701,7 @@
             "description": "Opaque version that must be submitted when accepting these terms"
           },
           "updatedAt": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "format": "date-time"
           }

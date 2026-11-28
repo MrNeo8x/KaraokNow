@@ -5,7 +5,7 @@ import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
 import { RolesGuard } from '../platform/auth/roles.guard';
 import { TenantGuard } from '../platform/tenant/tenant.guard';
-import { CreateRoomBlockDto, UpdateRoomBlockDto } from './room-block.dto';
+import { CreateRoomBlockDto, UpdateRoomBlockDto, RoomBlockResponseDto } from './room-block.dto';
 import { AvailabilitySearchDto } from './availability-search.dto';
 import { AvailabilitySearchService } from './availability-search.service';
 import { RoomBlockService } from './room-block.service';
@@ -21,18 +21,23 @@ export class RoomBlockController {
          @Query() query: AvailabilitySearchDto) {
     return this.searchService.search(req.actor, branchId, query);
   }
+  @ApiResponse({ status: 201, type: RoomBlockResponseDto })
   @Post('room-blocks') @RequireRoles('OWNER','BRANCH_MANAGER')
   create(@Req() req: AuthenticatedRequest, @Body() dto: CreateRoomBlockDto) { return this.blocks.create(req.actor, dto); }
+  @ApiResponse({ status: 200, type: [RoomBlockResponseDto] })
   @Get('branches/:branchId/room-blocks') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
   list(@Req() req: AuthenticatedRequest, @Param('branchId', ParseUUIDPipe) branchId: string) {
     return this.blocks.list(req.actor, branchId);
   }
+  @ApiResponse({ status: 200, type: RoomBlockResponseDto })
   @Get('room-blocks/:id') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
   get(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.blocks.get(req.actor, id); }
+  @ApiResponse({ status: 200, type: RoomBlockResponseDto })
   @Patch('room-blocks/:id') @RequireRoles('OWNER','BRANCH_MANAGER')
   update(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateRoomBlockDto) {
     return this.blocks.update(req.actor, id, dto);
   }
+  @ApiResponse({ status: 200, type: RoomBlockResponseDto })
   @Post('room-blocks/:id/release') @HttpCode(HttpStatus.OK) @RequireRoles('OWNER','BRANCH_MANAGER')
   release(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.blocks.release(req.actor, id); }
 }

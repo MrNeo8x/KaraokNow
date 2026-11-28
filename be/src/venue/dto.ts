@@ -57,7 +57,7 @@ export class UpdateRoomMediaDto {
   @IsOptional() @IsString() @IsNotEmpty() @Matches(/^(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9][A-Za-z0-9._/-]*$/)
   @MaxLength(500) assetRef?: string;
 
-  @ApiProperty({ required: false, maxLength: 200, nullable: true, description: 'Pass null to clear this metadata' })
+  @ApiProperty({ required: false, maxLength: 200, nullable: true, type: String, description: 'Pass null to clear this metadata' })
   @IsOptional() @IsString() @MaxLength(200) altText?: string | null;
 
   @ApiProperty({ required: false, minimum: 0, maximum: 10000 })

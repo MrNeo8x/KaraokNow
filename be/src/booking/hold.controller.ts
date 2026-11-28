@@ -21,11 +21,11 @@ export class HoldResponseDto {
   @ApiProperty({ format: 'date-time' }) reservedEndAt!: string;
   @ApiProperty({ format: 'date-time' }) expiresAt!: string;
   @ApiProperty({ enum: ['HELD', 'EXPIRED', 'CONFIRMED'] }) status!: string;
-  @ApiPropertyOptional({ nullable: true, description: 'Only present in individual hold responses' }) customerPhone?: string | null;
-  @ApiPropertyOptional({ nullable: true, description: 'Only present in individual hold responses' }) customerEmail?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'Only present in individual hold responses' }) customerPhone?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'Only present in individual hold responses' }) customerEmail?: string | null;
   @ApiPropertyOptional({ nullable: true, type: PriceSnapshotDto, description: 'Immutable server-calculated quote snapshot, only present in individual hold responses' }) priceSnapshot?: PriceSnapshotDto | null;
-  @ApiPropertyOptional({ nullable: true, format: 'date-time', description: 'Time staff recorded a successful verification call; individual responses only' }) phoneVerifiedAt?: string | null;
-  @ApiPropertyOptional({ nullable: true, format: 'uuid', description: 'Staff user who recorded the verification call; individual responses only' }) phoneVerifiedBy?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time', description: 'Time staff recorded a successful verification call; individual responses only' }) phoneVerifiedAt?: string | null;
+  @ApiPropertyOptional({ nullable: true, type: String, format: 'uuid', description: 'Staff user who recorded the verification call; individual responses only' }) phoneVerifiedBy?: string | null;
   @ApiPropertyOptional({ nullable: true, type: DepositPolicySnapshotDto, description: 'Deposit policy frozen with the price snapshot; individual responses only' }) depositPolicySnapshot?: DepositPolicySnapshotDto | null;
   @ApiPropertyOptional({ nullable: true, type: String, description: 'WEB holds: exact public terms the customer accepted. Confirmation must send this text as cancellationTerms. Null for staff holds; individual responses only' }) publicAcceptedTerms?: string | null;
   @ApiPropertyOptional({ nullable: true, type: String, description: 'Version of publicAcceptedTerms; individual responses only' }) publicAcceptedTermsVersion?: string | null;

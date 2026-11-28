@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { BranchResponseDto, RoomAmenityResponseDto, RoomMediaResponseDto, RoomResponseDto } from './venue-response.dto';
 import type { AuthenticatedRequest } from '../platform/auth/auth.types';
 import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
@@ -16,44 +17,57 @@ import { VenueService } from './venue.service';
 export class VenueController {
   constructor(private readonly venues: VenueService) {}
   @Post('branches') @RequireRoles('OWNER')
+  @ApiResponse({ status: 201, type: BranchResponseDto })
   createBranch(@Req() req: AuthenticatedRequest, @Body() dto: CreateBranchDto) { return this.venues.createBranch(req.actor, dto); }
   @Get('branches') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: [BranchResponseDto] })
   listBranches(@Req() req: AuthenticatedRequest) { return this.venues.listBranches(req.actor); }
   @Get('branches/:id') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: BranchResponseDto })
   getBranch(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.venues.getBranch(req.actor, id); }
   @Patch('branches/:id') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: BranchResponseDto })
   updateBranch(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateBranchDto) {
     return this.venues.updateBranch(req.actor, id, dto);
   }
   @Patch('branches/:id/status') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: BranchResponseDto })
   setBranchStatus(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: BranchStatusDto) {
     return this.venues.setBranchStatus(req.actor, id, dto);
   }
   @Post('rooms') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 201, type: RoomResponseDto })
   createRoom(@Req() req: AuthenticatedRequest, @Body() dto: CreateRoomDto) { return this.venues.createRoom(req.actor, dto); }
   @Get('branches/:branchId/rooms') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: [RoomResponseDto] })
   listRooms(@Req() req: AuthenticatedRequest, @Param('branchId', ParseUUIDPipe) branchId: string) {
     return this.venues.listRooms(req.actor, branchId);
   }
   @Get('rooms/:id') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
   getRoom(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) { return this.venues.getRoom(req.actor, id); }
   @Patch('rooms/:id') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
   updateRoom(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateRoomDto) {
     return this.venues.updateRoom(req.actor, id, dto);
   }
   @Patch('rooms/:id/status') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: RoomResponseDto })
   setRoomStatus(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RoomStatusDto) {
     return this.venues.setRoomStatus(req.actor, id, dto);
   }
   @Get('rooms/:id/amenities') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: [RoomAmenityResponseDto] })
   listRoomAmenities(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.venues.listRoomAmenities(req.actor, id);
   }
   @Post('rooms/:id/amenities') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 201, type: RoomAmenityResponseDto })
   createRoomAmenity(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateRoomAmenityDto) {
     return this.venues.createRoomAmenity(req.actor, id, dto);
   }
   @Patch('rooms/:id/amenities/:amenityId') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: RoomAmenityResponseDto })
   updateRoomAmenity(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string,
                     @Param('amenityId', ParseUUIDPipe) amenityId: string, @Body() dto: UpdateRoomAmenityDto) {
     return this.venues.updateRoomAmenity(req.actor, id, amenityId, dto);
@@ -64,14 +78,17 @@ export class VenueController {
     return this.venues.deleteRoomAmenity(req.actor, id, amenityId);
   }
   @Get('rooms/:id/media') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
+  @ApiResponse({ status: 200, type: [RoomMediaResponseDto] })
   listRoomMedia(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
     return this.venues.listRoomMedia(req.actor, id);
   }
   @Post('rooms/:id/media') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 201, type: RoomMediaResponseDto })
   createRoomMedia(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateRoomMediaDto) {
     return this.venues.createRoomMedia(req.actor, id, dto);
   }
   @Patch('rooms/:id/media/:mediaId') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: RoomMediaResponseDto })
   updateRoomMedia(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string,
                   @Param('mediaId', ParseUUIDPipe) mediaId: string, @Body() dto: UpdateRoomMediaDto) {
     return this.venues.updateRoomMedia(req.actor, id, mediaId, dto);
