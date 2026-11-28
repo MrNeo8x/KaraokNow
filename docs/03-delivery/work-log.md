@@ -28,6 +28,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: merchant thật Karaoke Majestic (local + production)
+
+- Nguồn: danh thiếp `docs/merchaint/img.png`. Tạo merchant `MAJESTIC` "Karaoke Majestic" + chi nhánh `LA_KHE` "Karaoke Majestic La Khê", `THANH_HA` "Karaoke Majestic Thanh Hà" (`Asia/Ho_Chi_Minh`, ACTIVE), chưa có phòng/giá, chưa xin công khai.
+- Cách tạo: script một lần (không commit) gọi `MerchantOnboardingService.create` và `VenueService.createBranch` với DTO đã validate — cùng logic, khoá và audit như API (`MERCHANT_CREATED`, 2× `BRANCH_CREATED`). Actor: production = Platform Admin của người dùng; local = Platform Admin UAT. Owner (người dùng chọn): tài khoản Platform Admin thứ hai — production dùng tài khoản sẵn có (không đổi mật khẩu); local tạo tài khoản mới với mật khẩu tạm, bắt đổi khi đăng nhập (đã kiểm: login 200, `/merchant/me` 403 "Password change is required").
+- Địa chỉ/SĐT chi nhánh chưa có chỗ lưu → task VEN-004 (BLOCKED chờ PO), dữ liệu ghi sẵn trong task.
+
+---
+
 ## 2026-11-28 — Session triển khai: đo IP khách trên production (OPS-007)
 
 - Theo `ops-007-client-ip-runbook.md` + `deploy-vercel.md`: kiểm tra tại HEAD `44a388e` (BE verify 57/57, E2E 45/45; FE 42/42, `tsc`, `build` trên worktree sạch); áp `20261124040000_cash_reconciliation` lên Prisma **trước** push; người dùng push `main` (5 commit `4af700b`…`44a388e`); hai project READY; smoke 200, `/docs`, cron và diag không secret → 404.
