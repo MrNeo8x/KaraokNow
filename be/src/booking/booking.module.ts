@@ -22,6 +22,8 @@ import { HoldDepositService } from './hold-deposit.service';
 import { BookingLifecycleController } from './booking-lifecycle.controller';
 import { BookingLifecycleService } from './booking-lifecycle.service';
 import { OvertimePolicyController, OvertimePolicyService } from './overtime-policy';
+import { CashLedgerController } from './cash-ledger.controller';
+import { CashLedgerService } from './cash-ledger.service';
 
-@Module({ imports: [AuthModule, PricingModule], controllers: [HoldTtlController, HoldController, BranchHoldController, NoDepositPolicyController, DepositPolicyController, HoldExpiryStatusController, ConfirmationController, BookingReadController, BranchBookingController, ManualPaymentController, PublicBookingController, HoldDepositController, BookingLifecycleController, OvertimePolicyController], providers: [HoldTtlService, HoldService, NoDepositPolicyService, DepositPolicyService, ConfirmationService, ManualPaymentService, PublicBookingService, HoldDepositService, BookingLifecycleService, OvertimePolicyService, TenantGuard], exports: [HoldService] })
+@Module({ imports: [AuthModule, PricingModule], controllers: [HoldTtlController, HoldController, BranchHoldController, NoDepositPolicyController, DepositPolicyController, HoldExpiryStatusController, ConfirmationController, BookingReadController, BranchBookingController, ManualPaymentController, PublicBookingController, HoldDepositController, BookingLifecycleController, OvertimePolicyController, CashLedgerController], providers: [HoldTtlService, HoldService, NoDepositPolicyService, DepositPolicyService, ConfirmationService, ManualPaymentService, PublicBookingService, HoldDepositService, BookingLifecycleService, OvertimePolicyService, CashLedgerService, TenantGuard], exports: [HoldService] })
 export class BookingModule {}

@@ -25,6 +25,7 @@ export class HoldDepositEntryDto {
   @ApiProperty({ nullable: true, type: String }) note!: string | null;
   @ApiProperty({ format: 'uuid' }) recordedBy!: string;
   @ApiProperty({ format: 'date-time' }) recordedAt!: string;
+  @ApiProperty({ description: 'True when an Owner/Branch Manager reversed this entry (PAY-007); reversed entries do not count' }) reversed!: boolean;
 }
 
 export class HoldDepositStatusDto {
@@ -32,7 +33,7 @@ export class HoldDepositStatusDto {
   @ApiProperty({ enum: ['HELD', 'EXPIRED', 'CONFIRMED'] }) holdStatus!: string;
   @ApiProperty({ nullable: true, type: DepositPolicySnapshotDto, description: 'Null until customer details and the price snapshot are recorded' }) depositPolicySnapshot!: DepositPolicySnapshotDto | null;
   @ApiProperty() requiredAmountVnd!: string;
-  @ApiProperty() totalRecordedVnd!: string;
+  @ApiProperty({ description: 'Recorded deposits net of reversals' }) totalRecordedVnd!: string;
   @ApiProperty() remainingVnd!: string;
   @ApiProperty({ description: 'True when the snapshot requires a deposit and the recorded total covers it' }) depositSatisfied!: boolean;
   @ApiProperty({ type: [HoldDepositEntryDto] }) items!: HoldDepositEntryDto[];

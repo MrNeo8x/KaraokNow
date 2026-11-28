@@ -187,6 +187,18 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
 - E2E mới đối chiếu response thật với schema (thiếu trường, sai kiểu, sai enum/định dạng, **trường không khai báo**) cho toàn bộ nhóm trên và đường booking chính — FE-011 có thể sinh type từ file này.
 - Không đổi hành vi endpoint.
 
+## FE READY — đối soát tiền mặt (PAY-007, PD-036, 2026-11-28)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 44/44 (response đối chiếu với `openapi.json`).
+
+- `GET /v1/merchant/booking/bookings/{id}/account` (mọi vai trò merchant, theo chi nhánh) → `{bookingStatus, priceTotalVnd, surchargesVnd, dueVnd, depositsVnd, cashVnd, refundsVnd, paidVnd, balanceVnd, settlement, retainedVnd, entries[]}`. `settlement` ∈ `UNPAID|PARTIAL|PAID|OVERPAID|CLOSED`; booking hủy/no-show: `dueVnd=0`, `settlement=CLOSED`, `retainedVnd` = số giữ lại. `entries[]`: `{kind: DEPOSIT|CASH|SURCHARGE|REVERSAL|REFUND, id, amountVnd (luôn dương), note, reversesType, reversesId, reversed, recordedBy, recordedAt}` — khoản bị đảo có `reversed=true` và không còn tính.
+- `POST /v1/merchant/booking/bookings/{id}/surcharges` (Owner, Branch Manager, Receptionist, Cashier), header `Idempotency-Key`, body `{amountVnd, reason}` (lý do bắt buộc). 409 nếu booking đã hủy/no-show hoặc key dùng cho body khác.
+- `POST /v1/merchant/booking/money-reversals` (Owner, Branch Manager) body `{entryType: HOLD_DEPOSIT|MANUAL_PAYMENT|SURCHARGE, entryId, reason}` — đảo **toàn bộ** khoản gốc. Gửi lại cùng lý do trả 200 như cũ; lý do khác → 409 "already reversed"; cọc của hold hết hạn đã xử lý → 409.
+- `GET /v1/merchant/branches/{branchId}/booking/unresolved-deposits?limit&offset` (Owner, Branch Manager, Cashier): hold hết hạn còn cọc ròng chưa xử lý `{holdId, roomId, channel, startAt, expiresAt, customerPhone, netDepositVnd}`.
+- `POST /v1/merchant/booking/holds/{id}/deposit-resolution` (Owner, Branch Manager) body `{refundAmountVnd (0 = giữ hết), reason}` → `{netDepositVnd, refundAmountVnd, retainedVnd, …}`. 409 nếu hold còn hiệu lực/đã xác nhận, không có cọc, hoàn vượt cọc, hoặc đã ghi khác.
+- `GET /v1/merchant/branches/{branchId}/cash-report?date=YYYY-MM-DD` (Owner, Branch Manager, Cashier): ngày theo múi giờ chi nhánh; `totals` và `byRecorder[]` gồm `depositsVnd, bookingCashVnd, cashReversalsVnd, refundsVnd, netCashVnd, surchargesVnd`. Ngày không hợp lệ → 422.
+- **Thay đổi hành vi hiện có:** `GET .../holds/{id}/deposits` mỗi khoản có thêm `reversed`, `totalRecordedVnd` là số ròng sau đảo; xác nhận có cọc và giới hạn tiền hoàn khi hủy đều tính theo số ròng. `GET .../manual-payments/summary` vẫn là tổng thô (chưa trừ đảo) — dùng `account` để hiển thị phải thu/đã thu.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

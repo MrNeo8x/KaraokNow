@@ -26,6 +26,7 @@
 - BE xong một contract → thêm mục `## FE READY — <tên> (<task>, <ngày>)` trong handoff (endpoint, body, response, mã lỗi, quyền, lưu ý). FE nối xong → thêm `### FE INTEGRATED — …`.
 - `task-board.md` và `fe-backend-handoff.md` bị cả hai luồng sửa. Khi commit, **chỉ stage phần của mình**: lưu diff của luồng kia (`git diff -- <file> > other.patch`), tạo bản tạm đã `patch -R`, rồi `git update-index --cacheinfo` bản đó. Kiểm tra `git diff --cached` không chứa hunk của luồng kia.
 - Khi thêm dòng mới vào bảng task board, tránh sửa dòng luồng kia đang sửa; thêm dòng mới ở cuối bảng nếu cần.
+- **Có thể có hơn hai session** (ví dụ session triển khai Vercel sửa `be/vercel.json`, `be/src/jobs/`, `be/package.json`). Luôn `git add` **đúng từng file của mình**, không `git add be/` hay `git add docs/`: commit `617198a` (API-004) từng gom nhầm `be/src/jobs/*` của session triển khai.
 
 ## Lệnh
 

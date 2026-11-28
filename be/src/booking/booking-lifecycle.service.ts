@@ -67,9 +67,12 @@ export class BookingLifecycleService {
         return;
       }
       if (booking.status !== 'CONFIRMED') throw new ConflictException(`Booking in status ${booking.status} cannot be cancelled or marked no-show`);
+      // Net of reversed entries (PAY-007).
       const collected = BigInt((await client.query(`SELECT
-          (SELECT COALESCE(SUM(amount_vnd),0) FROM manual_payments WHERE tenant_id=$1 AND booking_id=$2)
-        + (SELECT COALESCE(SUM(amount_vnd),0) FROM hold_deposits WHERE tenant_id=$1 AND hold_id=$3) AS total`,
+          (SELECT COALESCE(SUM(p.amount_vnd),0) FROM manual_payments p WHERE p.tenant_id=$1 AND p.booking_id=$2
+             AND NOT EXISTS (SELECT 1 FROM money_reversals r WHERE r.entry_type='MANUAL_PAYMENT' AND r.entry_id=p.id))
+        + (SELECT COALESCE(SUM(d.amount_vnd),0) FROM hold_deposits d WHERE d.tenant_id=$1 AND d.hold_id=$3
+             AND NOT EXISTS (SELECT 1 FROM money_reversals r WHERE r.entry_type='HOLD_DEPOSIT' AND r.entry_id=d.id)) AS total`,
       [actor.tenantId, id, booking.hold_id])).rows[0].total);
       if (BigInt(refund) > collected) throw new ConflictException(`Refund exceeds the amount recorded for this booking (${collected} VND)`);
       const status = dto.type === 'NO_SHOW' ? 'NO_SHOW' : 'CANCELLED';

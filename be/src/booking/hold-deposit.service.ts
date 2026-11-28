@@ -6,7 +6,11 @@ import { PG_POOL } from '../platform/database/database.module';
 import type { DepositPolicySnapshot } from './deposit-snapshot';
 import { RecordHoldDepositDto } from './hold-deposit.dto';
 
-const fields = `id,hold_id AS "holdId",branch_id AS "branchId",method,amount_vnd::text AS "amountVnd",note,recorded_by AS "recordedBy",recorded_at AS "recordedAt"`;
+const fields = `id,hold_id AS "holdId",branch_id AS "branchId",method,amount_vnd::text AS "amountVnd",note,recorded_by AS "recordedBy",recorded_at AS "recordedAt",
+  EXISTS(SELECT 1 FROM money_reversals r WHERE r.entry_type='HOLD_DEPOSIT' AND r.entry_id=hold_deposits.id) AS reversed`;
+/** Net deposits on a hold: reversed entries (PAY-007) no longer count toward coverage or limits. */
+export const NET_HOLD_DEPOSITS_SQL = `SELECT COALESCE(SUM(d.amount_vnd),0)::text AS total FROM hold_deposits d WHERE d.tenant_id=$1 AND d.hold_id=$2
+  AND NOT EXISTS (SELECT 1 FROM money_reversals r WHERE r.entry_type='HOLD_DEPOSIT' AND r.entry_id=d.id)`;
 
 @Injectable()
 export class HoldDepositService {
@@ -56,9 +60,9 @@ export class HoldDepositService {
     finally { client.release(); }
   }
 
-  /** Caller must hold the hold row lock so concurrent deposits/confirmation see a stable total. */
+  /** Net of reversals. Caller must hold the hold row lock so concurrent deposits/confirmation/reversals see a stable total. */
   async recordedTotal(client: PoolClient, tenantId: string, holdId: string): Promise<string> {
-    return (await client.query(`SELECT COALESCE(SUM(amount_vnd),0)::text AS total FROM hold_deposits WHERE tenant_id=$1 AND hold_id=$2`, [tenantId, holdId])).rows[0].total;
+    return (await client.query(NET_HOLD_DEPOSITS_SQL, [tenantId, holdId])).rows[0].total;
   }
 
   private async lockHold(client: PoolClient, actor: Actor, holdId: string) {
@@ -71,7 +75,7 @@ export class HoldDepositService {
 
   private async statusOf(client: PoolClient, tenantId: string, holdId: string, hold: { status: string; valid: boolean; deposit_policy_snapshot: DepositPolicySnapshot | null }) {
     const items = (await client.query(`SELECT ${fields} FROM hold_deposits WHERE tenant_id=$1 AND hold_id=$2 ORDER BY recorded_at,id`, [tenantId, holdId])).rows;
-    const recorded = items.reduce((sum, item) => sum + BigInt(item.amountVnd), 0n);
+    const recorded = items.filter(item => !item.reversed).reduce((sum, item) => sum + BigInt(item.amountVnd), 0n);
     const snapshot = hold.deposit_policy_snapshot;
     const required = BigInt(snapshot?.requiredAmountVnd ?? '0');
     const remaining = required > recorded ? required - recorded : 0n;

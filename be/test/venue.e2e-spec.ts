@@ -1608,6 +1608,120 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await pool.query(`DELETE FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel='CONTRACT'`, [TENANT_A]);
   }, 30000);
 
+  it('reconciles cash per booking: due vs paid, surcharges, reversals, expired-hold deposits and a daily report (PAY-007, PD-036)', async () => {
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'LEDGER', name: 'Ledger', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'LEDGER-R', name: 'Ledger room', capacity: 6 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'LEDGER-PLAN', name: 'Ledger plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Ledger plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'LEDGER-RULE', name: 'Giá', priority: 994, amountVnd: '200000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/LEDGER').send({ mode: 'FIXED', fixedAmountVnd: '50000' }).expect(200);
+    const receptionist = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'ledger-reception@example.com',$1,'Ledger Reception','ACTIVE') RETURNING id`, [await hash('Reception-password-123', 4)])).rows[0];
+    const member = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, receptionist.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'RECEPTIONIST')`, [member.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [member.id, TENANT_A, branch.id]);
+    const receptionToken = (await request(app.getHttpServer()).post('/v1/auth/login').send({ email: 'ledger-reception@example.com', password: 'Reception-password-123' }).expect(200)).body.accessToken;
+    const asReception = (method: 'get' | 'post', p: string) => request(app.getHttpServer())[method](p).set('Authorization', `Bearer ${receptionToken}`).set('X-Tenant-ID', TENANT_A);
+    const pricedHold = async (key: string, startAt: string) => {
+      const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', key).send({ roomId: room.id, channel: 'LEDGER', startAt, durationMinutes: 90 }).expect(201)).body;
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone: '0912345678', expectedTotalAmountVnd: '200000' }).expect(200);
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+      return hold;
+    };
+    const deposit = (holdId: string, key: string) => authorized('post', `/v1/merchant/booking/holds/${holdId}/deposits`).set('Idempotency-Key', key).send({ method: 'CASH', amountVnd: '50000' }).expect(200).then(r => r.body);
+    const account = async (bookingId: string) => {
+      const body = (await authorized('get', `/v1/merchant/booking/bookings/${bookingId}/account`).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/merchant/booking/bookings/{id}/account', 200, body);
+      return body;
+    };
+    const terms = { cancellationTerms: 'Liên hệ cơ sở.' };
+
+    // Booking 1: deposit, confirm, surcharge, CASH, over-collection, reversals.
+    const hold1 = await pricedHold('ledger-1', '2048-01-01T12:00:00Z');
+    const dep1 = await deposit(hold1.id, 'ledger-dep-1');
+    const booking = (await authorized('post', `/v1/merchant/booking/holds/${hold1.id}/confirm`).send(terms).expect(200)).body;
+    expect(await account(booking.id)).toMatchObject({ priceTotalVnd: '200000', depositsVnd: '50000', dueVnd: '200000', paidVnd: '50000', balanceVnd: '150000', settlement: 'PARTIAL', retainedVnd: null });
+    const surcharge = (await asReception('post', `/v1/merchant/booking/bookings/${booking.id}/surcharges`).set('Idempotency-Key', 'ledger-sur').send({ amountVnd: '30000', reason: 'Nước uống' }).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/booking/bookings/{id}/surcharges', 200, surcharge);
+    await asReception('post', `/v1/merchant/booking/bookings/${booking.id}/surcharges`).set('Idempotency-Key', 'ledger-sur').send({ amountVnd: '30000', reason: 'Nước uống' }).expect(200)
+      .expect(({ body }) => expect(body.id).toBe(surcharge.id));
+    await asReception('post', `/v1/merchant/booking/bookings/${booking.id}/surcharges`).set('Idempotency-Key', 'ledger-sur-bad').send({ amountVnd: '0', reason: 'x' }).expect(400);
+    await asReception('post', `/v1/merchant/booking/bookings/${booking.id}/surcharges`).set('Idempotency-Key', 'ledger-sur-blank').send({ amountVnd: '1000', reason: '  ' }).expect(400);
+    const cashPath = `/v1/merchant/booking/bookings/${booking.id}/manual-payments`;
+    await authorized('post', cashPath).set('Idempotency-Key', 'ledger-cash-1').send({ method: 'CASH', amountVnd: '150000' }).expect(200);
+    expect(await account(booking.id)).toMatchObject({ dueVnd: '230000', paidVnd: '200000', balanceVnd: '30000', settlement: 'PARTIAL' });
+    const extra = (await authorized('post', cashPath).set('Idempotency-Key', 'ledger-cash-2').send({ method: 'CASH', amountVnd: '40000' }).expect(200)).body;
+    expect(await account(booking.id)).toMatchObject({ paidVnd: '240000', balanceVnd: '-10000', settlement: 'OVERPAID' });
+
+    const reversal = { entryType: 'MANUAL_PAYMENT', entryId: extra.id, reason: 'Ghi trùng phiếu' };
+    await asReception('post', '/v1/merchant/booking/money-reversals').send(reversal).expect(403);
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ ...reversal, reason: ' ' }).expect(400);
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ ...reversal, entryId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }).expect(404);
+    const reversed = (await authorized('post', '/v1/merchant/booking/money-reversals').send(reversal).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/booking/money-reversals', 200, reversed);
+    expect(reversed).toMatchObject({ entryType: 'MANUAL_PAYMENT', entryId: extra.id, amountVnd: '40000' });
+    await authorized('post', '/v1/merchant/booking/money-reversals').send(reversal).expect(200).expect(({ body }) => expect(body.id).toBe(reversed.id));
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ ...reversal, reason: 'Khác' }).expect(409);
+    const afterCashReversal = await account(booking.id);
+    expect(afterCashReversal).toMatchObject({ cashVnd: '150000', paidVnd: '200000', balanceVnd: '30000', settlement: 'PARTIAL' });
+    expect(afterCashReversal.entries.find((e: { id: string }) => e.id === extra.id)).toMatchObject({ kind: 'CASH', reversed: true });
+    expect(afterCashReversal.entries.find((e: { id: string }) => e.id === reversed.id)).toMatchObject({ kind: 'REVERSAL', reversesType: 'MANUAL_PAYMENT', reversesId: extra.id, note: 'Ghi trùng phiếu' });
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ entryType: 'SURCHARGE', entryId: surcharge.id, reason: 'Khách không dùng' }).expect(200);
+    expect(await account(booking.id)).toMatchObject({ surchargesVnd: '0', dueVnd: '200000', paidVnd: '200000', balanceVnd: '0', settlement: 'PAID' });
+
+    // Booking 2: a reversed deposit no longer covers confirmation.
+    const hold2 = await pricedHold('ledger-2', '2048-01-02T12:00:00Z');
+    const dep2 = await deposit(hold2.id, 'ledger-dep-2');
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ entryType: 'HOLD_DEPOSIT', entryId: dep2.id, reason: 'Nhầm hold' }).expect(200);
+    await authorized('get', `/v1/merchant/booking/holds/${hold2.id}/deposits`).expect(200)
+      .expect(({ body }) => expect(body).toMatchObject({ totalRecordedVnd: '0', remainingVnd: '50000', depositSatisfied: false, items: [{ id: dep2.id, reversed: true }] }));
+    await authorized('post', `/v1/merchant/booking/holds/${hold2.id}/confirm`).send(terms).expect(409);
+    await authorized('post', `/v1/merchant/booking/holds/${hold2.id}/deposit-resolution`).send({ refundAmountVnd: '0', reason: 'x' }).expect(409);
+    await deposit(hold2.id, 'ledger-dep-2b');
+    await authorized('post', `/v1/merchant/booking/holds/${hold2.id}/confirm`).send(terms).expect(200);
+
+    // Hold 3: expires with a deposit; staff records the refund decision.
+    const hold3 = await pricedHold('ledger-3', '2048-01-03T12:00:00Z');
+    const dep3 = await deposit(hold3.id, 'ledger-dep-3');
+    await pool.query(`UPDATE booking_holds SET expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [hold3.id]);
+    const unresolved = (await authorized('get', `/v1/merchant/branches/${branch.id}/booking/unresolved-deposits`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/branches/{branchId}/booking/unresolved-deposits', 200, unresolved);
+    expect(unresolved.items).toEqual([expect.objectContaining({ holdId: hold3.id, netDepositVnd: '50000', customerPhone: '0912345678' })]);
+    const resolutionPath = `/v1/merchant/booking/holds/${hold3.id}/deposit-resolution`;
+    await asReception('post', resolutionPath).send({ refundAmountVnd: '20000', reason: 'Khách huỷ' }).expect(403);
+    await authorized('post', resolutionPath).send({ refundAmountVnd: '60000', reason: 'Khách huỷ' }).expect(409);
+    const resolution = (await authorized('post', resolutionPath).send({ refundAmountVnd: '20000', reason: 'Khách huỷ, giữ phí' }).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/booking/holds/{id}/deposit-resolution', 200, resolution);
+    expect(resolution).toMatchObject({ netDepositVnd: '50000', refundAmountVnd: '20000', retainedVnd: '30000' });
+    await authorized('post', resolutionPath).send({ refundAmountVnd: '20000', reason: 'Khách huỷ, giữ phí' }).expect(200);
+    await authorized('post', resolutionPath).send({ refundAmountVnd: '0', reason: 'Khác' }).expect(409);
+    expect((await pool.query('SELECT status FROM booking_holds WHERE id=$1', [hold3.id])).rows[0].status).toBe('EXPIRED');
+    await authorized('get', `/v1/merchant/branches/${branch.id}/booking/unresolved-deposits`).expect(200).expect(({ body }) => expect(body.items).toEqual([]));
+    await authorized('post', '/v1/merchant/booking/money-reversals').send({ entryType: 'HOLD_DEPOSIT', entryId: dep3.id, reason: 'Muộn' }).expect(409);
+
+    // Cancellation refund is capped by the net collected; a closed booking has nothing due.
+    await authorized('post', `/v1/merchant/booking/bookings/${booking.id}/outcome`).send({ type: 'CUSTOMER_CANCELLED', note: 'Huỷ, hoàn toàn bộ', refundAmountVnd: '200001' }).expect(409);
+    await authorized('post', `/v1/merchant/booking/bookings/${booking.id}/outcome`).send({ type: 'CUSTOMER_CANCELLED', note: 'Huỷ, hoàn toàn bộ', refundAmountVnd: '150000' }).expect(200);
+    expect(await account(booking.id)).toMatchObject({ bookingStatus: 'CANCELLED', dueVnd: '0', refundsVnd: '150000', paidVnd: '50000', settlement: 'CLOSED', retainedVnd: '50000' });
+    await asReception('post', `/v1/merchant/booking/bookings/${booking.id}/surcharges`).set('Idempotency-Key', 'ledger-sur-closed').send({ amountVnd: '1000', reason: 'Muộn' }).expect(409);
+
+    // Daily report for the branch's local day.
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const report = (await authorized('get', `/v1/merchant/branches/${branch.id}/cash-report`).query({ date: today }).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/branches/{branchId}/cash-report', 200, report);
+    expect(report).toMatchObject({ branchId: branch.id, date: today, timezone: 'Asia/Ho_Chi_Minh', totals: {
+      depositsVnd: '200000', bookingCashVnd: '190000', cashReversalsVnd: '90000', refundsVnd: '170000', netCashVnd: '130000', surchargesVnd: '0' } });
+    expect(report.byRecorder.map((r: { userId: string }) => r.userId).sort()).toEqual([OWNER_ID, receptionist.id].sort());
+    expect(report.byRecorder.find((r: { userId: string }) => r.userId === receptionist.id)).toMatchObject({ netCashVnd: '0', surchargesVnd: '30000' });
+    await authorized('get', `/v1/merchant/branches/${branch.id}/cash-report`).query({ date: '2026-02-30' }).expect(422);
+    await asReception('get', `/v1/merchant/branches/${branch.id}/cash-report`).query({ date: today }).expect(403);
+    const audit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE tenant_id=$1 AND action IN ('MONEY_REVERSED','BOOKING_SURCHARGE_ADDED','HOLD_DEPOSIT_RESOLVED')`, [TENANT_A]);
+    expect(audit.rows.map(r => r.action).sort()).toEqual(['BOOKING_SURCHARGE_ADDED', 'HOLD_DEPOSIT_RESOLVED', 'MONEY_REVERSED', 'MONEY_REVERSED', 'MONEY_REVERSED']);
+    expect(JSON.stringify(audit.rows)).not.toMatch(/Ghi trùng phiếu|Nước uống|giữ phí/);
+    expect(dep1.reversed).toBe(false);
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Ledger plan', status: 'INACTIVE' }).expect(200);
+  }, 30000);
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

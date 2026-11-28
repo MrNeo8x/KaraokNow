@@ -160,7 +160,8 @@ export class HoldService {
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
   }
-  private async expireById(client: PoolClient, id: string) {
+  /** Marks an overdue HELD hold EXPIRED and releases its occupancy; no-op otherwise. Caller holds the row lock. */
+  async expireById(client: PoolClient, id: string) {
     const expired = (await client.query(`UPDATE booking_holds SET status='EXPIRED',updated_at=clock_timestamp() WHERE id=$1 AND status='HELD' AND expires_at<=clock_timestamp() RETURNING id,tenant_id,occupancy_id`, [id])).rows[0];
     if (!expired) return;
     await client.query(`UPDATE room_occupancy SET status='RELEASED',updated_at=clock_timestamp() WHERE id=$1 AND status='HELD'`, [expired.occupancy_id]);

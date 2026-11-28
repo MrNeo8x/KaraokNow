@@ -21,11 +21,11 @@ Khi còn việc dở trong một task gần xong, **tách việc dở thành tas
 
 ## Tóm tắt hiện trạng
 
-- **Backend** (chạy từ `be/`, Node 26, 2026-11-26): `npm run verify` đạt — build, 11/11 unit suite (47/47 test, gồm kiểm tra env `TRUST_PROXY_HOPS`/rate limit public, chuẩn hoá SĐT, tính cọc và ghi log/ánh xạ lỗi tranh chấp), kiểm tra drift OpenAPI (77 path) và API Markdown. PostgreSQL Docker E2E đạt 43/43 (thêm overtime PD-030, khoá merchant PD-031, quyền theo vai trò API-003, timeout database OPS-004, contract OpenAPI API-004), hồi quy tranh chấp giữ phòng (10×100 request và kiểm tra khoá theo phòng tất định): tạo merchant bởi Platform Admin, duyệt listing, check-in/out, hủy/no-show, cọc trên hold và xác nhận khi đủ cọc, lịch booking, catalog công khai, CASH thủ công (idempotency/tổng), phạm vi vai trò/tenant. Migration mới đã kiểm up → down → up. Benchmark QA-002 (`npm run bench:booking`) đạt mọi mục tiêu p95 trên máy local — xem `docs/04-quality/booking-benchmark.md`.
+- **Backend** (chạy từ `be/`, Node 26, 2026-11-26): `npm run verify` đạt — build, 11/11 unit suite (47/47 test, gồm kiểm tra env `TRUST_PROXY_HOPS`/rate limit public, chuẩn hoá SĐT, tính cọc và ghi log/ánh xạ lỗi tranh chấp), kiểm tra drift OpenAPI (77 path) và API Markdown. PostgreSQL Docker E2E đạt 44/44 (thêm overtime PD-030, khoá merchant PD-031, quyền theo vai trò API-003, timeout database OPS-004, contract OpenAPI API-004, đối soát tiền mặt PAY-007), hồi quy tranh chấp giữ phòng (10×100 request và kiểm tra khoá theo phòng tất định): tạo merchant bởi Platform Admin, duyệt listing, check-in/out, hủy/no-show, cọc trên hold và xác nhận khi đủ cọc, lịch booking, catalog công khai, CASH thủ công (idempotency/tổng), phạm vi vai trò/tenant. Migration mới đã kiểm up → down → up. Benchmark QA-002 (`npm run bench:booking`) đạt mọi mục tiêu p95 trên máy local — xem `docs/04-quality/booking-benchmark.md`.
 - **Frontend** (`fe/`, session Luồng FE): FE unit test 32/32 (2026-11-26). Smoke test API qua proxy FE (`localhost:3100`, container backend/frontend đã rebuild, migrate + seed UAT) đạt 44/44: trang `/booking`, `/merchant`, `/platform`; PLT-001/002, publication, memberships, audit, backlog, sessions; luồng khách hold → cọc PERCENT → xác minh → xác nhận → check-in/out → tra cứu `COMPLETED`. **Kiểm thử trình duyệt** (Chrome headless qua Playwright, cùng ngày, container đã rebuild): khách mobile 390px và desktop (tìm phòng → báo giá → điều khoản → giữ chỗ → booking code và cọc → tra cứu → reload giữ mã, không cuộn ngang); lễ tân/Owner 19/19 (cọc, xác minh, xác nhận đủ cọc, check-in/out, thu tiền mặt, hủy có hoàn tiền, audit, phiên); Platform và phân quyền 14/14 (tạo merchant, Owner bị chặn `/platform`, Owner tạo Lễ tân → đổi mật khẩu bắt buộc → Lễ tân không thấy màn Owner). Lỗi FE phát hiện và đã sửa xem handoff. Script nằm ở `fe/e2e/`, chạy `npm run e2e` (setup UAT → API smoke → 3 bộ trình duyệt).
 - **Chưa có:** kiểm thử screen reader/bàn phím, Safari/Firefox, 429, mất mạng và refresh/logout đồng thời trên trình duyệt; vai trò Branch Manager/Cashier (QA-003), UAT (UAT-001), kết quả CI trên GitHub.
 
-Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 25, `READY` 2, `BLOCKED` 9, `BACKLOG` 3, `DONE` 50.
+Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 25, `READY` 4, `BLOCKED` 8, `BACKLOG` 3, `DONE` 52.
 
 ## Luồng Frontend
 
@@ -55,6 +55,7 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 | FE-011 | Sinh type FE từ OpenAPI và kiểm tra drift | READY | Type FE hiện viết tay theo handoff. BE đã khai báo response schema cho mọi operation và có E2E đối chiếu contract (API-004). | Chọn công cụ sinh type, thêm bước kiểm tra drift vào FE CI; đối chiếu lại các type viết tay với 24 trường đã sửa kiểu (xem handoff API-004). |
 | FE-012 | Giữ phiên qua reload và chọn tenant thuận tiện | BACKLOG | Phiên chỉ nằm trong bộ nhớ; tenant nhập bằng UUID. | Cần quyết định lưu trữ phiên an toàn (không đưa refresh token vào localStorage) và API/cách liệt kê tenant của user. |
 | FE-013 | Màn overtime và khoá merchant | VERIFY | `overtime-settings.tsx` (Giá & chính sách: đọc mọi vai trò, sửa ân hạn 0–60 phút, 403 rõ ràng); `booking-operations.tsx` hiển thị trễ/quá giờ và ân hạn sau check-out; `/platform` → Merchant: khoá/mở khoá với lý do bắt buộc, xác nhận khi khoá, nhãn "Đang bị khoá", lọc INACTIVE; `catalog-publication.tsx` cảnh báo khi `tenantStatus=INACTIVE`; `api.ts` dịch thông báo 409 "merchant bị khoá" và "thay đổi đồng thời". FE unit 33/33; `npm run e2e`: API 54/54, khách 20/20, lễ tân 21/21, Platform 16/16. | Đã thử trên trình duyệt (`fe/e2e/roles.mjs`): Owner của merchant bị khoá thấy cảnh báo, tạo hold walk-in bị chặn với thông báo tiếng Việt, mở khoá lại được. Còn UAT. |
+| FE-014 | Màn đối soát tiền mặt | READY | API đã sẵn (PAY-007), xem handoff. | Tài khoản booking (phải thu/đã thu/còn thiếu, danh sách khoản, khoản đã đảo), thêm phụ thu (Lễ tân/Thu ngân), đảo bút toán có lý do (Owner/Quản lý), danh sách cọc chờ xử lý và ghi hoàn/giữ, báo cáo tiền mặt cuối ngày theo chi nhánh. |
 
 ## Danh sách task
 
@@ -103,7 +104,7 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 | PAY-004 | Xử lý thanh toán đến muộn | Payment | 5 | P0 | BLOCKED | PAY-003, BKG-005 | Hold đã hết hạn không bao giờ tự xác nhận |
 | PAY-005 | Ghi nhận thanh toán thủ công | Payment | 5 | P0 | DONE | BKG-005 | CASH chỉ ghi thêm, có audit, tạo idempotent, đọc phân trang, `totalRecordedVnd`/`paymentCount` chính xác theo booking; E2E đồng thời, idempotency, phạm vi, tổng. Đối soát/sửa giao dịch tách sang PAY-007 |
 | PAY-006 | Cọc tiền mặt trên hold trước khi xác nhận | Payment | 5 | P0 | DONE | WEB-004, UAT-PD-002 | Migration `20261124000000_hold_deposits`; chính sách cọc snapshot trong `booking_holds.deposit_policy_snapshot` cùng lúc snapshot giá; `be/src/booking/deposit-snapshot.ts` (FIXED tối đa bằng tổng, PERCENT làm tròn lên, có unit test); `GET/POST /v1/merchant/booking/holds/{id}/deposits` chỉ ghi thêm, audit, idempotent, chặn vượt số còn thiếu/hold không hoạt động/chưa snapshot; xác nhận cần đủ cọc. E2E idempotency, cọc đồng thời, snapshot bất biến, vai trò, hết hạn, xác nhận |
-| PAY-007 | Đối soát sổ quỹ: phải thu/đã thu, sửa/đảo giao dịch, hoàn cọc khi hold hết hạn | Payment | 6 | P0 | BLOCKED | PAY-005, PAY-006, CAN-002 | Chờ PO quyết định: cách tính phải thu, quyền sửa/đảo giao dịch, hoàn cọc khi hold hết hạn, tiền hoàn ở CAN-002 có thành bút toán sổ quỹ hay không. Đồng thời xác nhận giả định làm tròn cọc và không cho ghi vượt (xem `work-log.md`) |
+| PAY-007 | Đối soát sổ quỹ: phải thu/đã thu, phụ thu, đảo bút toán, cọc hold hết hạn, báo cáo ngày | Payment | 6 | P0 | DONE | PAY-005, PAY-006, CAN-002, PD-036 | Migration `20261124040000_cash_reconciliation` (`booking_surcharges`, `money_reversals`, `hold_deposit_resolutions`, index báo cáo); `be/src/booking/cash-ledger.*`: tài khoản booking, phụ thu idempotent, đảo toàn phần một lần, danh sách và xử lý cọc hold hết hạn, báo cáo tiền mặt theo ngày/chi nhánh/người ghi; tổng cọc, kiểm tra đủ cọc và giới hạn hoàn khi hủy nay trừ khoản đã đảo. E2E 1 kịch bản đầy đủ (quyền, idempotency, đảo cọc làm mất điều kiện đủ cọc, hoàn vượt, báo cáo khớp số) và đối chiếu contract. Màn FE ở FE-014 |
 | WEB-001 | Nền web đặt phòng cho khách | Frontend | 5 | P0 | VERIFY | API-002, AVL-003, PRC-004 | Catalog, phòng trống, báo giá, điều khoản có version, guest hold/tra cứu (xem FE-006). Còn QA-003 (accessibility) và UAT |
 | WEB-002 | API catalog công khai và đặt phòng cho khách | Booking/Web | 5 | P0 | VERIFY | AVL-003, PRC-004 | Publication của Owner, catalog/phòng trống/báo giá/điều khoản công khai, guest hold nguyên tử, rate limit, tra cứu SĐT + mã, chỉ hiển thị khi `published` và `platform_approved`; hold/lookup trả `depositRequiredVnd`, lookup trả `bookingStatus`. Còn QA-003/UAT |
 | WEB-003 | Điều khoản đặt phòng công khai có version | Booking/Web | 5 | P0 | DONE | WEB-002, UAT-PD-005 | Owner lưu một nội dung, tăng version, audit không chép nội dung, đọc công khai có kiểm soát; E2E qua. FE nối ở FE-006 |
@@ -144,7 +145,7 @@ Cập nhật 2026-11-28. Lịch sử phiên: [`work-log.md`](work-log.md). Các 
 
 **Luồng BE**
 
-1. Hỏi PO rồi làm: PAY-007 (đối soát sổ quỹ, hoàn cọc khi hết hạn, xác nhận giả định cọc), BKG-008 (điều kiện không cọc theo trường hợp). BKG-007 và PLT-003 đã xong.
+1. Hỏi PO rồi làm: BKG-008 (điều kiện không cọc theo trường hợp). PAY-007, BKG-007 và PLT-003 đã xong.
 2. OPS-004 và API-004 đã xong; còn việc chờ quyết định ở mục 1 và mục 3.
 3. IAM-004 khi có ZBS OA/App/mẫu tin; OPS-002/OPS-003 khi có thiết kế môi trường production.
 4. Tuỳ chọn, cần quyết định: Platform Admin reset mật khẩu Owner, `GET /platform/me`; bổ sung response schema OpenAPI còn thiếu (hỗ trợ FE-011).
@@ -158,7 +159,7 @@ Quyết định pilot đã duyệt nằm ở [`docs/00-product/decision-log.md`]
 | Thứ tự | Quyết định / thiết lập | Cần trước | Task liên quan |
 |---:|---|---|---|
 | 1 | Cấu hình ZBS Template Message cho mã reset; dự phòng PD-014 đã duyệt; email tạm hoãn | Sprint 1 | IAM-004 / PD-012 / PD-014; ghi chú provider tại `docs/00-product/notification-provider-shortlist.md` |
-| 2 | Đối soát sổ quỹ, điều kiện không cọc theo trường hợp (overtime đã chốt PD-030) | Trước UAT tiền mặt đầy đủ | PAY-007, BKG-008 |
+| 2 | Điều kiện không cọc theo trường hợp (đối soát sổ quỹ đã chốt PD-036, overtime PD-030) | Trước UAT đầy đủ | BKG-008 |
 | 3 | Môi trường trình duyệt tự động cho kiểm thử FE–BE | Trước nghiệm thu `VERIFY` | QA-003 |
 | 4 | Provider thanh toán/MoR và đối soát commission sau pilot (pilot chỉ báo cáo commission) | Sau pilot | PAY-002 / PD-016 |
 

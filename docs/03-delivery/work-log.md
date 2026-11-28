@@ -8,7 +8,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `caa8de3` API-003 (điều khoản đã chấp nhận trên hold WEB, quyền đọc Thu ngân, `GET /merchant/me`) + OPS-005 (image `tools`, compose `--profile tools|workers`, `SWAGGER_ENABLED`); BE `da2eb69` overtime (PD-030) + khoá merchant (PD-031); FE `c6663d7` thiết kế tím/admin shell; BE `7796a6d` benchmark + sửa deadlock + UAT.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 47/47 unit, `npm run test:e2e` 43/43 (gồm contract OpenAPI), benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
+**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000`, frontend `:3100`; đã seed UAT, đã áp mọi migration. Backend container chạy code `caa8de3` (smoke: Thu ngân `GET /merchant/me` → `CASHIER`, đọc danh sách hold chi nhánh → 200). Frontend container chưa có phần FE đang dở. Worker tắt; bật bằng `docker compose --profile workers up -d` trong `be/`.
 
@@ -18,9 +18,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` và ký nhận; trả lời PAY-007 (đối soát sổ quỹ, hoàn cọc khi hold hết hạn) và BKG-008 (không cọc theo trường hợp); xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
+- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008 (không cọc theo trường hợp); xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
 - *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`).
-- *Luồng BE:* PAY-007/BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
+- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
 
@@ -33,6 +33,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: đối soát tiền mặt (PAY-007, PD-036)
+
+- PO chốt PD-036 (phải thu = giá + phụ thu; đã thu ròng sau đảo; hủy/no-show phải thu 0; đảo toàn phần có lý do; cọc hold hết hạn do Owner/Quản lý ghi hoàn/giữ; báo cáo ngày theo chi nhánh, chưa mở/đóng ca). Phụ thu: Owner, Quản lý, Lễ tân, Thu ngân.
+- Migration `20261124040000_cash_reconciliation` (up → down → up đã kiểm). `be/src/booking/cash-ledger.{dto,service,controller}.ts`: 6 endpoint (account, surcharges, money-reversals, unresolved-deposits, deposit-resolution, cash-report). `HoldService.expireById` mở public để xử lý cọc của hold quá hạn chưa được đánh dấu.
+- Thay đổi hành vi: tổng cọc trên hold, điều kiện đủ cọc khi xác nhận và giới hạn tiền hoàn khi hủy nay **trừ khoản đã đảo**; mỗi khoản cọc có `reversed`.
+- Kiểm chứng: unit 52/52, E2E 44/44 (kịch bản PAY-007 đối chiếu contract OpenAPI).
+- **Sự cố staging:** commit API-004 `617198a` của Luồng BE dùng `git add be/` nên gom nhầm `be/src/jobs/*` và phần đăng ký trong `be/src/app.module.ts` của session triển khai (OPS-006). Session đó đã ghi nhận và commit tiếp (`73deaec`); không viết lại lịch sử. Từ nay Luồng BE stage đúng từng file (đã ghi vào `AGENTS.md`).
 
 ---
 

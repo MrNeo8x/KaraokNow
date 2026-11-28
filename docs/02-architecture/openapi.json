@@ -3991,6 +3991,344 @@
         ]
       }
     },
+    "/v1/merchant/booking/bookings/{id}/account": {
+      "get": {
+        "operationId": "CashLedgerController_account",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Amount due vs paid with every money entry for the booking",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingAccountDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
+    "/v1/merchant/booking/bookings/{id}/surcharges": {
+      "post": {
+        "operationId": "CashLedgerController_addSurcharge",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Visible ASCII 1–100 characters; scoped to tenant and user",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddSurchargeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded surcharge or matching replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurchargeResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Booking is cancelled/no-show, or idempotency key reused with a different body"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
+    "/v1/merchant/booking/money-reversals": {
+      "post": {
+        "operationId": "CashLedgerController_reverse",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReversalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Full reversal of a deposit, CASH payment or surcharge; replay with the same reason returns it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReversalResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Entry already reversed with another reason, or expired-hold deposit already resolved"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/booking/unresolved-deposits": {
+      "get": {
+        "operationId": "CashLedgerController_unresolved",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expired holds that still have a net deposit and no resolution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnresolvedDepositListDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
+    "/v1/merchant/booking/holds/{id}/deposit-resolution": {
+      "post": {
+        "operationId": "CashLedgerController_resolve",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveDepositDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded refund/retention for an expired hold deposit, or matching replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepositResolutionDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Hold active or confirmed, no deposit, refund above net deposit, or a different resolution exists"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
+    "/v1/merchant/branches/{branchId}/cash-report": {
+      "get": {
+        "operationId": "CashLedgerController_report",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "description": "Local date in the branch timezone",
+            "schema": {
+              "example": "2026-11-28",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cash totals for one local day in the branch timezone, overall and per recorder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashReportDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "cash reconciliation"
+        ]
+      }
+    },
     "/v1/merchant/catalog/publication": {
       "get": {
         "operationId": "CatalogPublicationController_get",
@@ -7490,6 +7828,10 @@
           "recordedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "reversed": {
+            "type": "boolean",
+            "description": "True when an Owner/Branch Manager reversed this entry (PAY-007); reversed entries do not count"
           }
         },
         "required": [
@@ -7500,7 +7842,8 @@
           "amountVnd",
           "note",
           "recordedBy",
-          "recordedAt"
+          "recordedAt",
+          "reversed"
         ]
       },
       "HoldDepositStatusDto": {
@@ -7532,7 +7875,8 @@
             "type": "string"
           },
           "totalRecordedVnd": {
-            "type": "string"
+            "type": "string",
+            "description": "Recorded deposits net of reversals"
           },
           "remainingVnd": {
             "type": "string"
@@ -7644,6 +7988,561 @@
         },
         "required": [
           "graceMinutes"
+        ]
+      },
+      "LedgerEntryDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "DEPOSIT",
+              "CASH",
+              "SURCHARGE",
+              "REVERSAL",
+              "REFUND"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "string",
+            "description": "Always positive; the kind tells whether it adds to due, adds to paid or subtracts"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "description": "Payment note, surcharge/reversal reason or outcome note"
+          },
+          "reversesType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "HOLD_DEPOSIT",
+              "MANUAL_PAYMENT",
+              "SURCHARGE"
+            ],
+            "description": "REVERSAL only: type of the reversed entry"
+          },
+          "reversesId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "REVERSAL only: ID of the reversed entry"
+          },
+          "reversed": {
+            "type": "boolean",
+            "description": "True for DEPOSIT/CASH/SURCHARGE entries that have been reversed"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "amountVnd",
+          "note",
+          "reversesType",
+          "reversesId",
+          "reversed",
+          "recordedBy",
+          "recordedAt"
+        ]
+      },
+      "BookingAccountDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bookingStatus": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "CHECKED_IN",
+              "COMPLETED",
+              "CANCELLED",
+              "NO_SHOW"
+            ]
+          },
+          "priceTotalVnd": {
+            "type": "string",
+            "description": "Total from the price snapshot"
+          },
+          "surchargesVnd": {
+            "type": "string",
+            "description": "Surcharges net of reversals"
+          },
+          "dueVnd": {
+            "type": "string",
+            "description": "priceTotalVnd + surchargesVnd; 0 for CANCELLED/NO_SHOW (PD-036)"
+          },
+          "depositsVnd": {
+            "type": "string",
+            "description": "Hold deposits net of reversals"
+          },
+          "cashVnd": {
+            "type": "string",
+            "description": "Booking CASH payments net of reversals"
+          },
+          "refundsVnd": {
+            "type": "string",
+            "description": "Refund recorded with the cancellation/no-show outcome"
+          },
+          "paidVnd": {
+            "type": "string",
+            "description": "depositsVnd + cashVnd − refundsVnd"
+          },
+          "balanceVnd": {
+            "type": "string",
+            "description": "dueVnd − paidVnd; negative means collected more than due"
+          },
+          "settlement": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PARTIAL",
+              "PAID",
+              "OVERPAID",
+              "CLOSED"
+            ],
+            "description": "CLOSED for CANCELLED/NO_SHOW"
+          },
+          "retainedVnd": {
+            "type": "string",
+            "nullable": true,
+            "description": "CANCELLED/NO_SHOW only: amount the merchant keeps (= paidVnd)"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryDto"
+            }
+          }
+        },
+        "required": [
+          "bookingId",
+          "bookingStatus",
+          "priceTotalVnd",
+          "surchargesVnd",
+          "dueVnd",
+          "depositsVnd",
+          "cashVnd",
+          "refundsVnd",
+          "paidVnd",
+          "balanceVnd",
+          "settlement",
+          "retainedVnd",
+          "entries"
+        ]
+      },
+      "AddSurchargeDto": {
+        "type": "object",
+        "properties": {
+          "amountVnd": {
+            "type": "string",
+            "description": "Positive integer VND as a decimal string",
+            "example": "50000"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "What the surcharge is for (drinks, service…), required"
+          }
+        },
+        "required": [
+          "amountVnd",
+          "reason"
+        ]
+      },
+      "SurchargeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bookingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "branchId",
+          "amountVnd",
+          "reason",
+          "recordedBy",
+          "recordedAt"
+        ]
+      },
+      "CreateReversalDto": {
+        "type": "object",
+        "properties": {
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "HOLD_DEPOSIT",
+              "MANUAL_PAYMENT",
+              "SURCHARGE"
+            ]
+          },
+          "entryId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the hold deposit, manual payment or surcharge being reversed"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Why the original entry is wrong; required"
+          }
+        },
+        "required": [
+          "entryType",
+          "entryId",
+          "reason"
+        ]
+      },
+      "ReversalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entryType": {
+            "type": "string",
+            "enum": [
+              "HOLD_DEPOSIT",
+              "MANUAL_PAYMENT",
+              "SURCHARGE"
+            ]
+          },
+          "entryId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "string",
+            "description": "Full amount of the reversed entry"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "entryType",
+          "entryId",
+          "amountVnd",
+          "reason",
+          "recordedBy",
+          "recordedAt"
+        ]
+      },
+      "UnresolvedDepositDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roomId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "netDepositVnd": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "holdId",
+          "branchId",
+          "roomId",
+          "channel",
+          "startAt",
+          "expiresAt",
+          "customerPhone",
+          "netDepositVnd"
+        ]
+      },
+      "UnresolvedDepositListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnresolvedDepositDto"
+            }
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "ResolveDepositDto": {
+        "type": "object",
+        "properties": {
+          "refundAmountVnd": {
+            "type": "string",
+            "description": "CASH handed back, integer VND (0 = keep everything); at most the net deposit",
+            "example": "0"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Why the deposit was refunded or kept; required"
+          }
+        },
+        "required": [
+          "refundAmountVnd",
+          "reason"
+        ]
+      },
+      "DepositResolutionDto": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "netDepositVnd": {
+            "type": "string",
+            "description": "Net deposit on the hold when resolved"
+          },
+          "refundAmountVnd": {
+            "type": "string"
+          },
+          "retainedVnd": {
+            "type": "string",
+            "description": "netDepositVnd − refundAmountVnd"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "holdId",
+          "branchId",
+          "netDepositVnd",
+          "refundAmountVnd",
+          "retainedVnd",
+          "reason",
+          "recordedBy",
+          "recordedAt"
+        ]
+      },
+      "CashTotalsDto": {
+        "type": "object",
+        "properties": {
+          "depositsVnd": {
+            "type": "string",
+            "description": "Hold deposits recorded"
+          },
+          "bookingCashVnd": {
+            "type": "string",
+            "description": "Booking CASH recorded"
+          },
+          "cashReversalsVnd": {
+            "type": "string",
+            "description": "Reversals of deposits and CASH recorded (reduce cash)"
+          },
+          "refundsVnd": {
+            "type": "string",
+            "description": "Cancellation/no-show refunds plus expired-hold deposit refunds"
+          },
+          "netCashVnd": {
+            "type": "string",
+            "description": "depositsVnd + bookingCashVnd − cashReversalsVnd − refundsVnd: expected change in the till"
+          },
+          "surchargesVnd": {
+            "type": "string",
+            "description": "Surcharges added net of surcharge reversals (amount due, not cash)"
+          }
+        },
+        "required": [
+          "depositsVnd",
+          "bookingCashVnd",
+          "cashReversalsVnd",
+          "refundsVnd",
+          "netCashVnd",
+          "surchargesVnd"
+        ]
+      },
+      "CashRecorderTotalsDto": {
+        "type": "object",
+        "properties": {
+          "depositsVnd": {
+            "type": "string",
+            "description": "Hold deposits recorded"
+          },
+          "bookingCashVnd": {
+            "type": "string",
+            "description": "Booking CASH recorded"
+          },
+          "cashReversalsVnd": {
+            "type": "string",
+            "description": "Reversals of deposits and CASH recorded (reduce cash)"
+          },
+          "refundsVnd": {
+            "type": "string",
+            "description": "Cancellation/no-show refunds plus expired-hold deposit refunds"
+          },
+          "netCashVnd": {
+            "type": "string",
+            "description": "depositsVnd + bookingCashVnd − cashReversalsVnd − refundsVnd: expected change in the till"
+          },
+          "surchargesVnd": {
+            "type": "string",
+            "description": "Surcharges added net of surcharge reversals (amount due, not cash)"
+          },
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "depositsVnd",
+          "bookingCashVnd",
+          "cashReversalsVnd",
+          "refundsVnd",
+          "netCashVnd",
+          "surchargesVnd",
+          "userId",
+          "displayName"
+        ]
+      },
+      "CashReportDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Inclusive start of the local day"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Exclusive end of the local day"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/CashTotalsDto"
+          },
+          "byRecorder": {
+            "description": "Same totals per staff member who recorded the entries",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashRecorderTotalsDto"
+            }
+          }
+        },
+        "required": [
+          "branchId",
+          "date",
+          "timezone",
+          "from",
+          "to",
+          "totals",
+          "byRecorder"
         ]
       },
       "PublicationResponseDto": {

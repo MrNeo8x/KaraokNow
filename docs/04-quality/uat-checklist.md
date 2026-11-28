@@ -1,12 +1,12 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-035` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-036` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
 **Trong phạm vi:** Platform Admin tạo merchant và duyệt listing; Owner cấu hình merchant; khách đặt chỗ trên web không cần tài khoản; nhân viên gọi xác minh, ghi cọc tiền mặt, xác nhận, check-in/out, ghi hủy/no-show; phân quyền theo vai trò; tách dữ liệu giữa các merchant.
 
-**Ngoài phạm vi:** thanh toán online (PD-007), tin nhắn tự động ZNS/SMS/email (UAT-PD-007), quên mật khẩu (IAM-004), khách tự hủy (UAT-PD-008), tính tiền overtime hoặc gia hạn giờ (PD-030 chỉ ghi phút), đối soát sổ quỹ (PAY-007), Zalo/Messenger.
+**Ngoài phạm vi:** thanh toán online (PD-007), tin nhắn tự động ZNS/SMS/email (UAT-PD-007), quên mật khẩu (IAM-004), khách tự hủy (UAT-PD-008), tính tiền overtime hoặc gia hạn giờ (PD-030 chỉ ghi phút), mở/đóng ca thu ngân, Zalo/Messenger.
 
 ## 2. Chuẩn bị môi trường
 
@@ -127,6 +127,17 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | F4 | Branch Manager | Ghi no-show cho một booking đã xác nhận, không hoàn tiền | Booking "No-show", phòng trống lại | PD-027 | | |
 | F5 | Branch Manager | Thử hủy một booking đang check-in | Bị chặn | PD-027 | | |
 
+### H. Đối soát tiền mặt (PAY-007, PD-036)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| H1 | Receptionist, Cashier | Mở "tài khoản" của booking đã xác nhận có cọc; Lễ tân thêm phụ thu 30.000 đ (đồ uống); Thu ngân ghi tiền mặt phần còn lại | Phải thu = giá + phụ thu; đã thu = cọc + tiền mặt; trạng thái chuyển Còn thiếu → Đủ; mọi khoản hiện trong danh sách | PD-036 | | |
+| H2 | Cashier, Branch Manager | Thu ngân ghi trùng một phiếu tiền mặt; thử tự đảo; Quản lý đảo với lý do | Thu ngân không đảo được; Quản lý đảo được, khoản gốc vẫn hiện nhưng gạch "đã đảo", số đã thu giảm đúng; đảo lần hai báo đã đảo | PD-036 | | |
+| H3 | Branch Manager | Đảo khoản cọc của một hold chưa xác nhận, rồi thử xác nhận | Cọc không còn tính; không xác nhận được cho tới khi ghi cọc lại | PD-033, PD-036 | | |
+| H4 | Cashier, Branch Manager | Để một hold đã thu cọc hết hạn; mở danh sách "cọc chờ xử lý"; Quản lý ghi hoàn một phần với lý do | Hold hiện trong danh sách; hoàn vượt cọc bị chặn; sau khi ghi, hold biến khỏi danh sách và báo số giữ lại | PD-036 | | |
+| H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
+| H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
+
 ### G. Phân quyền và tách merchant
 
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
@@ -144,7 +155,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 ## 6. Tiêu chí kết thúc
 
-- 100% ca nhóm C, D, F và G đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
+- 100% ca nhóm C, D, F, G và H đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
 - Lỗi Trung bình/Thấp còn mở có hướng xử lý và được PO chấp nhận bằng văn bản.
 - Các giả định trước đây (B1, D2, E3) đã được PO chốt ngày 2026-11-28 (PD-033…PD-035); nếu UAT cho thấy cần đổi, ghi thành yêu cầu sửa và quyết định mới.
 - Kết quả, người thực hiện và ngày được ghi vào bảng; task board cập nhật UAT-001 và các task `VERIFY` liên quan.
