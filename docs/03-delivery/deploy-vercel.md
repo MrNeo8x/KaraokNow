@@ -122,6 +122,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **BKG-008** (PD-050 miễn cọc theo trường hợp): **migration `20261124110000_deposit_exemptions` phải áp lên Prisma trước khi push** (2 bảng mới — tương thích ngược; không cấu hình thì hành vi xác nhận như cũ). Push cùng commit FE-024 (type sinh lại).
+
 - **VEN-006** (PD-048 thư viện ảnh merchant/chi nhánh): **migration `20261124100000_venue_photos` phải áp lên Prisma trước khi push** (bảng mới, không đụng bảng cũ — tương thích ngược). Push BE cùng commit FE đã sinh lại type (FE-022) để Frontend CI không đỏ. Smoke: `GET /v1/public/branches` có `photos`, `merchantPhotos`.
 
 - **OPS-010** (PD-047): backup production hằng đêm qua GitHub Actions — người dùng thêm secret `PROD_DATABASE_URL`, `BACKUP_PASSPHRASE`; runbook `docs/03-delivery/ops-002-backup-restore.md` (cũng là quy trình khôi phục khi sự cố).

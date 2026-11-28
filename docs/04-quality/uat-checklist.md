@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-049` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-050` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -205,6 +205,15 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 |---|---|---|---|---|---|---|
 | J1 | Khách | Giữ chỗ trên điện thoại, đọc mã cho người khác gõ lại | Mã 6 ký tự chữ in hoa và số, không có 0/O/1/I; gõ chữ thường hoặc có khoảng trắng vẫn tra cứu được | PD-038 | | |
 | J2 | Khách | Tra cứu bằng mã đúng nhưng SĐT khác | Không thấy đơn | PD-038 | | |
+
+### S. Miễn cọc theo trường hợp (PD-050)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| S1 | Owner, Lễ tân | Đặt ngưỡng miễn cọc 300.000đ; lễ tân xác nhận booking 250.000đ ở kênh cần cọc khi chưa thu cọc | Xác nhận được, booking ghi lý do "giá trị nhỏ" | PD-050 | | |
+| S2 | Owner, Lễ tân | Khai báo khung giờ vắng T2–T6 10:00–17:00; xác nhận booking 14:00 thứ Ba và 20:00 thứ Ba | 14:00 được miễn, 20:00 vẫn cần cọc | PD-050 | | |
+| S3 | Owner, Lễ tân | Bật khách quen (≥ 2 lần hoàn thành / 90 ngày); khách cũ đặt lại (gõ SĐT dạng +84) | Được miễn; khách có no-show thì không | PD-050 | | |
+| S4 | Owner, Lễ tân, Thu ngân | Cho Lễ tân quyền miễn cọc; Lễ tân bấm miễn cọc kèm lý do; Thu ngân thử | Lễ tân làm được, Thu ngân bị chặn; audit có dòng miễn cọc | PD-050 | | |
 
 ### R. Thư viện ảnh merchant và chi nhánh (PD-048)
 

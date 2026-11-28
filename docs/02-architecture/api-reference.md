@@ -2859,6 +2859,116 @@ Response được khai báo:
 |---|---|---|
 | 200 | Cash totals for one local day in the branch timezone, overall and per recorder | {"$ref":"#/components/schemas/CashReportDto"} |
 
+### GET /v1/merchant/booking/deposit-exemptions
+
+Nhóm: deposit exemptions
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositExemptionPolicyDto"} |
+
+### PUT /v1/merchant/booking/deposit-exemptions
+
+Nhóm: deposit exemptions
+
+Replaces the merchant case-level deposit exemption policy (PD-050)
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/UpdateDepositExemptionPolicyDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositExemptionPolicyDto"} |
+| 409 | An off-peak window ends before it starts | Chưa khai báo schema |
+
+### GET /v1/merchant/booking/holds/{id}/deposit-exemption
+
+Nhóm: deposit exemptions
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositExemptionStatusDto"} |
+
+### POST /v1/merchant/booking/holds/{id}/deposit-waiver
+
+Nhóm: deposit exemptions
+
+Waives the deposit of one hold with a reason; allowed for the roles in waiverRoles (Owner always). Idempotent
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/DepositWaiverDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/DepositExemptionStatusDto"} |
+| 403 | Role not allowed to waive, or branch outside scope | Chưa khai báo schema |
+| 409 | Hold expired or already confirmed | Chưa khai báo schema |
+
+### DELETE /v1/merchant/booking/holds/{id}/deposit-waiver
+
+Nhóm: deposit exemptions
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 204 | Waiver removed (no-op when none) | Chưa khai báo schema |
+
 ### GET /v1/merchant/catalog/publication
 
 Nhóm: merchant catalog
@@ -7273,6 +7383,19 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "depositRecordedVnd": {
       "type": "string",
       "description": "Deposit-required path only: hold deposits recorded at confirmation"
+    },
+    "depositExemptionReasons": {
+      "type": "array",
+      "description": "Present only when a case allowed confirmation without the (full) deposit or the channel no-deposit permission (PD-050)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "AMOUNT",
+          "OFF_PEAK",
+          "REGULAR_CUSTOMER",
+          "MANUAL_WAIVER"
+        ]
+      }
     }
   },
   "required": [
@@ -8724,6 +8847,250 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "to",
     "totals",
     "byRecorder"
+  ]
+}
+```
+
+### OffPeakWindowDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "weekdays": {
+      "example": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "description": "ISO weekdays, 1 = Monday … 7 = Sunday",
+      "type": "array",
+      "items": {
+        "type": "number"
+      }
+    },
+    "from": {
+      "type": "string",
+      "example": "10:00",
+      "description": "Start time HH:mm (branch local time), inclusive"
+    },
+    "to": {
+      "type": "string",
+      "example": "17:00",
+      "description": "End time HH:mm, exclusive, later than from (same day)"
+    }
+  },
+  "required": [
+    "weekdays",
+    "from",
+    "to"
+  ]
+}
+```
+
+### DepositExemptionPolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "configured": {
+      "type": "boolean",
+      "description": "False while the merchant has never saved a policy (defaults shown)"
+    },
+    "maxAmountVnd": {
+      "type": "string",
+      "nullable": true
+    },
+    "offPeakWindows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/OffPeakWindowDto"
+      }
+    },
+    "regularMinCompleted": {
+      "type": "number",
+      "nullable": true
+    },
+    "regularLookbackDays": {
+      "type": "number"
+    },
+    "waiverRoles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    },
+    "version": {
+      "type": "string",
+      "nullable": true
+    }
+  },
+  "required": [
+    "configured",
+    "maxAmountVnd",
+    "offPeakWindows",
+    "regularMinCompleted",
+    "regularLookbackDays",
+    "waiverRoles",
+    "version"
+  ]
+}
+```
+
+### UpdateDepositExemptionPolicyDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "maxAmountVnd": {
+      "type": "string",
+      "nullable": true,
+      "example": "300000",
+      "description": "Bookings with total ≤ this amount need no deposit; null = off"
+    },
+    "offPeakWindows": {
+      "description": "Bookings starting inside one of these windows need no deposit; [] = off",
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/OffPeakWindowDto"
+      }
+    },
+    "regularMinCompleted": {
+      "type": "number",
+      "nullable": true,
+      "example": 3,
+      "description": "Regular customer: at least this many COMPLETED bookings and no NO_SHOW within the lookback; null = off"
+    },
+    "regularLookbackDays": {
+      "type": "number",
+      "example": 90,
+      "minimum": 7,
+      "maximum": 730
+    },
+    "waiverRoles": {
+      "type": "array",
+      "description": "Roles that may waive the deposit of a single hold (OWNER always included)",
+      "items": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "BRANCH_MANAGER",
+          "RECEPTIONIST",
+          "CASHIER"
+        ]
+      }
+    }
+  },
+  "required": [
+    "maxAmountVnd",
+    "offPeakWindows",
+    "regularMinCompleted",
+    "regularLookbackDays",
+    "waiverRoles"
+  ]
+}
+```
+
+### WaiverInfoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string"
+    },
+    "recordedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "reason",
+    "recordedBy",
+    "recordedAt"
+  ]
+}
+```
+
+### DepositExemptionStatusDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "holdId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "exempt": {
+      "type": "boolean",
+      "description": "True when at least one case applies: confirmation needs no deposit and no channel no-deposit permission"
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "AMOUNT",
+          "OFF_PEAK",
+          "REGULAR_CUSTOMER",
+          "MANUAL_WAIVER"
+        ]
+      }
+    },
+    "waiver": {
+      "nullable": true,
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/WaiverInfoDto"
+        }
+      ]
+    },
+    "canWaive": {
+      "type": "boolean",
+      "description": "Whether the caller may waive or revoke the waiver of this hold"
+    }
+  },
+  "required": [
+    "holdId",
+    "exempt",
+    "reasons",
+    "waiver",
+    "canWaive"
+  ]
+}
+```
+
+### DepositWaiverDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "example": "Khách đoàn công ty quen, quản lý đồng ý"
+    }
+  },
+  "required": [
+    "reason"
   ]
 }
 ```

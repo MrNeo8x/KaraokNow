@@ -7,11 +7,12 @@ import { ConfirmHoldDto } from './confirmation.dto';
 import { ListHoldsDto } from './hold.dto';
 import type { DepositPolicySnapshot } from './deposit-snapshot';
 import { HoldDepositService } from './hold-deposit.service';
+import { DepositExemptionService, type ExemptionReason } from './deposit-exemption';
 import { BOOKING_SELECT, toBooking } from './booking-read';
 
 @Injectable()
 export class ConfirmationService {
-  constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly deposits: HoldDepositService) {}
+  constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly deposits: HoldDepositService, private readonly exemptions: DepositExemptionService) {}
   async list(actor: Actor, branchId: string, query: ListHoldsDto) {
     const from = new Date(query.from), to = new Date(query.to);
     const zone = /[Tt].*(?:[Zz]|[+-]\d{2}:?\d{2})$/;
@@ -55,9 +56,14 @@ export class ConfirmationService {
       if (snapshot && snapshot.mode !== 'NONE') {
         // Deposit-required path (UAT-PD-002): the hold row lock serializes this check with concurrent deposit recording.
         const recorded = await this.deposits.recordedTotal(client, actor.tenantId!, holdId);
-        if (BigInt(recorded) < BigInt(snapshot.requiredAmountVnd)) throw new ConflictException('Required deposit has not been fully recorded');
+        let exemption: ExemptionReason[] = [];
+        if (BigInt(recorded) < BigInt(snapshot.requiredAmountVnd)) {
+          // BKG-008 / PD-050: a matching case (or a staff waiver) lets the hold confirm without the full deposit.
+          exemption = await this.exemptions.evaluate(client, actor.tenantId!, holdId);
+          if (!exemption.length) throw new ConflictException('Required deposit has not been fully recorded');
+        }
         policy = { depositMode: snapshot.mode, depositPolicyVersion: snapshot.policyVersion, requiredDepositVnd: snapshot.requiredAmountVnd,
-          depositRecordedVnd: recorded, noDepositAllowed: false, noDepositPolicyVersion: null };
+          depositRecordedVnd: recorded, noDepositAllowed: false, noDepositPolicyVersion: null, ...(exemption.length ? { depositExemptionReasons: exemption } : {}) };
       } else {
         let depositVersion: string | null = snapshot?.policyVersion ?? null;
         if (!snapshot) {
@@ -69,8 +75,13 @@ export class ConfirmationService {
         }
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`no-deposit:${actor.tenantId}:${hold.channel}`]);
         const permission = (await client.query(`SELECT allowed,version::text FROM tenant_no_deposit_confirmation_policies WHERE tenant_id=$1 AND channel=$2`, [actor.tenantId, hold.channel])).rows[0];
-        if (!permission?.allowed) throw new ConflictException('No-deposit confirmation is not enabled for this channel');
-        policy = { depositMode: 'NONE', depositPolicyVersion: depositVersion, noDepositAllowed: true, noDepositPolicyVersion: permission.version };
+        let exemption: ExemptionReason[] = [];
+        if (!permission?.allowed) {
+          exemption = await this.exemptions.evaluate(client, actor.tenantId!, holdId);
+          if (!exemption.length) throw new ConflictException('No-deposit confirmation is not enabled for this channel');
+        }
+        policy = { depositMode: 'NONE', depositPolicyVersion: depositVersion, noDepositAllowed: Boolean(permission?.allowed),
+          noDepositPolicyVersion: permission?.version ?? null, ...(exemption.length ? { depositExemptionReasons: exemption } : {}) };
       }
       const updated = await client.query(`UPDATE booking_holds SET status='CONFIRMED',updated_at=clock_timestamp()
         WHERE tenant_id=$1 AND id=$2 AND status='HELD' AND expires_at>clock_timestamp()`, [actor.tenantId, holdId]);
@@ -85,7 +96,7 @@ export class ConfirmationService {
       [id, actor.tenantId, hold.branch_id, hold.room_id, holdId, hold.occupancy_id, hold.channel, hold.start_at, hold.duration_minutes, hold.buffer_minutes,
         hold.customer_phone, hold.customer_email, hold.phone_verified_at, hold.phone_verified_by, JSON.stringify(hold.price_snapshot), dto.cancellationTerms, JSON.stringify(policy), actor.userId]);
       await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,after_data) VALUES($1,$2,$3,'BOOKING_CONFIRMED','BOOKING',$4,$5)`,
-        [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify({ holdId, channel: hold.channel, depositMode: policy.depositMode })]);
+        [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify({ holdId, channel: hold.channel, depositMode: policy.depositMode, depositExemptionReasons: policy.depositExemptionReasons ?? [] })]);
       const result = await this.findByHold(client, actor.tenantId!, holdId);
       await client.query('COMMIT'); return result;
     } catch (error) { await client.query('ROLLBACK'); throw error; }

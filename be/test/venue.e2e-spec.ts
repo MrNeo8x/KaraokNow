@@ -2509,6 +2509,103 @@ describe('Authentication, membership, RBAC and venue API', () => {
     // Visibility rules (published + approved merchant, active branch/room) are unchanged and covered by the public catalog test.
   });
 
+  it('confirms without deposit by merchant cases: small total, off-peak, regular customer, staff waiver by role (BKG-008, PD-050)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'EXEMPT', name: 'Exempt branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'EXEMPT-R', name: 'Exempt room', capacity: 8 }).expect(201)).body;
+    const plan = (await authorized('post', '/v1/merchant/pricing/plans').send({ code: 'EXEMPT-PLAN', name: 'Exempt plan' }).expect(201)).body;
+    await authorized('patch', `/v1/merchant/pricing/plans/${plan.id}`).send({ name: 'Exempt plan', status: 'ACTIVE' }).expect(200);
+    await authorized('post', '/v1/merchant/pricing/rules').send({ pricePlanId: plan.id, code: 'EXEMPT-RULE', name: 'Price', priority: 995, amountVnd: '100000', amountUnit: 'PER_BOOKING', roomId: room.id }).expect(201);
+    await authorized('patch', '/v1/merchant/booking/deposit-policy/EXEMPT_D').send({ mode: 'FIXED', fixedAmountVnd: '50000' }).expect(200);
+    const duration = (await pool.query('SELECT min_duration_minutes AS m FROM tenant_booking_policies WHERE tenant_id=$1', [TENANT_A])).rows[0]?.m ?? 60;
+    let n = 0;
+    const prepared = async (channel: string, startAt: string, phone = '0912345678') => {
+      const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', `exempt-${++n}`).send({ roomId: room.id, channel, startAt, durationMinutes: duration }).expect(201)).body;
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/details`).send({ phone, expectedTotalAmountVnd: '100000' }).expect(200);
+      await authorized('post', `/v1/merchant/booking/holds/${hold.id}/phone-verification`).expect(200);
+      return hold;
+    };
+    const confirm = (holdId: string) => authorized('post', `/v1/merchant/booking/holds/${holdId}/confirm`).send({ cancellationTerms: 'Liên hệ cơ sở.' });
+    const putPolicy = (body: Record<string, unknown>) => request(server).put('/v1/merchant/booking/deposit-exemptions').set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A)
+      .send({ maxAmountVnd: null, offPeakWindows: [], regularMinCompleted: null, regularLookbackDays: 90, waiverRoles: ['OWNER'], ...body });
+
+    const initial = (await authorized('get', '/v1/merchant/booking/deposit-exemptions').expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/booking/deposit-exemptions', 200, initial);
+    await putPolicy({ offPeakWindows: [{ weekdays: [1], from: '17:00', to: '10:00' }] }).expect(409);
+    await putPolicy({ maxAmountVnd: '0' }).expect(400);
+
+    // 1) No case configured: a channel without no-deposit permission cannot confirm.
+    const h1 = await prepared('EXEMPT_N', '2047-07-01T12:00:00+07:00', '0911555444');   // unique phone: history matters for case 3
+    await confirm(h1.id).expect(409);
+    // Small total ≤ 100.000 → AMOUNT.
+    const saved = (await putPolicy({ maxAmountVnd: '100000', waiverRoles: ['RECEPTIONIST'] }).expect(200)).body;
+    assertMatchesContract(doc, 'put', '/v1/merchant/booking/deposit-exemptions', 200, saved);
+    expect(saved).toMatchObject({ configured: true, maxAmountVnd: '100000', waiverRoles: ['OWNER', 'RECEPTIONIST'] });
+    const st = (await authorized('get', `/v1/merchant/booking/holds/${h1.id}/deposit-exemption`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/booking/holds/{id}/deposit-exemption', 200, st);
+    expect(st).toMatchObject({ exempt: true, reasons: ['AMOUNT'], waiver: null, canWaive: true });
+    const b1 = (await confirm(h1.id).expect(200)).body;
+    expect(b1.confirmationPolicySnapshot).toMatchObject({ depositMode: 'NONE', noDepositAllowed: false, depositExemptionReasons: ['AMOUNT'] });
+    // Deposit-required channel: small total also covers the missing deposit.
+    const hd = await prepared('EXEMPT_D', '2047-07-01T15:00:00+07:00');
+    expect((await confirm(hd.id).expect(200)).body.confirmationPolicySnapshot).toMatchObject({ requiredDepositVnd: '50000', depositRecordedVnd: '0', depositExemptionReasons: ['AMOUNT'] });
+
+    // 2) Off-peak window (weekday + local time of the start).
+    const offStart = '2047-07-02T10:30:00+07:00';
+    const isoDow = ((new Date(offStart).getUTCDay() + 6) % 7) + 1;
+    await putPolicy({ offPeakWindows: [{ weekdays: [isoDow], from: '10:00', to: '11:00' }] }).expect(200);
+    const hOff = await prepared('EXEMPT_N', offStart);
+    const hPeak = await prepared('EXEMPT_N', '2047-07-02T19:00:00+07:00');
+    expect((await confirm(hOff.id).expect(200)).body.confirmationPolicySnapshot.depositExemptionReasons).toEqual(['OFF_PEAK']);
+    await confirm(hPeak.id).expect(409);
+
+    // 3) Regular customer: completed history for the same phone in another format.
+    await authorized('post', `/v1/merchant/booking/bookings/${b1.id}/check-in`).expect(200);
+    await authorized('post', `/v1/merchant/booking/bookings/${b1.id}/check-out`).expect(200);
+    await putPolicy({ regularMinCompleted: 1 }).expect(200);
+    const hRegular = await prepared('EXEMPT_N', '2047-07-03T20:00:00+07:00', '+84911555444');
+    const hStranger = await prepared('EXEMPT_N', '2047-07-03T22:00:00+07:00', '0987000111');
+    expect((await confirm(hRegular.id).expect(200)).body.confirmationPolicySnapshot.depositExemptionReasons).toEqual(['REGULAR_CUSTOMER']);
+    await confirm(hStranger.id).expect(409);
+
+    // 4) Staff waiver by role: Receptionist allowed by policy, Cashier not; reason required.
+    await putPolicy({ waiverRoles: ['RECEPTIONIST'] }).expect(200);
+    const mk = async (email: string, role: string) => {
+      const userId = randomUUID(), membershipId = randomUUID();
+      await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,$2,$3,$4,'ACTIVE')`, [userId, email, await hash('Exempt-pass-123', 4), role]);
+      await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES ($1,$2,$3,'ACTIVE')`, [membershipId, TENANT_A, userId]);
+      await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES ($1,$2)`, [membershipId, role]);
+      await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES ($1,$2,$3)`, [membershipId, TENANT_A, branch.id]);
+      const token = (await request(server).post('/v1/auth/login').send({ email, password: 'Exempt-pass-123' }).expect(200)).body.accessToken;
+      return (method: 'post' | 'get' | 'delete', path: string) => request(server)[method](path).set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A);
+    };
+    const reception = await mk('exempt-reception@example.com', 'RECEPTIONIST');
+    const cashier = await mk('exempt-cashier@example.com', 'CASHIER');
+    await cashier('post', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).send({ reason: 'x' }).expect(403);
+    expect((await cashier('get', `/v1/merchant/booking/holds/${hStranger.id}/deposit-exemption`).expect(200)).body.canWaive).toBe(false);
+    await reception('post', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).send({ reason: '  ' }).expect(400);
+    const waived = (await reception('post', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).send({ reason: 'Khách đoàn công ty, quản lý đồng ý' }).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/booking/holds/{id}/deposit-waiver', 200, waived);
+    expect(waived).toMatchObject({ exempt: true, reasons: ['MANUAL_WAIVER'], waiver: { reason: 'Khách đoàn công ty, quản lý đồng ý' } });
+    await reception('delete', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).expect(204);
+    await confirm(hStranger.id).expect(409);
+    await reception('post', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).send({ reason: 'Đã gọi xác nhận lại' }).expect(200);
+    expect((await confirm(hStranger.id).expect(200)).body.confirmationPolicySnapshot.depositExemptionReasons).toEqual(['MANUAL_WAIVER']);
+    await reception('post', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).send({ reason: 'again' }).expect(409);
+    await reception('delete', `/v1/merchant/booking/holds/${hStranger.id}/deposit-waiver`).expect(409);
+    // Peak hold still blocked; waiver on the deposit-required channel covers the deposit.
+    const hd2 = await prepared('EXEMPT_D', '2047-07-04T20:00:00+07:00', '0987000222');
+    await confirm(hd2.id).expect(409);
+    await authorized('post', `/v1/merchant/booking/holds/${hd2.id}/deposit-waiver`).send({ reason: 'Owner miễn cọc' }).expect(200);
+    expect((await confirm(hd2.id).expect(200)).body.confirmationPolicySnapshot).toMatchObject({ requiredDepositVnd: '50000', depositExemptionReasons: ['MANUAL_WAIVER'] });
+
+    const audit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE tenant_id=$1 AND action IN ('HOLD_DEPOSIT_WAIVED','HOLD_DEPOSIT_WAIVER_REVOKED','DEPOSIT_EXEMPTION_POLICY_UPDATED')`, [TENANT_A]);
+    expect(audit.rows.filter(r => r.action === 'HOLD_DEPOSIT_WAIVED')).toHaveLength(3);
+    expect(JSON.stringify(audit.rows)).not.toContain('Khách đoàn');
+    await putPolicy({}).expect(200);   // reset for later tests
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

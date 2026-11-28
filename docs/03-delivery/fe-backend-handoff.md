@@ -218,6 +218,16 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — miễn cọc theo trường hợp (BKG-008, PD-050, 2026-11-28)
+
+**OpenAPI đổi → `npm run types:generate`.** E2E 60/60, benchmark đạt.
+
+- Chính sách (header `X-Tenant-ID`): `GET /v1/merchant/booking/deposit-exemptions` (mọi vai trò) → `{ configured, maxAmountVnd|null, offPeakWindows[{ weekdays[1–7, 1=T2], from 'HH:mm', to 'HH:mm' }], regularMinCompleted|null, regularLookbackDays, waiverRoles[], version|null }` (chưa lưu → `configured:false`, mọi trường hợp tắt, `waiverRoles` OWNER+BRANCH_MANAGER). `PUT` (Owner/Branch Manager) gửi **đủ** các trường; `to` ≤ `from` → 409; `waiverRoles` luôn có OWNER.
+- Trên hold: `GET /v1/merchant/booking/holds/{id}/deposit-exemption` → `{ holdId, exempt, reasons: ['AMOUNT'|'OFF_PEAK'|'REGULAR_CUSTOMER'|'MANUAL_WAIVER'], waiver|null{ reason, recordedBy, recordedAt }, canWaive }`. Hiện nhãn "Được miễn cọc: giá trị nhỏ / giờ vắng / khách quen / quản lý miễn" khi `exempt`.
+- `POST /v1/merchant/booking/holds/{id}/deposit-waiver` `{ reason }` (≤ 500, bắt buộc) → trạng thái như trên; vai trò không có trong `waiverRoles` → 403 (dùng `canWaive` để ẩn nút); hold hết hạn/đã xác nhận → 409. `DELETE` → 204 (chỉ trước khi xác nhận).
+- Xác nhận (`POST …/holds/{id}/confirm`) nay thành công cả khi chưa đủ cọc hoặc kênh chưa bật không cọc **nếu** `exempt`; `confirmationPolicySnapshot.depositExemptionReasons` có mặt khi được miễn. Không miễn thì 409 như cũ.
+- Production cần migration `20261124110000_deposit_exemptions` trước khi push.
+
 ## FE READY — ảnh phòng cho khách (VEN-007, PD-049, 2026-11-28)
 
 **OpenAPI đổi → `npm run types:generate`.** E2E 59/59. `GET /v1/public/branches/{id}/rooms` → mỗi phòng có thêm `photos: [{ url, altText }]` đã sắp theo `displayOrder` (tối đa 10), chỉ ảnh đã tải file thật; phòng chưa có ảnh → `[]` (giữ ảnh mặc định). Dùng nguyên `url`. Không migration — deploy được ngay khi FE sinh lại type.

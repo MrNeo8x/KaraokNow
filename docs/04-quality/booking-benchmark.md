@@ -90,6 +90,10 @@ Sau khi đặt giới hạn pool/timeout mặc định (pool 10, chờ kết n�
 
 `lockRoomOccupancy` giờ giải phóng các giữ chỗ quá hạn của phòng trước khi ghi, và tìm phòng bỏ qua occupancy HELD của giữ chỗ quá hạn. Một lần chạy: tìm phòng p95 24,5 ms, báo giá 19,7 ms, giữ phòng 44,2 ms, tranh chấp 100×10 p95 175 ms, luồng nhân viên ≤ 35 ms; tất cả đạt, không 5xx.
 
+## Chạy lại sau BKG-008 (2026-11-28)
+
+Xác nhận đánh giá thêm trường hợp miễn cọc khi thiếu cọc/thiếu quyền kênh. Một lần chạy: tìm phòng p95 29,5 ms, báo giá 19,7 ms, giữ phòng 92 ms, tranh chấp 100×10 p95 166 ms, xác nhận 41 ms; tất cả đạt.
+
 ## Giới hạn và việc tiếp theo
 
 - Kết quả dao động theo tải máy: một lần chạy sau đó, khi máy đang chạy song song việc khác, cho tìm phòng p95 55 ms và tranh chấp p95 345 ms — vẫn dưới mục tiêu, đúng đắn vẫn đạt. Khi so sánh giữa các lần đo, chạy trên máy rảnh và lặp ít nhất 3 lần.

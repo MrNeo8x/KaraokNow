@@ -8,7 +8,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Code trên `main`:** `origin/main` = `0de3b9a` (FE-022 thư viện ảnh; gồm BE VEN-006 `eb9e128`). **Chưa push:** `9fa051c` BE VEN-007 ảnh phòng cho khách (không migration; OpenAPI đổi → Frontend CI `types:check` đỏ tới khi FE-023 sinh lại type — nên push cùng FE-023), `bb47b38` bind mount lưu file local, và commit tài liệu này.
 
-**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **59/59** (sau VEN-007); diễn tập khôi phục local `counts_match=yes`. FE (FE-022) theo nhật ký Luồng FE. Local: `GET /v1/public/branches/{id}/rooms` trả 4–5 ảnh mỗi phòng Majestic.
+**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **60/60** (sau BKG-008); diễn tập khôi phục local `counts_match=yes`. FE (FE-022) theo nhật ký Luồng FE. Local: `GET /v1/public/branches/{id}/rooms` trả 4–5 ảnh mỗi phòng Majestic.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` **32 migration** (đến `20261124100000_venue_photos`); backend `:3000` chạy `9fa051c`; file upload ở **`be/.storage`** (bind mount `./.storage:/app/.storage`, gitignore — giữ qua rebuild; có 36 file demo Majestic). Seed UAT (Platform Admin UAT là Super Admin); dữ liệu demo MAJESTIC (6 phòng, 28 ảnh phòng, 8 ảnh chi nhánh, bảng giá `MAJESTIC_STD`) do session triển khai tạo. `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
@@ -18,12 +18,21 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* thêm secret backup và chạy tay workflow (OPS-010); đăng ký uptime monitor (OPS-009); UAT nhóm A–R; thay ảnh demo Majestic bằng ảnh thật khi có; trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB.
+- *Người dùng / PO:* thêm secret backup và chạy tay workflow (OPS-010); đăng ký uptime monitor (OPS-009); UAT nhóm A–R; thay ảnh demo Majestic bằng ảnh thật khi có; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB.
 - *Session triển khai:* push `9fa051c` cùng FE-023 (không migration); commit nhật ký demo Majestic; nhắc: luôn áp migration trước push.
 - *Luồng FE:* **FE-023** ảnh phòng thật trên trang khách (handoff "FE READY — ảnh phòng cho khách", `types:generate`); các task FE khác `VERIFY`.
-- *Luồng BE:* không còn task không bị chặn — BKG-008 (PO), IAM-004 (ZBS), OPS-010 (secret), PAY-002–004 (sau pilot).
+- *Luồng BE:* không còn task không bị chặn — IAM-004 (ZBS), OPS-010 (secret), PAY-002–004 (sau pilot).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng BE: miễn cọc theo trường hợp (BKG-008, PD-050)
+
+- PO định nghĩa "trường hợp" của PD-005: giá trị booking nhỏ, khung giờ vắng, khách quen, quản lý duyệt từng booking, và "nhân viên được quyền quyết định theo phân quyền" → hiểu là merchant chọn vai trò được miễn cọc từng hold (Owner luôn được) → PD-050.
+- Code: migration `20261124110000_deposit_exemptions`; `be/src/booking/deposit-exemption.ts` (chính sách, đánh giá, miễn/huỷ miễn, controller); `ConfirmationService` gọi `evaluate` khi thiếu cọc hoặc kênh chưa bật không cọc; snapshot `depositExemptionReasons` chỉ khi được miễn (giữ nguyên dạng snapshot cũ). So SĐT khách quen bằng biểu thức chuẩn hoá giống `normalizePhone`.
+- Kiểm chứng: unit 73/73, E2E 60/60 (4 trường hợp × nhánh kênh/nhánh cọc, khách có no-show không được miễn, Thu ngân 403, lý do rỗng 400, huỷ miễn, sau xác nhận 409, audit không chứa lý do), benchmark đạt, migration up → down → up.
+- FE-024 `READY`. Production: áp `20261124110000` trước push.
 
 ---
 

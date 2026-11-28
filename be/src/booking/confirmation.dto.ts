@@ -13,6 +13,9 @@ class ConfirmationPolicySnapshotDto {
   @ApiProperty({ nullable: true, type: String }) noDepositPolicyVersion!: string | null;
   @ApiPropertyOptional({ description: 'Deposit-required path only' }) requiredDepositVnd?: string;
   @ApiPropertyOptional({ description: 'Deposit-required path only: hold deposits recorded at confirmation' }) depositRecordedVnd?: string;
+  @ApiPropertyOptional({ enum: ['AMOUNT', 'OFF_PEAK', 'REGULAR_CUSTOMER', 'MANUAL_WAIVER'], isArray: true,
+    description: 'Present only when a case allowed confirmation without the (full) deposit or the channel no-deposit permission (PD-050)' })
+  depositExemptionReasons?: string[];
 }
 export class BookingOutcomeDto {
   @ApiProperty({ enum: ['CUSTOMER_CANCELLED', 'MERCHANT_CANCELLED', 'NO_SHOW'] }) type!: string;
