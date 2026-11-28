@@ -14,6 +14,7 @@ const MATRIX = {
   'cash.report': ['OWNER', 'BRANCH_MANAGER', 'CASHIER'], // daily cash report and unresolved expired-hold deposits
   'deposit.resolve': ['OWNER', 'BRANCH_MANAGER'], // record refund/retention of an expired hold's deposit
   'venue.manage': ['OWNER', 'BRANCH_MANAGER'], // rooms, amenities and room photos
+  'reports.view': ['OWNER', 'BRANCH_MANAGER'], // RPT-001 booking/revenue, occupancy and channel reports (PD-044)
   'owner.admin': ['OWNER'], // memberships, publication, public terms, audit, ops backlog, price plans
 } as const satisfies Record<string, readonly Role[]>;
 export type Permission = keyof typeof MATRIX;

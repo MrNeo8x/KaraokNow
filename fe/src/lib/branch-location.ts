@@ -22,3 +22,21 @@ export function patchText(input: string, previous: string | null | undefined): s
 
 /** Message shown when the BE cannot read coordinates from the pasted link (422). */
 export const MAPS_LINK_HELP = 'Mở đúng quán trên Google Maps rồi bấm Chia sẻ → Sao chép liên kết, hoặc dán toạ độ (vd 21.0285, 105.8542).';
+
+export type HoursInput = { allDay: boolean; openingTime: string; closingTime: string };
+export type HoursPayload = { openingTime: string | null; closingTime: string | null };
+
+/**
+ * Opening hours for POST/PATCH (PD-043): both fields together, both null = open 24 h. Returns undefined when nothing
+ * changed versus `previous` (edit) or when creating a 24 h branch (BE default), or an error message.
+ */
+export function hoursPayload(input: HoursInput, previous?: { openingTime?: string | null; closingTime?: string | null }): HoursPayload | undefined | { error: string } {
+  const next: HoursPayload = input.allDay ? { openingTime: null, closingTime: null } : { openingTime: input.openingTime || null, closingTime: input.closingTime || null };
+  if (!input.allDay) {
+    if (!next.openingTime || !next.closingTime) return { error: 'Nhập cả giờ mở và giờ đóng cửa, hoặc chọn mở 24 giờ.' };
+    if (next.openingTime === next.closingTime) return { error: 'Giờ mở và giờ đóng cửa không được trùng nhau. Mở cả ngày thì chọn "Mở 24 giờ".' };
+  }
+  const before: HoursPayload = { openingTime: previous?.openingTime ?? null, closingTime: previous?.closingTime ?? null };
+  if (!previous && input.allDay) return undefined;
+  return next.openingTime === before.openingTime && next.closingTime === before.closingTime ? undefined : next;
+}

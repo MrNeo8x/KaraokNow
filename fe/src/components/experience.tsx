@@ -25,17 +25,19 @@ import CashReconciliation from './cash-reconciliation';
 import MerchantLogoCard, { type MerchantLogo } from './merchant-logo';
 import MerchantDocuments from './merchant-documents';
 import PlatformUsers from './platform-users';
+import PlatformReports from './platform-reports';
+import MerchantReports from './merchant-reports';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
 import { RolesProvider } from './permissions-context';
 import { can } from '@/lib/permissions';
 import { roleLabel, type Role } from '@/lib/admin';
-import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
+import { BadgeCheck, BarChart3, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
 import { autoTenant, cookieLogout, cookieRefresh, parseSession, readLastTenant, refreshDelay, rememberTenant, type MyTenant, type Session } from '@/lib/session';
 
 export type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
-export type Branch = { id: string; name: string; code: string; timezone: string; status: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; mapsUrl?: string | null; directionsUrl?: string | null };
+export type Branch = { id: string; name: string; code: string; timezone: string; status: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; mapsUrl?: string | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null };
 export type Room = { id: string; name: string; code: string; capacity: number; status: string };
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
   const page = initialPage;
@@ -152,14 +154,15 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const sessionsCard = <MySessions token={session.accessToken} onCurrentRevoked={() => void logout()} />;
 
   if (page === 'platform') {
-    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'users', label: 'Người dùng', icon: Users }, { id: 'account', label: 'Tài khoản', icon: UserCog }];
-    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', users: 'Người dùng', account: 'Tài khoản' };
+    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'users', label: 'Người dùng', icon: Users }, { id: 'reports', label: 'Báo cáo', icon: BarChart3 }, { id: 'account', label: 'Tài khoản', icon: UserCog }];
+    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', users: 'Người dùng', reports: 'Báo cáo nền tảng', account: 'Tài khoản' };
     return <AdminShell product="Platform" nav={nav} active={platformSection} onSelect={selectPlatform} title={titles[platformSection]} subtitle="Quản trị toàn hệ thống · không gắn với merchant nào"
       footer={<><strong>Platform Admin</strong><a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
       {error && <div role="alert" className="error">{error}</div>}
       {platformSection === 'listings' && <PlatformListings token={session.accessToken} />}
       {platformSection === 'merchants' && <PlatformMerchants token={session.accessToken} />}
       {platformSection === 'users' && <PlatformUsers token={session.accessToken} />}
+      {platformSection === 'reports' && <PlatformReports token={session.accessToken} />}
       {platformSection === 'account' && sessionsCard}
     </AdminShell>;
   }
@@ -170,12 +173,13 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     { id: 'overview', label: 'Tổng quan', icon: LayoutDashboard },
     { id: 'bookings', label: 'Lịch & Đặt phòng', icon: CalendarDays },
     ...(roles !== null && !can(roles, 'cash.report') ? [] : [{ id: 'cash', label: 'Tiền mặt', icon: Wallet }]),
+    ...(roles !== null && !can(roles, 'reports.view') ? [] : [{ id: 'reports', label: 'Báo cáo', icon: BarChart3 }]),
     { id: 'rooms', label: 'Phòng hát', icon: DoorOpen },
     { id: 'pricing', label: 'Giá & chính sách', icon: Tags },
     ...(isOwner === false ? [] : [{ id: 'users', label: 'Người dùng', icon: Users }, { id: 'marketplace', label: 'Marketplace', icon: Store }]),
     { id: 'settings', label: 'Cài đặt hệ thống', icon: Settings },
   ];
-  const titles: Record<string, string> = { overview: 'Tổng quan', bookings: 'Lịch & Đặt phòng', cash: 'Đối soát tiền mặt', rooms: 'Phòng hát', pricing: 'Giá & chính sách', users: 'Người dùng & phân quyền', marketplace: 'Marketplace', settings: 'Cài đặt hệ thống' };
+  const titles: Record<string, string> = { overview: 'Tổng quan', bookings: 'Lịch & Đặt phòng', cash: 'Đối soát tiền mặt', reports: 'Báo cáo & thống kê', rooms: 'Phòng hát', pricing: 'Giá & chính sách', users: 'Người dùng & phân quyền', marketplace: 'Marketplace', settings: 'Cài đặt hệ thống' };
   const section = nav.some(item => item.id === merchantSection) ? merchantSection : 'overview';
   function openTenant(id: string) { setBranch(''); setBranches([]); setRooms([]); setMe(null); setLogoUrl(null); setActiveTenant(id); setRevision(value => value + 1); }
   function switchMerchant() { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); setMe(null); setLogoUrl(null); }
@@ -219,6 +223,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         {currentBranch && <BranchHolds key={`branch-holds:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}
       </>}
       {section === 'cash' && (currentBranch ? <CashReconciliation key={`cash:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} /> : <div className="card empty">Chọn chi nhánh để xem báo cáo tiền mặt.</div>)}
+      {section === 'reports' && <MerchantReports key={`reports:${activeTenant}`} token={session.accessToken} tenant={activeTenant} branches={branches} />}
       {section === 'rooms' && <>
         <section className="card" aria-labelledby="room-table-title"><div className="section-head"><h2 id="room-table-title">Quản lý phòng</h2><span className="pill purple">{rooms.length} phòng</span></div>
           {loading ? <p role="status">Đang tải dữ liệu…</p> : branches.length === 0 ? <div className="empty">Chưa có chi nhánh được cấp quyền.</div> : rooms.length === 0 ? <div className="empty">Chi nhánh này chưa có phòng.</div>
@@ -254,5 +259,5 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   </AdminShell>;
 }
 
-const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
-const PLATFORM_IDS = ['listings', 'merchants', 'users', 'account'];
+const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'reports', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
+const PLATFORM_IDS = ['listings', 'merchants', 'users', 'reports', 'account'];

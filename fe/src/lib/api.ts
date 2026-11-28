@@ -4,7 +4,9 @@ export class ApiError extends Error {
 }
 
 // Backend messages that end users see often; translated so the UI stays Vietnamese. Unknown messages pass through.
-const FRIENDLY: [RegExp, string][] = [
+const FRIENDLY: [RegExp, string | ((match: RegExpMatchArray) => string)][] = [
+  [/15-minute boundary/i, 'Giờ bắt đầu phải theo bước 15 phút (vd 20:00, 20:15).'],
+  [/within the branch opening hours \(([^)]*)\)/i, match => `Giờ đặt phải nằm trong giờ mở cửa của chi nhánh (${match[1]}).`],
   [/changed concurrently/i, 'Dữ liệu vừa được thay đổi đồng thời. Vui lòng tải lại rồi thử lại.'],
   [/insufficient role/i, 'Vai trò của bạn không có quyền thực hiện thao tác này.'],
   [/at least one active owner/i, 'Merchant phải còn ít nhất một Owner đang hoạt động.'],
@@ -18,7 +20,10 @@ const FRIENDLY: [RegExp, string][] = [
   [/^nothing to change$/i, 'Không có thay đổi nào để lưu.'],
   [/merchant is suspended/i, 'Merchant đang bị Platform khoá: không nhận giữ chỗ mới. Các giữ chỗ và booking hiện có vẫn xử lý được.'],
 ];
-export function friendlyMessage(message: string): string { return FRIENDLY.find(([pattern]) => pattern.test(message))?.[1] ?? message; }
+export function friendlyMessage(message: string): string {
+  for (const [pattern, text] of FRIENDLY) { const match = message.match(pattern); if (match) return typeof text === 'function' ? text(match) : text; }
+  return message;
+}
 
 /** Builds the user-facing error for a failed response (shared by JSON and binary requests). */
 async function toApiError(response: Response): Promise<ApiError> {

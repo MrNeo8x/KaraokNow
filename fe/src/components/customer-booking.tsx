@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Navigation, Phone } from 'lucide-react';
+import { Clock, Navigation, Phone } from 'lucide-react';
 import { CalendarDays, Check, CheckCircle2, ClipboardList, Copy, Home, MapPin, Mic2, Minus, Plus, Search } from 'lucide-react';
 import { ApiError, request } from '@/lib/api';
 import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle';
 import { formatPhone, telHref } from '@/lib/branch-location';
-import { SLOTS, firstSlot, initialChoice, slotOpen, upcomingDates } from '@/lib/booking-time';
+import { DEFAULT_POLICY, calendarStart, durationOptions, fitsWindow, initialChoice, isPast, nearestDuration, openingWindow, pickTime, quickSlots, upcomingDates, type BookingPolicy } from '@/lib/booking-time';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, formatBookingCode, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
-export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null };
+export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null; bookingPolicy?: BookingPolicy };
 export type Room = { id: string; branchId?: string; name: string; capacity: number };
 type Page<T> = { items: T[]; hasMore: boolean };
 export type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
@@ -21,16 +21,23 @@ const RETRY_COOLDOWN_MS = 60_000;
 function session(): Storage | null { try { return window.sessionStorage; } catch { return null; } }
 const fixedRoomImages = ['/rooms/room-violet.svg', '/rooms/room-rose.svg', '/rooms/room-blue.svg'];
 
-// The public terms endpoint answers 404 when the merchant has not configured terms; that is a normal state, not a failure.
+// Unconfigured terms come back as 200 { configured: false } (normal state); 404 means the branch is no longer public.
 function fetchTerms(branchId: string, signal?: AbortSignal): Promise<Terms> {
   return request<Terms>(`/public/branches/${encodeURIComponent(branchId)}/booking-terms`, { signal })
-    .catch(err => { if (err instanceof ApiError && err.status === 404) return { configured: false, terms: null, version: null }; throw err; });
+    .catch(err => { if (err instanceof ApiError && err.status === 404) throw new ApiError('Chi nhánh này hiện không nhận đặt phòng online. Vui lòng chọn chi nhánh khác.', 404); throw err; });
 }
 function durationLabel(minutes: number) { return minutes % 60 === 0 ? `${minutes / 60} giờ` : `${(minutes / 60).toLocaleString('vi-VN')} giờ`; }
 /** Address, call button and Google Maps directions for a branch; each part is hidden when missing (PD-042). */
+/** "Mở cửa 18:00–02:00 (qua nửa đêm)" or "Mở cửa 24 giờ". */
+function openingLabel(branch: Branch): string {
+  if (!branch.openingTime || !branch.closingTime) return 'Mở cửa 24 giờ';
+  return `Mở cửa ${branch.openingTime}–${branch.closingTime}${branch.closingTime <= branch.openingTime ? ' (qua nửa đêm)' : ''}`;
+}
+
 function BranchContact({ branch, compact = false }: { branch?: Branch; compact?: boolean }) {
-  if (!branch || (!branch.address && !branch.phone && !branch.directionsUrl)) return null;
+  if (!branch) return null;
   return <div className="branch-contact-block">
+    <p className="branch-address"><Clock size={14} aria-hidden /> {openingLabel(branch)}</p>
     {branch.address && <p className="branch-address"><MapPin size={14} aria-hidden /> {branch.address}</p>}
     {!compact && (branch.phone || branch.directionsUrl) && <div className="branch-contact">
       {branch.phone && <a href={telHref(branch.phone)} aria-label={`Gọi ${branch.name} ${formatPhone(branch.phone)}`}><Phone size={14} aria-hidden /> {formatPhone(branch.phone)}</a>}
@@ -80,6 +87,21 @@ export default function CustomerBooking() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, []);
+
+  // PD-043: opening window and duration policy of the selected branch; startAt uses the real calendar date.
+  const selected = branches.find(item => item.id === branchId);
+  const hours = openingWindow(selected?.openingTime, selected?.closingTime);
+  const durations = durationOptions(selected?.bookingPolicy ?? DEFAULT_POLICY);
+  const start = calendarStart(date || '1970-01-01', time, hours);
+  const timeFits = fitsWindow(time, duration, hours);
+  const timeIssue = !/^\d{2}:\d{2}$/.test(time) ? 'Chọn giờ bắt đầu.' : Number(time.slice(3)) % 15 !== 0 ? 'Giờ bắt đầu theo bước 15 phút (vd 20:00, 20:15, 20:30).' : !timeFits ? `Giờ này cộng ${durationLabel(duration)} nằm ngoài giờ mở cửa (${selected?.openingTime}–${selected?.closingTime}).` : clock !== null && date && isPast(date, time, hours, clock) ? 'Giờ này đã qua.' : '';
+  const policyKey = `${selected?.openingTime ?? ''}|${selected?.closingTime ?? ''}|${durations.join(',')}`;
+  useEffect(() => {
+    if (!selected) return;
+    const nextDuration = durations.includes(duration) ? duration : nearestDuration(durations, duration);
+    if (nextDuration !== duration) setDuration(nextDuration);
+    if (date) setTime(current => pickTime(date, current, hours, nextDuration, Date.now()) ?? current);
+  }, [policyKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setAvailability(null); setQuotes({}); setAcceptedTerms(null);
@@ -153,13 +175,14 @@ export default function CustomerBooking() {
     } finally { setLookingUp(false); }
   }
 
-  function startAt() { return `${date}T${time}:00+07:00`; }
+  function startAt() { return `${start.date}T${time}:00+07:00`; }
 
   function resetSearch() { setAvailability(null); setQuotes({}); setAcceptedTerms(null); }
 
   async function findAvailability(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(''); setQuotes({}); setAcceptedTerms(null);
     if (!branchId || !date || !time) { setError('Vui lòng chọn địa điểm, ngày và giờ bắt đầu.'); return; }
+    if (timeIssue) { setError(timeIssue); return; }
     setSearching(true);
     try {
       const query = new URLSearchParams({ startAt: startAt(), durationMinutes: String(duration) });
@@ -203,14 +226,15 @@ export default function CustomerBooking() {
       <form className="app-card" onSubmit={findAvailability} aria-labelledby="customer-time-title">
         <h2 id="customer-time-title"><span className="step-no">2</span>Chọn ngày &amp; giờ</h2>
         <span className="app-label">Chọn ngày</span>
-        <div className="chip-row" role="group" aria-label="Chọn ngày">{dates.map(item => <button type="button" key={item.value} className="date-chip" aria-pressed={date === item.value} onClick={() => { setDate(item.value); setTime(current => firstSlot(item.value, current, Date.now()) ?? current); resetSearch(); }}>{item.weekday}<strong>{item.label}</strong></button>)}<label className="date-other"><span className="visually-hidden">Ngày</span><input aria-label="Ngày" type="date" min={today || undefined} value={date} onChange={event => { const value = event.target.value; setDate(value); setTime(current => firstSlot(value, current, Date.now()) ?? current); resetSearch(); }} required /></label></div>
+        <div className="chip-row" role="group" aria-label="Chọn ngày">{dates.map(item => <button type="button" key={item.value} className="date-chip" aria-pressed={date === item.value} onClick={() => { setDate(item.value); setTime(current => pickTime(item.value, current, hours, duration, Date.now()) ?? current); resetSearch(); }}>{item.weekday}<strong>{item.label}</strong></button>)}<label className="date-other"><span className="visually-hidden">Ngày</span><input aria-label="Ngày" type="date" min={today || undefined} value={date} onChange={event => { const value = event.target.value; setDate(value); setTime(current => pickTime(value, current, hours, duration, Date.now()) ?? current); resetSearch(); }} required /></label></div>
         <span className="app-label">Chọn khung giờ</span>
-        <div className="slot-grid" role="group" aria-label="Giờ bắt đầu">{SLOTS.map(slot => <button type="button" key={slot} className="slot" aria-pressed={time === slot} disabled={clock === null || !slotOpen(date, slot, clock)} onClick={() => { setTime(slot); resetSearch(); }}>{slot}</button>)}</div>
+        <div className="slot-grid" role="group" aria-label="Giờ bắt đầu">{quickSlots(hours, duration).map(slot => { const nextDay = calendarStart(date || '1970-01-01', slot, hours).nextDay; return <button type="button" key={slot} className="slot" aria-pressed={time === slot} disabled={clock === null || !date || isPast(date, slot, hours, clock)} onClick={() => { setTime(slot); resetSearch(); }}>{slot}{nextDay && <small className="slot-next-day">hôm sau</small>}</button>; })}</div>
+        <div className="custom-time"><label>Giờ khác (bước 15 phút)<input type="time" step={900} aria-label="Giờ khác" value={time} onChange={event => { setTime(event.target.value); resetSearch(); }} /></label>{start.nextDay && !timeIssue && <p className="notice">Bắt đầu {time} rạng sáng {start.date.slice(8, 10)}/{start.date.slice(5, 7)} (ngày hôm sau).</p>}{timeIssue && <p className="error" role="alert">{timeIssue}</p>}</div>
         <div className="stepper-row">
-          <div><span className="app-label">Thời lượng</span><div className="stepper"><button type="button" aria-label="Giảm thời lượng" disabled={duration <= 60} onClick={() => { setDuration(value => value - 30); resetSearch(); }}><Minus size={16} /></button><output aria-live="polite" aria-label="Thời lượng">{durationLabel(duration)}</output><button type="button" aria-label="Tăng thời lượng" disabled={duration >= 480} onClick={() => { setDuration(value => value + 30); resetSearch(); }}><Plus size={16} /></button></div></div>
+          <div><span className="app-label">Thời lượng</span><div className="stepper"><button type="button" aria-label="Giảm thời lượng" disabled={durations.indexOf(duration) <= 0} onClick={() => { setDuration(value => durations[Math.max(0, durations.indexOf(value) - 1)] ?? value); resetSearch(); }}><Minus size={16} /></button><output aria-live="polite" aria-label="Thời lượng">{durationLabel(duration)}</output><button type="button" aria-label="Tăng thời lượng" disabled={durations.indexOf(duration) >= durations.length - 1} onClick={() => { setDuration(value => durations[Math.min(durations.length - 1, durations.indexOf(value) + 1)] ?? value); resetSearch(); }}><Plus size={16} /></button></div></div>
           <div><span className="app-label">Số khách</span><div className="stepper"><button type="button" aria-label="Giảm số khách" disabled={guests <= 1} onClick={() => { setGuests(value => value - 1); resetSearch(); }}><Minus size={16} /></button><output aria-live="polite" aria-label="Số khách">{guests} người</output><button type="button" aria-label="Tăng số khách" disabled={guests >= 100} onClick={() => { setGuests(value => value + 1); resetSearch(); }}><Plus size={16} /></button></div></div>
         </div>
-        <button className="primary app-cta" disabled={loading || searching || !branchId || !date}><Search size={16} aria-hidden /> {searching ? 'Đang tìm…' : 'Tìm phòng trống'}</button>
+        <button className="primary app-cta" disabled={loading || searching || !branchId || !date || !!timeIssue}><Search size={16} aria-hidden /> {searching ? 'Đang tìm…' : 'Tìm phòng trống'}</button>
       </form>
       {availability && <section className="app-card" aria-labelledby="customer-rooms-title">
         <h2 id="customer-rooms-title"><span className="step-no">3</span>Phòng còn trống</h2>

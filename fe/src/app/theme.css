@@ -394,3 +394,50 @@ main.admin-content { margin: 0; }
 .branch-contact-block { display: grid; gap: 4px; margin-top: 10px; text-align: left; }
 .branch-option-address { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
 .success-card .branch-contact { justify-content: center; }
+/* Opening hours and custom start time (FE-019, PD-043) */
+.slot { display: grid; justify-items: center; gap: 0; line-height: 1.15; }
+.slot-next-day { font-size: 10px; font-weight: 600; opacity: .8; }
+.custom-time { display: grid; gap: 6px; margin-top: 10px; max-width: 360px; }
+.custom-time input { margin-top: 6px; }
+.custom-time .notice, .custom-time .error { margin: 0; }
+.hours-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.hours-fields .check-row { grid-column: 1 / -1; }
+/* Reports and charts (FE-020) */
+.report-filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 4px 0 14px; }
+.report-filters label { min-width: 150px; }
+.report-filters input, .report-filters select { margin-top: 6px; padding: 9px 10px; }
+.report-tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.report-tabs button { border: 0; background: transparent; padding: 10px 12px; font-weight: 700; color: var(--muted); border-bottom: 2px solid transparent; }
+.report-tabs button[aria-selected="true"] { color: var(--brand-700); border-bottom-color: var(--brand-700); }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.chart-card { margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: #fff; display: grid; gap: 8px; min-width: 0; }
+.chart-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.chart-head strong { display: block; font-size: 14px; }
+.chart-head small { color: var(--muted); font-size: 12px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 14px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--text-2); }
+.chart-legend i, .chart-tooltip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart-axes line { stroke: #ece9f3; stroke-width: 1; }
+.chart-axes text, .end-label { fill: var(--muted); font-size: 11px; }
+.end-label { fill: var(--text-2); font-weight: 600; }
+.chart .baseline { stroke: #cfc9dc; stroke-width: 1; }
+.chart .crosshair { stroke: #b9b1cc; stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-tooltip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); pointer-events: none; z-index: 2; display: grid; gap: 2px; padding: 8px 10px; border-radius: 9px; background: var(--text); color: #fff; font-size: 12px; white-space: nowrap; box-shadow: var(--shadow); }
+.rate-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; align-content: start; }
+.rate-bars li { position: relative; display: grid; grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px; }
+.rate-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.rate-track { height: 12px; border-radius: 4px; background: #f1eef8; overflow: hidden; }
+.rate-fill { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #7c3aed; }
+.rate-value { text-align: right; font-weight: 700; color: var(--text); }
+.rate-detail { position: absolute; right: 0; top: -26px; padding: 4px 8px; border-radius: 7px; background: var(--text); color: #fff; font-size: 11.5px; white-space: nowrap; z-index: 2; }
+.heatmap { display: grid; gap: 8px; overflow-x: auto; }
+.heatmap-grid { display: grid; grid-template-columns: 28px repeat(24, minmax(14px, 1fr)); gap: 2px; min-width: 420px; }
+.heat-row { display: contents; }
+.heat-day, .heat-hour { font-size: 10.5px; color: var(--muted); text-align: center; align-self: center; }
+.heat-cell { aspect-ratio: 1; border-radius: 3px; min-height: 12px; }
+.heat-cell:hover { outline: 2px solid var(--text); outline-offset: -1px; }
+.heat-legend { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+.heat-legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.heat-legend strong { margin-left: 10px; color: var(--text); }
+.date-note { font-size: 12px; color: var(--muted); }

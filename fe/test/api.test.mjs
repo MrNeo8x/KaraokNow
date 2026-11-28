@@ -98,3 +98,9 @@ test('dịch thông báo quản lý user của Platform (PD-040)', async () => {
   assert.match(friendlyMessage('Enable the user before issuing a temporary password'), /mở khoá/);
   assert.equal(friendlyMessage('Something else'), 'Something else');
 });
+
+test('dịch lỗi giờ lẻ và giờ mở cửa (PD-043)', async () => {
+  const { friendlyMessage } = await import('../src/lib/api.ts');
+  assert.match(friendlyMessage('startAt must be on a 15-minute boundary'), /bước 15 phút/);
+  assert.equal(friendlyMessage('The booking must start and end within the branch opening hours (18:00–02:00)'), 'Giờ đặt phải nằm trong giờ mở cửa của chi nhánh (18:00–02:00).');
+});

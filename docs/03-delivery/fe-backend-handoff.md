@@ -222,6 +222,11 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 
 Trả lời mục "Cần BE xem" (2026-11-26): `GET /v1/public/branches/{id}/booking-terms` nay trả **200 `{ configured: false, terms: null, version: null, updatedAt: null }`** khi chi nhánh đã công khai nhưng merchant chưa đặt điều khoản (giống endpoint Owner); **404 chỉ khi chi nhánh không công khai**. FE đang xử lý cả hai nên không vỡ; có thể bỏ nhánh coi 404 là "chưa cấu hình". OpenAPI thêm mô tả 404 → `npm run types:generate`.
 
+
+### FE INTEGRATED — điều khoản công khai chưa cấu hình (2026-11-28)
+
+`customer-booking.tsx` (`fetchTerms`): `configured: false` hiện thông báo "Merchant chưa cấu hình điều khoản…" như trước; 404 không còn bị coi là "chưa cấu hình" mà báo "Chi nhánh này hiện không nhận đặt phòng online. Vui lòng chọn chi nhánh khác." Đã `npm run types:generate`.
+
 ## FE READY — báo cáo và thống kê (RPT-001, PD-044, 2026-11-28)
 
 **OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 53/53 (số liệu đối chiếu dữ liệu dựng sẵn, contract, CSV).
@@ -237,6 +242,14 @@ Tham số chung (query): `from`, `to` (`YYYY-MM-DD`, ngày địa phương, gồ
   - `GET /v1/platform/reports/merchants` → `rows[{ tenantId, tenantName, tenantStatus, listingLive, branches, rooms, holds, bookings, completed, cancelled, noShow, conversionRate, expectedRevenueVnd, netCollectedVnd }]` (sắp theo số booking).
 - Lễ tân/Thu ngân: 403 (vẫn dùng báo cáo tiền mặt theo ngày).
 
+
+### FE INTEGRATED — báo cáo và thống kê (FE-020, RPT-001, 2026-11-28)
+
+- Merchant: mục "Báo cáo" (`merchant-reports.tsx`) chỉ hiện cho Owner/Branch Manager (`reports.view` trong `permissions.ts`). Ba tab: Booking & doanh thu (KPI, cột booking theo kỳ, đường doanh thu dự kiến vs thực thu ròng, ghi chú ngày diễn ra/ngày ghi nhận, bảng đủ cột tiền), Công suất phòng (tỷ lệ, thanh theo phòng, bản đồ nhiệt thứ × giờ), Kênh & chuyển đổi. Lọc từ/đến (mặc định 30 ngày gần nhất theo giờ Việt Nam, tính ở trình duyệt), gộp theo, chi nhánh; "Tải CSV" theo tab đang mở (`format=csv` qua `requestBlob`, `fe/src/lib/download.ts`).
+- Platform: mục "Báo cáo" (`platform-reports.tsx`): snapshot, giữ chỗ vs booking xác nhận, merchant mới, bảng merchant (sắp xếp, 20 dòng đầu + "Xem tất cả"), CSV tổng quan và CSV merchant. Tiền chỉ hiển thị theo từng merchant.
+- Biểu đồ SVG tự viết (`charts.tsx`, không thêm thư viện): mọi biểu đồ có tooltip và nút "Bảng số liệu"; một chuỗi dùng màu thương hiệu, hai chuỗi dùng xanh/cam kèm chú thích và nhãn cuối đường; trục số đếm luôn là số nguyên.
+- Kiểm thử: unit `chart-math.test.mjs`; e2e `fe/e2e/reports.mjs` 15/15 (403 Lễ tân/Owner gọi Platform, 422 > 366 ngày, số liệu khớp API, tooltip, bảng 30 dòng, `groupBy=month`, CSV, công suất 7×24, kênh, lỗi khoảng ngày, Branch Manager thấy/Lễ tân không thấy, Platform snapshot + bảng + CSV). Đã `npm run types:generate`.
+
 ## FE READY — giờ lẻ và giờ mở cửa (VEN-005, PD-043, 2026-11-28)
 
 **OpenAPI đổi → chạy `npm run types:generate` trước, nếu không `types:check` trong CI sẽ đỏ.** Đã qua build, drift check BE, PostgreSQL Docker E2E 52/52.
@@ -247,6 +260,13 @@ Tham số chung (query): `from`, `to` (`YYYY-MM-DD`, ngày địa phương, gồ
 - Gợi ý UI: nút giờ nhanh sinh theo giờ mở cửa (mỗi giờ chẵn trong khung, kể cả sau 0:00 thuộc ngày hôm sau — gửi đúng ngày lịch thật trong `startAt`), thêm "Giờ khác" chọn giờ/phút bước 15; khi chọn giờ sau nửa đêm, nhắc rõ ngày. Ẩn hoặc vô hiệu giờ làm khoảng đặt vượt giờ đóng cửa với thời lượng đang chọn.
 - Giữ chỗ của nhân viên (`/merchant/booking/holds`) không bị giới hạn bước 15 phút hay giờ mở cửa.
 - Production cần migration `20261124080000_branch_opening_hours` trước khi push.
+
+
+### FE INTEGRATED — giờ lẻ và giờ mở cửa (FE-019, VEN-005, 2026-11-28)
+
+- Form chi nhánh (`branch-hours-fields.tsx`, `hoursPayload` trong `branch-location.ts`): ô "Mở 24 giờ" hoặc giờ mở/đóng (bước 15 phút), luôn gửi cả hai trường (24 giờ = cả hai `null`), báo lỗi khi thiếu một trường hoặc hai giờ trùng nhau, gợi ý "Đóng cửa sau nửa đêm".
+- Trang khách (`customer-booking.tsx`, `booking-time.ts`): hiện "Mở cửa HH:mm–HH:mm (qua nửa đêm)" / "Mở cửa 24 giờ"; nút giờ nhanh mỗi giờ chẵn trong khung mở cửa vừa đủ thời lượng (sau 0:00 ghi "hôm sau" và gửi `startAt` đúng ngày lịch kế tiếp); ô "Giờ khác" bước 15 phút, báo rạng sáng hôm sau, báo lỗi ngoài giờ/lệch bước/đã qua và khoá nút tìm; thời lượng theo `bookingPolicy`. 422 của BE được dịch sang tiếng Việt (`api.ts`).
+- e2e `fe/e2e/opening-hours.mjs` 11/11 (đặt lại chi nhánh UAT về 24 giờ khi xong).
 
 ## FE READY — địa chỉ và vị trí chi nhánh (VEN-004, PD-042, 2026-11-28)
 

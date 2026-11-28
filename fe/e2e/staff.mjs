@@ -8,7 +8,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); page.on('pageerror', e => errors.push(String(e)));
 page.on('response', r => { if (r.status() >= 400) console.log('   ↳', r.status(), r.request().method(), r.url().replace(BASE, '')); });
 page.on('dialog', d => { console.log('   ⚑ confirm:', d.message().slice(0, 90)); d.accept(); });
-const step = async (name, fn) => { try { const extra = await fn(); log(true, name, extra ?? ''); } catch (e) { log(false, name, e.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/staff-error-${results.length}.png`, fullPage: true }); } };
+const step = async (name, fn) => { try { const extra = await fn(); log(true, name, extra ?? ''); } catch (e) { log(false, name, e.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/staff-error-${name.replace(/[^\p{L}\d]+/gu, '-').slice(0, 40)}.png`, fullPage: true }).catch(() => {}); } };
 try {
   await step('Owner đăng nhập', async () => { await page.goto(BASE + '/merchant'); await page.getByLabel('Email').fill(OWNER.email); await page.getByLabel('Mật khẩu').fill(OWNER.password); await page.getByRole('button', { name: 'Đăng nhập' }).click(); await page.locator('.kpi, .tenant-picker').first().waitFor({ timeout: 15000 }); });
   await step('Nhập tenant, tải chi nhánh', async () => { await selectTenant(page, TENANT); await page.locator('.kpi').first().waitFor({ timeout: 15000 }); });

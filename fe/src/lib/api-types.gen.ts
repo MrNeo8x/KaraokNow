@@ -479,6 +479,91 @@ export interface paths {
         patch: operations["PlatformMembershipsController_update"];
         trace?: never;
     };
+    "/v1/merchant/reports/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bookings by service date and money by recorded date, per period. With format=csv the same rows are returned as text/csv (UTF-8 BOM) */
+        get: operations["MerchantReportsController_bookings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/reports/occupancy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Room occupancy and peak start hours. With format=csv the same rows are returned as text/csv (UTF-8 BOM) (one row per room) */
+        get: operations["MerchantReportsController_occupancy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/reports/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Holds by channel and conversion to bookings. With format=csv the same rows are returned as text/csv (UTF-8 BOM) */
+        get: operations["MerchantReportsController_channels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Platform growth and activity per period (Vietnam time) plus a current snapshot. With format=csv the same rows are returned as text/csv (UTF-8 BOM) */
+        get: operations["PlatformReportsController_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/reports/merchants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Activity per merchant in the range (counts and money totals only). With format=csv the same rows are returned as text/csv (UTF-8 BOM) */
+        get: operations["PlatformReportsController_merchants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/merchant/branches": {
         parameters: {
             query?: never;
@@ -1890,6 +1975,145 @@ export interface components {
             roles?: ("OWNER" | "BRANCH_MANAGER" | "RECEPTIONIST" | "CASHIER")[];
             branchIds?: string[];
             reason: string;
+        };
+        BookingReportRowDto: {
+            /**
+             * @description Period start date
+             * @example 2026-11-01
+             */
+            period: string;
+            /** @description Bookings whose start falls in the period (service date) */
+            bookings: number;
+            upcoming: number;
+            completed: number;
+            cancelled: number;
+            noShow: number;
+            /** @description Price + net surcharges of bookings not cancelled/no-show, by service date */
+            expectedRevenueVnd: string;
+            /** @description Deposits recorded in the period (by recorded date, same as the cash report) */
+            depositsVnd: string;
+            bookingCashVnd: string;
+            /** @description Reversed deposits and cash payments */
+            reversalsVnd: string;
+            refundsVnd: string;
+            /** @description deposits + cash − reversals − refunds */
+            netCollectedVnd: string;
+        };
+        BookingReportDto: {
+            from: string;
+            to: string;
+            /** @enum {string} */
+            groupBy: "day" | "week" | "month";
+            /** @description Branches included */
+            branchIds: string[];
+            totals: components["schemas"]["BookingReportRowDto"];
+            rows: components["schemas"]["BookingReportRowDto"][];
+        };
+        RoomOccupancyDto: {
+            /** Format: uuid */
+            branchId: string;
+            branchName: string;
+            /** Format: uuid */
+            roomId: string;
+            roomName: string;
+            /** @description Minutes of confirmed/checked-in/completed bookings starting in the range (buffer excluded) */
+            bookedMinutes: number;
+            /** @description Days × daily opening minutes (1440 when the branch has no opening hours) */
+            availableMinutes: number;
+            /** @description bookedMinutes / availableMinutes, 0–1 (4 decimals) */
+            occupancyRate: number;
+        };
+        PeakHourDto: {
+            /** @description ISO weekday, 1 = Monday … 7 = Sunday */
+            weekday: number;
+            /** @description Local start hour 0–23 */
+            hour: number;
+            bookings: number;
+        };
+        OccupancyReportDto: {
+            from: string;
+            to: string;
+            branchIds: string[];
+            bookedMinutes: number;
+            availableMinutes: number;
+            occupancyRate: number;
+            rooms: components["schemas"]["RoomOccupancyDto"][];
+            /** @description Only cells with at least one booking */
+            peakHours: components["schemas"]["PeakHourDto"][];
+        };
+        ChannelRowDto: {
+            /** @example WEB */
+            channel: string;
+            /** @description Holds created in the range (by created date) */
+            holds: number;
+            /** @description Of those, holds that became bookings */
+            confirmed: number;
+            /** @description Of those, holds that expired without a booking */
+            expired: number;
+            /** @description confirmed / holds, 0–1 (4 decimals) */
+            conversionRate: number;
+        };
+        ChannelReportDto: {
+            from: string;
+            to: string;
+            branchIds: string[];
+            /** @description All channels together (channel = "ALL") */
+            totals: components["schemas"]["ChannelRowDto"];
+            rows: components["schemas"]["ChannelRowDto"][];
+        };
+        PlatformSnapshotDto: {
+            merchantsActive: number;
+            merchantsSuspended: number;
+            /** @description Published listings waiting for Platform approval */
+            listingsPendingApproval: number;
+            /** @description Listings visible to customers */
+            listingsLive: number;
+            /** @description Merchants with at least one booking confirmed in the range */
+            merchantsWithBookings: number;
+            activeUsers: number;
+        };
+        PlatformOverviewRowDto: {
+            period: string;
+            newMerchants: number;
+            newBranches: number;
+            newUsers: number;
+            holds: number;
+            /** @description Bookings confirmed in the period (by confirmation date) */
+            bookingsConfirmed: number;
+        };
+        PlatformOverviewDto: {
+            from: string;
+            to: string;
+            /** @enum {string} */
+            groupBy: "day" | "week" | "month";
+            /** @example Asia/Ho_Chi_Minh */
+            timezone: string;
+            snapshot: components["schemas"]["PlatformSnapshotDto"];
+            totals: components["schemas"]["PlatformOverviewRowDto"];
+            rows: components["schemas"]["PlatformOverviewRowDto"][];
+        };
+        PlatformMerchantRowDto: {
+            /** Format: uuid */
+            tenantId: string;
+            tenantName: string;
+            /** @enum {string} */
+            tenantStatus: "ACTIVE" | "INACTIVE";
+            listingLive: boolean;
+            branches: number;
+            rooms: number;
+            holds: number;
+            bookings: number;
+            completed: number;
+            cancelled: number;
+            noShow: number;
+            conversionRate: number;
+            expectedRevenueVnd: string;
+            netCollectedVnd: string;
+        };
+        PlatformMerchantReportDto: {
+            from: string;
+            to: string;
+            rows: components["schemas"]["PlatformMerchantRowDto"][];
         };
         CreateBranchDto: {
             code: string;
@@ -4161,6 +4385,184 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    MerchantReportsController_bookings: {
+        parameters: {
+            query: {
+                /** @description First local date (inclusive), YYYY-MM-DD */
+                from: string;
+                /** @description Last local date (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Period size (weeks start on Monday) */
+                groupBy?: "day" | "week" | "month";
+                /** @description csv returns text/csv (UTF-8 with BOM) for spreadsheets */
+                format?: "json" | "csv";
+                /** @description One branch; omitted = every branch the caller can see */
+                branchId?: string;
+            };
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingReportDto"];
+                    "text/csv": components["schemas"]["BookingReportDto"];
+                };
+            };
+            /** @description Branch outside the caller scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid range (max 366 days) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MerchantReportsController_occupancy: {
+        parameters: {
+            query: {
+                /** @description First local date (inclusive), YYYY-MM-DD */
+                from: string;
+                /** @description Last local date (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Period size (weeks start on Monday) */
+                groupBy?: "day" | "week" | "month";
+                /** @description csv returns text/csv (UTF-8 with BOM) for spreadsheets */
+                format?: "json" | "csv";
+                /** @description One branch; omitted = every branch the caller can see */
+                branchId?: string;
+            };
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OccupancyReportDto"];
+                    "text/csv": components["schemas"]["OccupancyReportDto"];
+                };
+            };
+        };
+    };
+    MerchantReportsController_channels: {
+        parameters: {
+            query: {
+                /** @description First local date (inclusive), YYYY-MM-DD */
+                from: string;
+                /** @description Last local date (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Period size (weeks start on Monday) */
+                groupBy?: "day" | "week" | "month";
+                /** @description csv returns text/csv (UTF-8 with BOM) for spreadsheets */
+                format?: "json" | "csv";
+                /** @description One branch; omitted = every branch the caller can see */
+                branchId?: string;
+            };
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelReportDto"];
+                    "text/csv": components["schemas"]["ChannelReportDto"];
+                };
+            };
+        };
+    };
+    PlatformReportsController_overview: {
+        parameters: {
+            query: {
+                /** @description First local date (inclusive), YYYY-MM-DD */
+                from: string;
+                /** @description Last local date (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Period size (weeks start on Monday) */
+                groupBy?: "day" | "week" | "month";
+                /** @description csv returns text/csv (UTF-8 with BOM) for spreadsheets */
+                format?: "json" | "csv";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformOverviewDto"];
+                    "text/csv": components["schemas"]["PlatformOverviewDto"];
+                };
+            };
+            /** @description Caller is not a Platform Admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformReportsController_merchants: {
+        parameters: {
+            query: {
+                /** @description First local date (inclusive), YYYY-MM-DD */
+                from: string;
+                /** @description Last local date (inclusive); at most 366 days after from */
+                to: string;
+                /** @description Period size (weeks start on Monday) */
+                groupBy?: "day" | "week" | "month";
+                /** @description csv returns text/csv (UTF-8 with BOM) for spreadsheets */
+                format?: "json" | "csv";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMerchantReportDto"];
+                    "text/csv": components["schemas"]["PlatformMerchantReportDto"];
+                };
             };
         };
     };
@@ -6550,6 +6952,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description configured=false (terms/version null) when the merchant has not set terms yet */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -6557,6 +6960,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PublicBookingTermsResponseDto"];
                 };
+            };
+            /** @description Branch is not published */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

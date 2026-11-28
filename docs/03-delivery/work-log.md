@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau RPT-002)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-019/FE-020)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -14,16 +14,27 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** `45a14e2`; **28 migration** (đến `20261124060000_platform_user_management`); Blob đã gắn (OPS-008 `VERIFY`); env BE `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; `/v1/health/jobs` 200. **Lần push tới: áp trước lên Prisma `20261124070000_branch_location` rồi `20261124080000_branch_opening_hours`** (cột nullable + CHECK, tương thích ngược). Push BE cùng các commit FE đã sinh lại type (FE `types:check` trong CI). Sau deploy: smoke `GET /v1/public/branches` có `address`, `openingTime`, `bookingPolicy`; `GET /v1/merchant/reports/bookings` (Owner) 200, Branch Manager với chi nhánh không được giao 403; Owner MAJESTIC nhập địa chỉ/SĐT/link Google Maps/giờ mở cửa cho `LA_KHE`, `THANH_HA` qua giao diện (không seed). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Luồng FE: FE-019 (giờ lẻ/giờ mở cửa) và FE-020 (màn báo cáo: `merchant-reports.tsx`, `platform-reports.tsx`, `charts.tsx`, `chart-math.ts`, `download.ts`…), chưa commit. Session triển khai: `deploy-vercel.md`, dòng OPS-008, mục nhật ký deploy chưa commit. `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE. Không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Luồng FE: không có (FE-019, FE-020 đã commit, `VERIFY`; FE-019 phải deploy sau migration `20261124080000` của VEN-005 trên production). Session triển khai: `deploy-vercel.md`, dòng OPS-008, mục nhật ký deploy chưa commit. `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE. Không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* đăng ký uptime monitor (OPS-009, `deploy-vercel.md` §6a); UAT theo `docs/04-quality/uat-checklist.md` nhóm I–P; xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định có làm sạch email/lý do trong audit cũ trên production (AUD-002/RPT-002 chỉ sửa từ nay).
 - *Session triển khai:* migrate `20261124070000` + `20261124080000` → push → smoke như trên.
-- *Luồng FE:* hoàn tất FE-019, FE-020; chạy lại `npm run e2e` trên backend local `a8c42c5`; FE-020 nên ẩn mục báo cáo với Lễ tân/Thu ngân (BE trả 403) và xử lý 404/403 khi đổi chi nhánh.
+- *Luồng FE:* không còn task FE `READY`. Theo dõi hai bước e2e không ổn định (`staff.mjs` hold trên lịch, `session.mjs` đổi merchant); QA-003/UAT cho màn báo cáo với dữ liệu nhiều kỳ và mobile.
 - *Luồng BE:* BKG-008 khi có PO; OPS-002 (cần quyền Prisma production); IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache (ứng viên: báo cáo nếu chậm).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường.
+
+---
+
+## 2026-11-28 — Luồng FE: giờ lẻ/giờ mở cửa (FE-019) và màn báo cáo (FE-020)
+
+- Người dùng: "Tiếp FE-019 và các phần khác BE đã xong". Sinh lại `api-types.gen.ts` cho VEN-005, RPT-001 và contract điều khoản công khai (`ad5fe44`).
+- FE-019: form chi nhánh có giờ mở/đóng cửa hoặc 24 giờ; trang khách hiện giờ mở cửa, nút giờ theo khung mở cửa (sau 0:00 là "hôm sau", gửi đúng ngày lịch), ô "Giờ khác" bước 15 phút, thời lượng theo `bookingPolicy`, dịch 422 sang tiếng Việt.
+- FE-020: mục "Báo cáo" cho Owner/Branch Manager (quyền `reports.view`, Lễ tân/Thu ngân không thấy) với ba tab booking & doanh thu / công suất phòng / kênh, lọc ngày-kỳ-chi nhánh, CSV; mục "Báo cáo" ở `/platform` (snapshot, biểu đồ, bảng merchant 20 dòng + xem tất cả, CSV). Biểu đồ SVG tự viết, không thêm dependency.
+- Điều khoản công khai: 404 nay báo "Chi nhánh này hiện không nhận đặt phòng online" thay vì coi là chưa cấu hình.
+- Sửa test: `staff.mjs` gọi biến `results` không tồn tại khi một bước fail → script dừng giữa chừng (chỉ in 13 dòng).
+- Kiểm chứng: unit 67/67, `tsc`, `types:check`, `next build`. `npm run e2e` lượt đầu: API 66, vị trí 7, giờ mở cửa 11, khách 26, Platform 16, vai trò 28, files 13, user Platform 12, báo cáo 15 đạt; `staff` (bước hold trên lịch) và `session` (đổi merchant) mỗi bộ fail 1 bước, chạy lại sau rebuild cả hai đạt (29/29, 9/9) → tổng **232/232** khi gộp lần chạy lại; hai bước này có dấu hiệu không ổn định, theo dõi thêm.
 
 ---
 
