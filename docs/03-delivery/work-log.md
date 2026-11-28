@@ -2,32 +2,28 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-012)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau IAM-008)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage, `ec53b06` work log, `8029594` BKG-010 mã đặt phòng 6 ký tự, và commit FE-015/FE-016 của Luồng FE). **BKG-010 đã lên production trước FE-016** (session triển khai push `560e3e9`…`8029594`): khách trên production nhận mã 6 ký tự nhưng FE production cũ chặn tra cứu. **Cần push và deploy commit FE-016 này ngay.** Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
+**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28, sau BKG-010) `npm run verify` 65/65 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-015/FE-016) `npm test` 51/51, `next build`, `npm run e2e`: API 66/66, khách 22/22, lễ tân 29/29, Platform 16/16, vai trò 28/28, `files.mjs` 10/13 (3 bước hiển thị ảnh chờ BE sửa lỗi phục vụ file local).
+**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **48/48**, migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
 
-**Môi trường local** (`be/compose.yaml`, rebuild 2026-11-28): Postgres `:5433` đã áp 27 migration (đến `20261124050000_file_storage`); backend `:3000` chạy `1205321` (có FILE-001), health ready 200. Container không có token Blob → file ghi vào `/app/.storage` trong container (đã kiểm ghi được), **mất khi rebuild** — chỉ để thử. Ảnh public đọc qua `/v1/files/public/…` (FE rewrite) — **hiện trả 500** vì `sendFile` từ chối thư mục `.storage` (yêu cầu BE trong handoff "FE INTEGRATED (một phần) — ảnh, logo, giấy tờ"). Frontend `:3100` có FE-015/FE-016. Đã seed UAT. Worker tắt.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
 
-**Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
+**Production (Vercel):** chạy `84aa397`; 27 migration (đến `20261124050000_file_storage`); Blob `vn-karaoke-now-blob-pub/-pri` đã gắn vào BE (OPS-008 `VERIFY` — chờ Owner thử upload trên giao diện). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; không đặt `AUTH_COOKIE_SECURE` (cookie Secure). **Trước khi push `693fd7b`: áp migration `20261124060000_platform_user_management` lên Prisma** (chỉ thêm bảng/cột nullable/index). Sau deploy: smoke `GET /v1/platform/users?limit=1` (admin 200, user thường 403); đăng nhập trên domain FE → cookie `kn_refresh` HttpOnly/Secure path `/v1/auth`, F5 vẫn đăng nhập. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-012. Luồng BE đã commit IAM-008 (`693fd7b`, quản lý user cho Platform Admin; FE-017 `READY`). Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Session triển khai có `deploy-vercel.md`, dòng OPS-008 trong task board và mục nhật ký OPS-008 chưa commit — không commit hộ. `docs/KaraokeNow_Merchant_Feature_Plan.md` chưa track (không phải của Luồng BE).
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
-- *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
-- *Luồng FE:* **FE-017** màn quản lý user cho Platform Admin (handoff "FE READY — quản lý user của Platform"); sau deploy FE-012 kiểm tra cookie `kn_refresh` trên domain FE Vercel; FE-011; QA-003 phần còn lại.
-- *Luồng BE:* sửa `files.controller.ts` (`sendFile(file, { dotfiles: 'allow' })` hoặc thư mục mặc định không có dấu chấm; `NotFoundError` → 404); BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
+- *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (nhóm I ảnh/giấy tờ, J mã đặt phòng, K phiên đăng nhập, L quản lý user); trả lời BKG-008; quyết định có sửa audit `MEMBERSHIP_CREATED` đang chứa email (có từ trước, lệch quy tắc audit không PII).
+- *Session triển khai:* migrate `20261124060000` → push → smoke như trên; đóng OPS-008 sau khi Owner thử upload.
+- *Luồng FE:* **FE-017** màn quản lý user cho Platform Admin (handoff "FE READY — quản lý user của Platform"); FE-011; QA-003 phần còn lại.
+- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
-
-
-
-
 
 ---
 

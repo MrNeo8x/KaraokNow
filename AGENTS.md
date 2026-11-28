@@ -70,6 +70,8 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Pool/timeout PostgreSQL có giới hạn mặc định (OPS-004, `be/src/platform/database/pool-config.ts`): mọi transaction và chờ khoá phải xong trong `PG_LOCK_TIMEOUT_MS` (5 s) / `PG_STATEMENT_TIMEOUT_MS` (15 s). Test cố tình giữ khoá lâu hơn sẽ nhận 409 (`55P03`).
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
 - File (PD-037) đi qua `ObjectStorageService` (`be/src/platform/storage/`): không gọi `@vercel/blob` trực tiếp ở chỗ khác; kiểm tra loại bằng `requireFile` (magic bytes), ≤ 4 MB (giới hạn body 4,5 MB của Vercel Function). E2E dùng backend local trong thư mục tạm (`STORAGE_LOCAL_DIR`). Dependency runtime mới của `be/` phải có bản CommonJS và ghim chính xác.
+- Phiên staff (PD-039): refresh token nằm trong cookie HttpOnly `kn_refresh` (path `/v1/auth`), refresh/logout bằng cookie phải kèm header `X-KN-Session: 1`; cửa sổ 10 s cho refresh trùng giữa các tab **chỉ** ở chế độ cookie — token gửi trong body vẫn bị coi là reuse. Stack HTTP local cần `AUTH_COOKIE_SECURE=false` (đã có trong `compose.yaml`).
+- Thao tác của Platform Admin không thuộc tenant ghi vào `platform_audit_logs` (`audit_logs.tenant_id` bắt buộc). Platform sửa membership qua `MembershipService` với `MembershipHooks` (`start`/`beforeCommit`) để kiểm tra và ghi audit trong cùng transaction; không tự thao tác lên tài khoản của mình, merchant luôn còn ≥ 1 Owner ACTIVE.
 - Git index dùng chung giữa các session: chạy `git diff --cached --name-only` ngay trước `git commit` — file người khác đã stage sẽ lọt vào commit của mình.
 
 ## Trạng thái task
