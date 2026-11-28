@@ -2,30 +2,37 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-021; phần production theo Luồng BE ~15:50)
+## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau rà soát Master Plan)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `148cbde` — **đã push** `c4de3f1` (IAM-009/010 Super Admin + phiên hỗ trợ, **migration `20261124090000_support_sessions`**, OpenAPI đổi), `d987b96`, `f431918`, `148cbde` (OPS-002 backup). Không có nhật ký nào ghi đã áp `20261124090000` lên Prisma trước push.
+**Code trên `main`:** `origin/main` = `5135bdd` (tài liệu Merchant Feature Plan). Production chạy `e0daab2` (FE-021) — gồm toàn bộ BE tới IAM-009/010 và OPS-002. **Chưa push:** `16549c2`, `d0c53f9` (rà soát Master Plan) và commit tài liệu này — chỉ tài liệu, không migration.
 
-> **CẢNH BÁO production (kiểm lúc ~15:50):** `/v1/health/ready` 200 nhưng `/v1/platform/support-sessions` vẫn 404 → Vercel chưa phục vụ `c4de3f1` (đang build, build lỗi hoặc chưa deploy). **Phải áp `20261124090000_support_sessions` lên Prisma ngay** (chỉ thêm cột `platform_admins.super_admin` default false + bảng `support_sessions`, tương thích ngược). Nếu bản mới lên trước migration: `GET /v1/platform/users*` lỗi 500 (cột `super_admin`), và người không phải thành viên gọi API merchant cũng 500 thay vì 403. Ngoài ra **Frontend CI `types:check` sẽ đỏ** ở `c4de3f1`…`148cbde` vì type FE mới (FE-021) còn chưa commit — production FE vẫn build được (Vercel không chạy CI) nhưng màn FE chưa có `readOnly`/`superAdmin`.
+**Kiểm chứng gần nhất:** BE `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **57/57**; diễn tập khôi phục local `counts_match=yes` (RTO 1 s). FE (FE-021) unit 71/71, `types:check`, `tsc`, `next build`, browser e2e **248/248**. Smoke production sau deploy `e0daab2`: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, `/v1/platform/support-sessions` 401 không auth.
 
-**Kiểm chứng gần nhất:** BE (sau IAM-009) `npm run verify` 73/73 unit + drift OpenAPI/Markdown, `npm run test:e2e` **57/57**; migration `20261124090000` up → down → up. OPS-002: diễn tập khôi phục local (thường + mã hoá) 42 bảng/4.093 dòng `counts_match=yes`, RTO 1 s. FE (deploy `d76ad76`) unit 67/67, `types:check`, `tsc`, `build`.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **31 migration**, seed UAT (Platform Admin UAT là Super Admin); backend `:3000` chạy code BE mới nhất (`c4de3f1`, không đổi tới nay), `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container (mất khi rebuild); `/v1/health/jobs` local 503 vì worker tắt (bình thường).
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433` **31 migration**, seed UAT chạy lại (Platform Admin UAT là **Super Admin**); backend `:3000` chạy `c4de3f1` (code BE không đổi tới `148cbde`), `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container; `/v1/health/jobs` local 503 (worker tắt, bình thường).
+**Production (Vercel):** `e0daab2`; Prisma **31 migration** (đến `20261124090000_support_sessions`, áp trước push); **2/2 Platform Admin là Super Admin** (cấp bởi operator, có `platform_audit_logs`). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Workflow backup `.github/workflows/db-backup.yml` có trên `main` nhưng **bỏ qua cho tới khi có secret** (OPS-010). Preview Vercel dùng chung DB production — chưa có staging tách biệt. Chưa kiểm bằng trình duyệt: phiên hỗ trợ Super Admin, màn báo cáo/giờ mở cửa/địa chỉ với tài khoản thật; chưa nhập địa chỉ/SĐT/link/giờ mở cửa cho `LA_KHE`, `THANH_HA` (MAJESTIC). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Production (Vercel):** BE/FE đang (hoặc sắp) chuyển từ `d76ad76` sang `148cbde`; Prisma **30 migration** theo nhật ký gần nhất. Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Việc ngay: (1) áp `20261124090000`; (2) kiểm deploy `148cbde` READY trên Vercel; (3) smoke `POST /v1/platform/support-sessions` không auth → 401, `/v1/platform/users` (admin) 200; (4) theo chỉ định của người dùng chạy đúng một lệnh `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL`. Workflow backup `.github/workflows/db-backup.yml` đã lên `main` nhưng bỏ qua cho tới khi có secret (OPS-010). Còn chờ: nhập địa chỉ/SĐT/link/giờ mở cửa MAJESTIC qua giao diện. Quy trình: `docs/03-delivery/deploy-vercel.md`.
+**Tài liệu kế hoạch:** `docs/KaraokeNow_Codex_Master_Plan.md` đã rà lại theo bằng chứng 2026-11-28 (bảng module, FR, mục tiêu backup, công nghệ/môi trường, mục 13.1). Khi xong tính năng lớn, cập nhật cả dòng MOD/FR và 13.1.
 
-**Đang dở (working tree):** Luồng BE không có. Luồng FE: không có (FE-021 đã commit, `VERIFY`, e2e 248/248; commit này làm Frontend CI `types:check` xanh lại). `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE.
+**Đang dở (working tree):** không có của Luồng BE.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* xác nhận/áp migration `20261124090000` (hoặc giao session triển khai) và kiểm deploy; chỉ định Super Admin đầu tiên; thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT nhóm I–Q; xem lại PD-044; trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ.
-- *Session triển khai:* các bước "Việc ngay" ở trên; ghi nhật ký.
-- *Luồng FE:* không còn task FE `READY`. Có thể ẩn nốt nút ghi ở các form cài đặt trong phiên hỗ trợ (hiện bị chặn trước khi gửi).
-- *Luồng BE:* BKG-008 khi có PO; IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache. Không còn task BE không bị chặn khác.
+- *Người dùng / PO:* thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm A–Q (88 ca); Owner thử upload ảnh/logo/PDF trên production (đóng OPS-008); xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB khỏi production.
+- *Session triển khai:* push các commit tài liệu khi thuận tiện; ghi nhật ký khi Owner/Super Admin thử trên production.
+- *Luồng FE:* các task FE đều `VERIFY` — hỗ trợ UAT/QA-003 phần còn lại (bàn phím/screen reader, Safari/Firefox, mất mạng).
+- *Luồng BE:* không còn task không bị chặn — BKG-008 (chờ PO), IAM-004 (chờ ZBS), OPS-010 (chờ secret), PAY-002–004 (sau pilot). Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng BE: rà soát Master Plan
+
+- Người dùng hỏi upload file đã xong chưa vì Master Plan báo chưa: đã xong (FILE-001 `DONE`, FE-015 `VERIFY`, OPS-008 `VERIFY` chờ Owner thử trên giao diện) — Master Plan cũ. Rà toàn bộ và sửa: MOD-01/02/03/04/06/07/11/14, FR-003/004/005/006/011/012/013/014, mục tiêu backup (thương mại vs PD-047 pilot), quyết định còn mở, công nghệ (Vercel + Prisma Postgres, Redis chưa dùng), môi trường (preview dùng chung DB production), ghi chú API thực tế (112 đường dẫn), mục 13.1 viết lại theo 2026-11-28.
+- Cảnh báo "migration chưa áp" trong snapshot trước đã hết: session triển khai áp `20261124090000` trước push và deploy `e0daab2`.
 
 ---
 
