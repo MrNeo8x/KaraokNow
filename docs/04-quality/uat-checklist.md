@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-044` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-046` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -137,6 +137,15 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H4 | Cashier, Branch Manager | Để một hold đã thu cọc hết hạn; mở danh sách "cọc chờ xử lý"; Quản lý ghi hoàn một phần với lý do | Hold hiện trong danh sách; hoàn vượt cọc bị chặn; sau khi ghi, hold biến khỏi danh sách và báo số giữ lại | PD-036 | | |
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
+
+### Q. Hỗ trợ merchant và kiêm nhiệm (PD-045, PD-046)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| Q1 | Super Admin, Owner | Mở phiên hỗ trợ vào một merchant với lý do; xem lịch, booking, báo cáo, nhân viên | Xem được như Owner; SĐT/email bị che; không có nút sửa (hoặc sửa bị từ chối); Owner thấy dòng audit "SUPPORT_SESSION_STARTED" | PD-045 | | |
+| Q2 | Super Admin | Kết thúc phiên; chờ quá 60 phút với phiên khác | Không còn xem được merchant | PD-045 | | |
+| Q3 | Platform Admin thường | Thử mở phiên hỗ trợ | Bị từ chối | PD-045 | | |
+| Q4 | Platform Admin, Owner | Owner mời một Platform Admin làm Owner; admin đăng nhập, chọn merchant, làm việc như Owner; thử khoá/duyệt merchant đó trong khu Platform | Làm việc bình thường trong merchant; thao tác Platform lên chính merchant đó bị chặn | PD-046 | | |
 
 ### P. Báo cáo và thống kê (PD-044)
 

@@ -10,6 +10,8 @@ export interface Actor {
   membershipId?: string;
   roles: Role[];
   branchIds: string[];
+  /** PD-045: set when a Super Admin reads this tenant through a support session (read-only, contact data masked). */
+  support?: { sessionId: string; expiresAt: string; reason: string };
 }
 
 export interface AuthenticatedRequest extends Request {

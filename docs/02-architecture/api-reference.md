@@ -606,6 +606,61 @@ Response được khai báo:
 | 200 | Platform Admin granted. Idempotent | {"$ref":"#/components/schemas/PlatformUserDto"} |
 | 409 | User is disabled | Chưa khai báo schema |
 
+### POST /v1/platform/users/{id}/super-admin
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Super Admin granted (PD-045). Caller must be Super Admin; target must be an active Platform Admin | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 409 | Target is not a Platform Admin | Chưa khai báo schema |
+
+### POST /v1/platform/users/{id}/super-admin/revoke
+
+Nhóm: platform users
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/PlatformReasonDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Super Admin revoked; the user's open support sessions end | {"$ref":"#/components/schemas/PlatformUserDto"} |
+| 403 | Not a Platform Admin, or the action targets the caller's own account | Chưa khai báo schema |
+| 409 | Would leave no active Super Admin | Chưa khai báo schema |
+
 ### POST /v1/platform/users/{id}/platform-admin/revoke
 
 Nhóm: platform users
@@ -3023,6 +3078,64 @@ Response được khai báo:
 | 200 | Merchant ACTIVE again; listing reappears if still published and approved. Idempotent | {"$ref":"#/components/schemas/MerchantSummaryDto"} |
 | 403 | Not a Platform Admin, or the admin belongs to the merchant | Chưa khai báo schema |
 
+### POST /v1/platform/support-sessions
+
+Nhóm: platform support
+
+Opens (or returns the already active) read-only support session into a merchant for 60 minutes. Then call merchant APIs with X-Tenant-ID = tenantId: GET only, contact data masked
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/StartSupportSessionDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | Chưa mô tả | {"$ref":"#/components/schemas/SupportSessionDto"} |
+| 403 | Not a Super Admin, or the admin belongs to that merchant | Chưa khai báo schema |
+| 404 | Merchant not found | Chưa khai báo schema |
+
+### GET /v1/platform/support-sessions
+
+Nhóm: platform support
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| query | `status` | Không | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Latest 200 sessions of every Super Admin | {"type":"array","items":{"$ref":"#/components/schemas/SupportSessionDto"}} |
+
+### POST /v1/platform/support-sessions/{id}/end
+
+Nhóm: platform support
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Idempotent; any Super Admin may end a session | {"$ref":"#/components/schemas/SupportSessionDto"} |
+
 ## Các schema request và response
 
 Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là các trường bắt buộc.
@@ -3468,6 +3581,32 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### SupportContextDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "expiresAt",
+    "reason"
+  ]
+}
+```
+
 ### MerchantMeDto
 
 ```json
@@ -3501,7 +3640,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "membershipId": {
       "type": "string",
-      "format": "uuid"
+      "format": "uuid",
+      "nullable": true,
+      "description": "null in a Super Admin support session"
     },
     "roles": {
       "type": "array",
@@ -3525,6 +3666,20 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "platformAdmin": {
       "type": "boolean",
       "description": "True when the user also holds the global Platform Admin grant"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "description": "True in a support session: every write is rejected (PD-045)"
+    },
+    "support": {
+      "nullable": true,
+      "description": "Set when a Super Admin is viewing through a support session",
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/components/schemas/SupportContextDto"
+        }
+      ]
     }
   },
   "required": [
@@ -3537,7 +3692,9 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "membershipId",
     "roles",
     "branchIds",
-    "platformAdmin"
+    "platformAdmin",
+    "readOnly",
+    "support"
   ]
 }
 ```
@@ -3747,6 +3904,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "platformAdmin": {
       "type": "boolean"
     },
+    "superAdmin": {
+      "type": "boolean",
+      "description": "Super Admin (PD-045): may open read-only support sessions and grant Super Admin"
+    },
     "createdAt": {
       "type": "string",
       "format": "date-time"
@@ -3780,6 +3941,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "status",
     "mustChangePassword",
     "platformAdmin",
+    "superAdmin",
     "createdAt",
     "lastLoginAt",
     "disabledAt",
@@ -9188,6 +9350,89 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   },
   "required": [
     "reason"
+  ]
+}
+```
+
+### StartSupportSessionDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "example": "Ticket #123: Owner báo không thấy booking hôm nay"
+    }
+  },
+  "required": [
+    "tenantId",
+    "reason"
+  ]
+}
+```
+
+### SupportSessionDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantName": {
+      "type": "string"
+    },
+    "adminUserId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "adminDisplayName": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "endedAt": {
+      "type": "string",
+      "format": "date-time",
+      "nullable": true
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Not ended and not expired"
+    }
+  },
+  "required": [
+    "id",
+    "tenantId",
+    "tenantName",
+    "adminUserId",
+    "adminDisplayName",
+    "reason",
+    "startedAt",
+    "expiresAt",
+    "endedAt",
+    "active"
   ]
 }
 ```

@@ -58,3 +58,9 @@ Platform reports (`GET /v1/platform/reports/overview|merchants`, JSON or CSV) re
 - Owner-only tenant-wide aggregates: audit log, hold-expiry backlog, outbox backlog.
 - Platform reports and user management: Platform Admin grant only; counts and money totals per merchant, no customer contact data.
 - Public: `/v1/health/jobs` (platform-wide counts only, PD-041) and `/v1/metrics` (request counts by method/status, no data).
+
+### Super Admin support sessions and dual roles (PD-045, PD-046)
+
+- `POST /v1/platform/support-sessions` `{tenantId, reason}`, `GET …?status=active|all`, `POST …/{id}/end`, `POST /v1/platform/users/{id}/super-admin[/revoke]`: Super Admin only (`platform_admins.super_admin`).
+- With an active session, `TenantGuard` accepts the Super Admin for that tenant as `OWNER` with `actor.support` set: only GET/HEAD pass (others → 403 "Support sessions are read-only"); `SupportMaskInterceptor` masks `customerPhone`, `customerEmail`, `email` in every response. Not usable for a merchant the admin belongs to (they use their own membership).
+- A Platform Admin may hold memberships; a real membership always takes precedence over a support session. Platform actions on a merchant they belong to stay forbidden (listing approval, suspend/reactivate, Platform membership edits, support session).

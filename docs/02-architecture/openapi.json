@@ -1077,6 +1077,105 @@
         ]
       }
     },
+    "/v1/platform/users/{id}/super-admin": {
+      "post": {
+        "operationId": "PlatformUsersController_grantSuper",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Super Admin granted (PD-045). Caller must be Super Admin; target must be an active Platform Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Target is not a Platform Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
+    "/v1/platform/users/{id}/super-admin/revoke": {
+      "post": {
+        "operationId": "PlatformUsersController_revokeSuper",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformReasonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Super Admin revoked; the user's open support sessions end",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Platform Admin, or the action targets the caller's own account"
+          },
+          "409": {
+            "description": "Would leave no active Super Admin"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform users"
+        ]
+      }
+    },
     "/v1/platform/users/{id}/platform-admin/revoke": {
       "post": {
         "operationId": "PlatformUsersController_revokeAdmin",
@@ -6670,6 +6769,126 @@
           "platform merchants"
         ]
       }
+    },
+    "/v1/platform/support-sessions": {
+      "post": {
+        "description": "Opens (or returns the already active) read-only support session into a merchant for 60 minutes. Then call merchant APIs with X-Tenant-ID = tenantId: GET only, contact data masked",
+        "operationId": "SupportSessionController_start",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSupportSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportSessionDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a Super Admin, or the admin belongs to that merchant"
+          },
+          "404": {
+            "description": "Merchant not found"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "",
+        "tags": [
+          "platform support"
+        ]
+      },
+      "get": {
+        "operationId": "SupportSessionController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "active",
+              "type": "string",
+              "enum": [
+                "active",
+                "all"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest 200 sessions of every Super Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupportSessionDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform support"
+        ]
+      }
+    },
+    "/v1/platform/support-sessions/{id}/end": {
+      "post": {
+        "operationId": "SupportSessionController_end",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent; any Super Admin may end a session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportSessionDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform support"
+        ]
+      }
     }
   },
   "info": {
@@ -7060,6 +7279,27 @@
           }
         }
       },
+      "SupportContextDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "expiresAt",
+          "reason"
+        ]
+      },
       "MerchantMeDto": {
         "type": "object",
         "properties": {
@@ -7090,7 +7330,9 @@
           },
           "membershipId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "null in a Super Admin support session"
           },
           "roles": {
             "type": "array",
@@ -7114,6 +7356,20 @@
           "platformAdmin": {
             "type": "boolean",
             "description": "True when the user also holds the global Platform Admin grant"
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "True in a support session: every write is rejected (PD-045)"
+          },
+          "support": {
+            "nullable": true,
+            "description": "Set when a Super Admin is viewing through a support session",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupportContextDto"
+              }
+            ]
           }
         },
         "required": [
@@ -7126,7 +7382,9 @@
           "membershipId",
           "roles",
           "branchIds",
-          "platformAdmin"
+          "platformAdmin",
+          "readOnly",
+          "support"
         ]
       },
       "MyTenantDto": {
@@ -7311,6 +7569,10 @@
           "platformAdmin": {
             "type": "boolean"
           },
+          "superAdmin": {
+            "type": "boolean",
+            "description": "Super Admin (PD-045): may open read-only support sessions and grant Super Admin"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -7344,6 +7606,7 @@
           "status",
           "mustChangePassword",
           "platformAdmin",
+          "superAdmin",
           "createdAt",
           "lastLoginAt",
           "disabledAt",
@@ -12082,6 +12345,79 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "StartSupportSessionDto": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "Ticket #123: Owner báo không thấy booking hôm nay"
+          }
+        },
+        "required": [
+          "tenantId",
+          "reason"
+        ]
+      },
+      "SupportSessionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantName": {
+            "type": "string"
+          },
+          "adminUserId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adminDisplayName": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Not ended and not expired"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "tenantName",
+          "adminUserId",
+          "adminDisplayName",
+          "reason",
+          "startedAt",
+          "expiresAt",
+          "endedAt",
+          "active"
         ]
       }
     }

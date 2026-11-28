@@ -218,6 +218,18 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — phiên hỗ trợ Super Admin (IAM-009, PD-045) và kiêm nhiệm (PD-046), 2026-11-28
+
+**OpenAPI đổi → `npm run types:generate`.** Đã qua build, drift check BE, PostgreSQL Docker E2E 57/57.
+
+- `PlatformUserDto` có thêm `superAdmin`. Cấp/thu hồi: `POST /v1/platform/users/{id}/super-admin` và `…/super-admin/revoke` `{ reason }` — chỉ Super Admin (khác → 403); người nhận phải đang là Platform Admin (409); không tự thu hồi (403); phải còn ≥ 1 Super Admin (409).
+- Phiên hỗ trợ (Super Admin): `POST /v1/platform/support-sessions` `{ tenantId, reason }` → 201 `SupportSessionDto { id, tenantId, tenantName, adminUserId, adminDisplayName, reason, startedAt, expiresAt, endedAt, active }` (đang có phiên với merchant đó → trả lại phiên cũ). 60 phút. Admin là thành viên của merchant đó → 403 (dùng membership của mình). `GET /v1/platform/support-sessions?status=active|all`; `POST /v1/platform/support-sessions/{id}/end`.
+- Trong phiên: gọi API merchant như bình thường với `X-Tenant-ID = tenantId`. `GET /v1/merchant/me` → `roles: ['OWNER']`, `membershipId: null`, **`readOnly: true`**, `support: { sessionId, expiresAt, reason }`. Mọi lệnh ghi → 403 `Support sessions are read-only`; hết hạn/kết thúc → 403 `No active membership for tenant` (đưa về khu Platform). `customerPhone`, `customerEmail`, `email` trả về đã che (`0912•••678`, `n•••@gmail.com`) — hiển thị nguyên giá trị, không tự gọi lại.
+- `MerchantMeDto` có thêm `readOnly`, `support` (nullable); `membershipId` có thể `null`. Người dùng thường: `readOnly: false`, `support: null`.
+- Gợi ý UI: banner "Đang xem hỗ trợ — chỉ xem — hết hạn lúc …" + nút Kết thúc; ẩn nút ghi khi `readOnly`. `/v1/me/tenants` **không** liệt kê merchant đang hỗ trợ — vào từ khu Platform.
+- Kiêm nhiệm (PD-046): Platform Admin được mời làm thành viên sẽ thấy merchant trong `/v1/me/tenants` như mọi người; FE cần cho người dùng vừa có khu Platform vừa có khu merchant chuyển qua lại.
+- Production cần migration `20261124090000_support_sessions` và chỉ định Super Admin đầu tiên.
+
 ## FE READY — điều khoản công khai chưa cấu hình (2026-11-28)
 
 Trả lời mục "Cần BE xem" (2026-11-26): `GET /v1/public/branches/{id}/booking-terms` nay trả **200 `{ configured: false, terms: null, version: null, updatedAt: null }`** khi chi nhánh đã công khai nhưng merchant chưa đặt điều khoản (giống endpoint Owner); **404 chỉ khi chi nhánh không công khai**. FE đang xử lý cả hai nên không vỡ; có thể bỏ nhánh coi 404 là "chưa cấu hình". OpenAPI thêm mô tả 404 → `npm run types:generate`.

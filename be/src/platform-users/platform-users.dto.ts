@@ -31,6 +31,7 @@ export class PlatformUserDto {
   @ApiProperty({ enum: ['ACTIVE', 'DISABLED'] }) status!: string;
   @ApiProperty() mustChangePassword!: boolean;
   @ApiProperty() platformAdmin!: boolean;
+  @ApiProperty({ description: 'Super Admin (PD-045): may open read-only support sessions and grant Super Admin' }) superAdmin!: boolean;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) lastLoginAt!: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, type: String }) disabledAt!: string | null;

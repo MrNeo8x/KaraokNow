@@ -9,6 +9,7 @@ import {
   PlatformUserQueryDto, TemporaryPasswordDto
 } from './platform-users.dto';
 import { PlatformUsersService } from './platform-users.service';
+import { SuperAdminGuard } from './super-admin.guard';
 
 const SELF = 'Not a Platform Admin, or the action targets the caller\'s own account';
 
@@ -56,6 +57,21 @@ export class PlatformUsersController {
   @ApiResponse({ status: 409, description: 'User is disabled' })
   grantAdmin(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PlatformReasonDto) {
     return this.users.setPlatformAdmin(req.actor, id, true, dto.reason);
+  }
+
+  @Post(':id/super-admin') @HttpCode(200) @UseGuards(SuperAdminGuard)
+  @ApiResponse({ status: 200, type: PlatformUserDto, description: 'Super Admin granted (PD-045). Caller must be Super Admin; target must be an active Platform Admin' })
+  @ApiResponse({ status: 409, description: 'Target is not a Platform Admin' })
+  grantSuper(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PlatformReasonDto) {
+    return this.users.setSuperAdmin(req.actor, id, true, dto.reason);
+  }
+
+  @Post(':id/super-admin/revoke') @HttpCode(200) @UseGuards(SuperAdminGuard)
+  @ApiResponse({ status: 200, type: PlatformUserDto, description: 'Super Admin revoked; the user\'s open support sessions end' })
+  @ApiResponse({ status: 403, description: SELF })
+  @ApiResponse({ status: 409, description: 'Would leave no active Super Admin' })
+  revokeSuper(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PlatformReasonDto) {
+    return this.users.setSuperAdmin(req.actor, id, false, dto.reason);
   }
 
   @Post(':id/platform-admin/revoke') @HttpCode(200)

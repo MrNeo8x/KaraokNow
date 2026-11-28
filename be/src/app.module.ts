@@ -21,6 +21,9 @@ import { StorageModule } from './platform/storage/storage.module';
 import { MerchantDocumentsModule } from './merchant-documents/merchant-documents.module';
 import { PlatformUsersModule } from './platform-users/platform-users.module';
 import { ReportsModule } from './reports/reports.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { SupportMaskInterceptor } from './platform/tenant/support-mask.interceptor';
+import { SupportSessionsModule } from './platform-users/support-sessions.module';
 
 @Module({
   imports: [
@@ -44,8 +47,9 @@ import { ReportsModule } from './reports/reports.module';
     OperationsModule,
     PricingModule,
     BookingModule,
-    CatalogModule, ListingApprovalModule, JobsModule
-  ]
+    CatalogModule, ListingApprovalModule, JobsModule, SupportSessionsModule
+  ],
+  providers: [{ provide: APP_INTERCEPTOR, useClass: SupportMaskInterceptor }]
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

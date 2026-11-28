@@ -120,7 +120,8 @@ async function main(): Promise<void> {
     await upsertDepositPolicy(client, UAT2.tenantId, 'WEB', 'NONE', null, ACCOUNTS.owner2.userId);
     await allowNoDeposit(client, UAT2.tenantId, 'WEB', ACCOUNTS.owner2.userId);
 
-    await client.query(`INSERT INTO platform_admins(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET revoked_at=NULL`, [ACCOUNTS.platform.userId]);
+    // UAT Platform Admin is also Super Admin (PD-045) so support sessions can be tried locally. Never run this seed on production.
+    await client.query(`INSERT INTO platform_admins(user_id,super_admin) VALUES($1,true) ON CONFLICT(user_id) DO UPDATE SET revoked_at=NULL,super_admin=true`, [ACCOUNTS.platform.userId]);
     await client.query('COMMIT');
 
     const approval2 = (await client.query(`SELECT platform_approved FROM tenant_public_catalog WHERE tenant_id=$1`, [UAT2.tenantId])).rows[0].platform_approved;

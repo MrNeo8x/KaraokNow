@@ -2303,6 +2303,107 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await pool.query('UPDATE tenant_public_catalog SET published=false WHERE tenant_id=$1', [tenantId]);
   });
 
+  it('lets a Super Admin open a read-only, masked, audited support session into a merchant (PD-045)', async () => {
+    const server = app.getHttpServer();
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const mk = async (email: string, superAdmin: boolean | null) => {
+      const id = randomUUID();
+      await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,$2,$3,$4,'ACTIVE')`, [id, email, await hash('Support-pass-1', 4), email.split('@')[0]]);
+      if (superAdmin !== null) await pool.query('INSERT INTO platform_admins(user_id,super_admin) VALUES($1,$2)', [id, superAdmin]);
+      const token = (await request(server).post('/v1/auth/login').send({ email, password: 'Support-pass-1' }).expect(200)).body.accessToken;
+      return { id, token };
+    };
+    const sup = await mk('sup-super@example.com', true);
+    const plain = await mk('sup-plain@example.com', false);
+    const as = (token: string) => ({
+      get: (path: string) => request(server).get(path).set('Authorization', `Bearer ${token}`),
+      post: (path: string) => request(server).post(path).set('Authorization', `Bearer ${token}`)
+    });
+    // Tenant A data with a customer phone to check masking.
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'SUP-1', name: 'Support branch', timezone: 'Asia/Ho_Chi_Minh', phone: '0989015619' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'SUP-R', name: 'Support room', capacity: 4 }).expect(201)).body;
+    const duration = (await pool.query('SELECT min_duration_minutes AS m FROM tenant_booking_policies WHERE tenant_id=$1', [TENANT_A])).rows[0]?.m ?? 60;
+    const hold = (await authorized('post', '/v1/merchant/booking/holds').set('Idempotency-Key', 'sup-hold').send({ roomId: room.id, channel: 'SUP', startAt: '2047-06-01T19:00:00+07:00', durationMinutes: duration }).expect(201)).body;
+    await pool.query(`UPDATE booking_holds SET customer_phone='+84912345678',customer_email='khach.hang@gmail.com',price_snapshot='{"totalAmountVnd":"1"}'::jsonb WHERE id=$1`, [hold.id]);
+
+    const tenantGet = (token: string, path: string) => as(token).get(path).set('X-Tenant-ID', TENANT_A);
+    await tenantGet(sup.token, '/v1/merchant/branches').expect(403);                       // no session yet
+    await as(plain.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: 'x' }).expect(403);
+    await as(sup.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: '  ' }).expect(400);
+    const session = (await as(sup.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: 'Ticket #42: Owner không thấy giữ chỗ' }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/platform/support-sessions', 201, session);
+    expect(session).toMatchObject({ tenantId: TENANT_A, active: true, reason: 'Ticket #42: Owner không thấy giữ chỗ' });
+    expect(new Date(session.expiresAt).getTime() - new Date(session.startedAt).getTime()).toBe(60 * 60_000);
+    expect((await as(sup.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: 'again' }).expect(201)).body.id).toBe(session.id);
+
+    // Reads work as a read-only Owner, contact data masked; writes rejected.
+    const me = (await tenantGet(sup.token, '/v1/merchant/me').expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/merchant/me', 200, me);
+    expect(me).toMatchObject({ roles: ['OWNER'], membershipId: null, readOnly: true, support: { sessionId: session.id } });
+    const detail = (await tenantGet(sup.token, `/v1/merchant/booking/holds/${hold.id}`).expect(200)).body;
+    expect(detail).toMatchObject({ customerPhone: '0912•••678', customerEmail: 'k•••@gmail.com' });
+    expect((await tenantGet(sup.token, `/v1/merchant/branches/${branch.id}`).expect(200)).body.phone).toBe('+84989015619');
+    const members = (await tenantGet(sup.token, '/v1/merchant/memberships').expect(200)).body;
+    expect(members.every((m: { email: string }) => m.email.includes('•••'))).toBe(true);
+    await tenantGet(sup.token, '/v1/merchant/reports/bookings').query({ from: '2026-11-01', to: '2026-11-30' }).expect(200);
+    await tenantGet(sup.token, '/v1/merchant/audit-logs').expect(200);
+    await as(sup.token).post('/v1/merchant/branches').set('X-Tenant-ID', TENANT_A).send({ code: 'SUP-X', name: 'x', timezone: 'Asia/Ho_Chi_Minh' }).expect(403)
+      .expect(({ body }) => expect(body.error.message).toBe('Support sessions are read-only'));
+    await request(server).patch(`/v1/merchant/branches/${branch.id}`).set('Authorization', `Bearer ${sup.token}`).set('X-Tenant-ID', TENANT_A).send({ name: 'x' }).expect(403);
+    await tenantGet(sup.token, '/v1/merchant/branches').set('X-Tenant-ID', TENANT_B).expect(403);   // other merchant: no session
+    // Owner sees who looked and why; platform audit too.
+    const merchantAudit = (await authorized('get', '/v1/merchant/audit-logs').expect(200)).body;
+    expect(merchantAudit.find((a: { action: string }) => a.action === 'SUPPORT_SESSION_STARTED')).toBeTruthy();
+
+    // Listing, ending, expiry.
+    const active = (await as(sup.token).get('/v1/platform/support-sessions').expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/support-sessions', 200, active);
+    expect(active.map((s: { id: string }) => s.id)).toContain(session.id);
+    expect((await as(sup.token).post(`/v1/platform/support-sessions/${session.id}/end`).expect(200)).body.active).toBe(false);
+    await tenantGet(sup.token, '/v1/merchant/branches').expect(403);
+    const second = (await as(sup.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: 'Ticket #43' }).expect(201)).body;
+    expect(second.id).not.toBe(session.id);
+    await pool.query(`UPDATE support_sessions SET started_at=clock_timestamp()-interval '61 minutes',expires_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, [second.id]);
+    await tenantGet(sup.token, '/v1/merchant/branches').expect(403);
+    const actions = (await pool.query(`SELECT action FROM audit_logs WHERE tenant_id=$1 AND entity_type='SUPPORT_SESSION' ORDER BY occurred_at`, [TENANT_A])).rows.map(r => r.action);
+    expect(actions).toEqual(['SUPPORT_SESSION_STARTED', 'SUPPORT_SESSION_ENDED', 'SUPPORT_SESSION_STARTED']);
+
+    // Super Admin management: only Super Admin grants; at least one remains; revoking ends open sessions.
+    await as(plain.token).post(`/v1/platform/users/${plain.id}/super-admin`).send({ reason: 'self' }).expect(403);
+    expect((await as(sup.token).post(`/v1/platform/users/${plain.id}/super-admin`).send({ reason: 'Trực hỗ trợ' }).expect(200)).body.superAdmin).toBe(true);
+    const third = (await as(plain.token).post('/v1/platform/support-sessions').send({ tenantId: TENANT_A, reason: 'Ticket #44' }).expect(201)).body;
+    await as(sup.token).post(`/v1/platform/users/${plain.id}/super-admin/revoke`).send({ reason: 'Hết ca' }).expect(200);
+    expect((await pool.query('SELECT ended_at FROM support_sessions WHERE id=$1', [third.id])).rows[0].ended_at).not.toBeNull();
+    await as(sup.token).post(`/v1/platform/users/${sup.id}/super-admin/revoke`).send({ reason: 'self' }).expect(403);
+    const user = (await as(sup.token).get(`/v1/platform/users/${sup.id}`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/users/{id}', 200, user);
+    expect(user.superAdmin).toBe(true);
+  });
+
+  it('allows a Platform Admin to also be an invited Owner of a merchant, keeping conflict-of-interest blocks (PD-046)', async () => {
+    const server = app.getHttpServer();
+    const adminId = randomUUID();
+    await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,'dual-admin@example.com',$2,'Dual','ACTIVE')`, [adminId, await hash('Dual-pass-123', 4)]);
+    await pool.query('INSERT INTO platform_admins(user_id,super_admin) VALUES($1,true)', [adminId]);
+    // Invited by the Owner of tenant A through the normal membership API.
+    const invited = (await authorized('post', '/v1/merchant/memberships').send({ email: 'dual-admin@example.com', displayName: 'Dual', temporaryPassword: 'ignored-for-existing', roles: ['OWNER'], branchIds: [] }).expect(201)).body;
+    expect(invited.userId).toBe(adminId);
+    const token = (await request(server).post('/v1/auth/login').send({ email: 'dual-admin@example.com', password: 'Dual-pass-123' }).expect(200)).body.accessToken;
+    const tenants = (await request(server).get('/v1/me/tenants').set('Authorization', `Bearer ${token}`).expect(200)).body;
+    expect(tenants.map((t: { tenantId: string }) => t.tenantId)).toContain(TENANT_A);
+    const me = (await request(server).get('/v1/merchant/me').set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A).expect(200)).body;
+    expect(me).toMatchObject({ roles: ['OWNER'], platformAdmin: true, readOnly: false, support: null });
+    await request(server).post('/v1/merchant/branches').set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A)
+      .send({ code: 'DUAL-1', name: 'Dual branch', timezone: 'Asia/Ho_Chi_Minh' }).expect(201);
+    await request(server).get('/v1/platform/merchants').set('Authorization', `Bearer ${token}`).expect(200);
+    // Conflict of interest on their own merchant stays blocked.
+    await request(server).post(`/v1/platform/merchants/${TENANT_A}/suspend`).set('Authorization', `Bearer ${token}`).send({ reason: 'x' }).expect(403);
+    await request(server).post('/v1/platform/support-sessions').set('Authorization', `Bearer ${token}`).send({ tenantId: TENANT_A, reason: 'x' }).expect(403);
+    await request(server).post(`/v1/platform/merchants/${TENANT_A}/memberships`).set('Authorization', `Bearer ${token}`)
+      .send({ email: 'x@example.com', displayName: 'x', temporaryPassword: 'Xx-temp-password-1', roles: ['CASHIER'], branchIds: [], reason: 'x' }).expect(403);
+    await request(server).patch(`/v1/merchant/memberships/${invited.id}`).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A).send({ status: 'INACTIVE' }).expect(200);
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

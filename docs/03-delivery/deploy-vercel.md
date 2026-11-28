@@ -121,6 +121,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **IAM-009** (PD-045 phiên hỗ trợ Super Admin): **migration `20261124090000_support_sessions` trước push** (cột `platform_admins.super_admin` mặc định false + bảng `support_sessions`). Sau migrate, người dùng **chỉ định Super Admin đầu tiên**; session triển khai chạy một lệnh duy nhất `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL` (không seed dữ liệu khác). Các Super Admin sau cấp qua API/UI.
+
 - **RPT-001** (báo cáo): không migration, không env. Truy vấn tổng hợp trên bảng booking/tiền hiện có; theo dõi thời gian phản hồi khi dữ liệu lớn.
 
 - **PD-043** (giờ lẻ 15 phút, giờ mở cửa chi nhánh): **migration `20261124080000_branch_opening_hours` trước push** (cột nullable + CHECK). Chi nhánh chưa đặt giờ mở cửa = không giới hạn, nên không ảnh hưởng đặt phòng hiện tại; chỉ thêm ràng buộc giờ chia hết 15 phút cho khách. Push cùng lần với commit FE sinh lại type (`types:check`).

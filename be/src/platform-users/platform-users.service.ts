@@ -13,6 +13,7 @@ const PLATFORM_ADMIN_LOCK = 'platform-admins';
 
 const USER_FIELDS = `u.id,u.email,u.display_name AS "displayName",u.status,u.must_change_password AS "mustChangePassword",
   EXISTS(SELECT 1 FROM platform_admins p WHERE p.user_id=u.id AND p.revoked_at IS NULL) AS "platformAdmin",
+  EXISTS(SELECT 1 FROM platform_admins p WHERE p.user_id=u.id AND p.revoked_at IS NULL AND p.super_admin) AS "superAdmin",
   u.created_at AS "createdAt",
   (SELECT max(e.occurred_at) FROM auth_security_events e WHERE e.user_id=u.id AND e.event='LOGIN_SUCCEEDED') AS "lastLoginAt",
   u.disabled_at AS "disabledAt",u.disabled_reason AS "disabledReason",
@@ -104,11 +105,37 @@ export class PlatformUsersService {
         const remaining = (await client.query(`SELECT count(*)::int AS n FROM platform_admins p JOIN users u ON u.id=p.user_id
           WHERE p.revoked_at IS NULL AND u.status='ACTIVE' AND p.user_id<>$1`, [userId])).rows[0].n;
         if (remaining < 1) throw new ConflictException('At least one active Platform Admin must remain');
-        await client.query('UPDATE platform_admins SET revoked_at=clock_timestamp(),revoked_by=$2 WHERE user_id=$1', [userId, actor.userId]);
+        const supers = (await client.query(`SELECT count(*)::int AS n FROM platform_admins p JOIN users u ON u.id=p.user_id
+          WHERE p.revoked_at IS NULL AND p.super_admin AND u.status='ACTIVE' AND p.user_id<>$1`, [userId])).rows[0].n;
+        const isSuper = (await client.query('SELECT super_admin FROM platform_admins WHERE user_id=$1', [userId])).rows[0]?.super_admin;
+        if (isSuper && supers < 1) throw new ConflictException('At least one active Super Admin must remain');
+        await client.query('UPDATE platform_admins SET revoked_at=clock_timestamp(),revoked_by=$2,super_admin=false WHERE user_id=$1', [userId, actor.userId]);
       }
       if (grant !== active) {
         await this.audit(client, actor, grant ? 'PLATFORM_ADMIN_GRANTED' : 'PLATFORM_ADMIN_REVOKED', 'USER', userId, null,
           { platformAdmin: active }, { platformAdmin: grant, reason: reason.trim() });
+      }
+      return this.get(userId, client);
+    });
+  }
+
+  /** PD-045: only a Super Admin may change Super Admin (enforced by the controller guard); target must be an active Platform Admin. */
+  async setSuperAdmin(actor: Actor, userId: string, grant: boolean, reason: string) {
+    if (!grant) this.assertNotSelf(actor, userId);
+    return this.tx(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [PLATFORM_ADMIN_LOCK]);
+      await this.lockUser(client, userId);
+      const grantRow = (await client.query('SELECT super_admin FROM platform_admins WHERE user_id=$1 AND revoked_at IS NULL', [userId])).rows[0];
+      if (!grantRow) throw new ConflictException('Grant Platform Admin first');
+      if (grantRow.super_admin !== grant) {
+        if (!grant) {
+          const others = (await client.query(`SELECT count(*)::int AS n FROM platform_admins p JOIN users u ON u.id=p.user_id
+            WHERE p.revoked_at IS NULL AND p.super_admin AND u.status='ACTIVE' AND p.user_id<>$1`, [userId])).rows[0].n;
+          if (others < 1) throw new ConflictException('At least one active Super Admin must remain');
+          await client.query('UPDATE support_sessions SET ended_at=clock_timestamp() WHERE admin_user_id=$1 AND ended_at IS NULL', [userId]);
+        }
+        await client.query('UPDATE platform_admins SET super_admin=$2 WHERE user_id=$1', [userId, grant]);
+        await this.audit(client, actor, grant ? 'SUPER_ADMIN_GRANTED' : 'SUPER_ADMIN_REVOKED', 'USER', userId, null, { superAdmin: !grant }, { superAdmin: grant, reason: reason.trim() });
       }
       return this.get(userId, client);
     });
@@ -125,12 +152,14 @@ export class PlatformUsersService {
   }
 
   async createMembership(actor: Actor, tenantId: string, dto: PlatformCreateMembershipDto) {
+    await this.assertNotMember(actor, tenantId); // authorization before payload validation (403 before 400)
     const { reason, ...membership } = dto;
     return this.memberships.create(this.tenantActor(actor, tenantId), membership as PlatformCreateMembershipDto,
       this.membershipHooks(actor, tenantId, 'PLATFORM_MEMBERSHIP_CREATED', reason));
   }
 
   async updateMembership(actor: Actor, tenantId: string, membershipId: string, dto: PlatformUpdateMembershipDto) {
+    await this.assertNotMember(actor, tenantId);
     const { reason, ...changes } = dto;
     if (changes.status === undefined && changes.roles === undefined && changes.branchIds === undefined) {
       throw new BadRequestException('Nothing to change');
@@ -155,6 +184,11 @@ export class PlatformUsersService {
         await this.audit(client, actor, action, 'MEMBERSHIP', membershipId, tenantId, shape(before), { ...shape(after), reason: reason.trim() });
       }
     };
+  }
+
+  private async assertNotMember(actor: Actor, tenantId: string) {
+    const member = await this.db.query(`SELECT 1 FROM tenant_memberships WHERE tenant_id=$1 AND user_id=$2 AND status='ACTIVE'`, [tenantId, actor.userId]);
+    if (member.rowCount) throw new ForbiddenException('Platform Admin cannot edit memberships of a merchant they belong to');
   }
 
   private tenantActor(actor: Actor, tenantId: string): Actor {
