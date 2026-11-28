@@ -548,7 +548,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(app.getHttpServer()).post('/v1/public/booking/holds').send(publicHoldBody).expect(400);
     const publicHold = (await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1').send(publicHoldBody).expect(201)).body;
     expect(publicHold).toMatchObject({ roomId: active.id, branchId: branch.id, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1' });
-    expect(publicHold.bookingCode).toMatch(/^[a-f0-9]{32}$/);
+    expect(publicHold.bookingCode).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
     await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1').send(publicHoldBody).expect(201)
       .expect(({ body }) => expect(body).toEqual(publicHold));
     await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1')
@@ -556,6 +556,9 @@ describe('Authentication, membership, RBAC and venue API', () => {
     await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: '0911222334', bookingCode: publicHold.bookingCode }).expect(404);
     await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: publicHold.bookingCode }).expect(200)
       .expect(({ body }) => expect(body).toMatchObject({ holdId: publicHold.holdId, bookingId: null, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1' }));
+    const looseCode = `${publicHold.bookingCode.slice(0, 3).toLowerCase()}-${publicHold.bookingCode.slice(3)} `;
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: looseCode }).expect(200);
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: 'ABC12O' }).expect(400);
     await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: '+84911222333', bookingCode: publicHold.bookingCode }).expect(200)
       .expect(({ body }) => expect(body.holdId).toBe(publicHold.holdId));
     await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-1')
@@ -565,6 +568,13 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(publicAudit.rows).toHaveLength(1);
     expect(JSON.stringify(publicAudit.rows)).not.toContain(publicHoldBody.phone);
     expect(JSON.stringify(publicAudit.rows)).not.toContain(publicHold.bookingCode);
+    // PD-038: codes issued before the change (32 hex, unkeyed SHA-256) still work for lookup.
+    const legacyCode = 'abcdef0123456789abcdef0123456789';
+    const savedHash = (await pool.query(`SELECT booking_code_hash FROM booking_holds WHERE id=$1`, [publicHold.holdId])).rows[0].booking_code_hash;
+    await pool.query(`UPDATE booking_holds SET booking_code_hash=encode(sha256($2::bytea),'hex') WHERE id=$1`, [publicHold.holdId, legacyCode]);
+    await request(app.getHttpServer()).post('/v1/public/booking/lookup').send({ phone: publicHoldBody.phone, bookingCode: legacyCode.toUpperCase() }).expect(200)
+      .expect(({ body }) => expect(body.holdId).toBe(publicHold.holdId));
+    await pool.query(`UPDATE booking_holds SET booking_code_hash=$2 WHERE id=$1`, [publicHold.holdId, savedHash]);
     expect(JSON.stringify((await pool.query('SELECT key_hash FROM public_rate_limit_buckets')).rows)).not.toContain(publicHoldBody.phone);
     await pool.query(`UPDATE public_rate_limit_buckets SET request_count=20 WHERE scope='PUBLIC_HOLD_IP'`);
     await request(app.getHttpServer()).post('/v1/public/booking/holds').set('Idempotency-Key', 'public-hold-rate-limit')

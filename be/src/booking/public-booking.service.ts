@@ -9,6 +9,7 @@ import { normalizePhone } from './phone';
 import { snapshotDepositPolicy } from './deposit-snapshot';
 import { lockRoomOccupancy } from '../availability/occupancy-lock';
 import { CreatePublicHoldDto, PublicBookingLookupDto } from './public-booking.dto';
+import { bookingCodeHash, deriveBookingCode } from './booking-code';
 
 @Injectable()
 export class PublicBookingService {
@@ -71,7 +72,8 @@ export class PublicBookingService {
       const ttl = (await client.query(`SELECT ttl_minutes FROM tenant_hold_ttl_policies WHERE tenant_id=$1 AND channel='WEB'`, [room.tenantId])).rows[0]?.ttl_minutes ?? 15;
       const bufferMinutes = buffer.buffer_enabled ? buffer.buffer_minutes : 0;
       const deposit = await snapshotDepositPolicy(client, room.tenantId, 'WEB', quote.priceSnapshot.totalAmountVnd);
-      const holdId = randomUUID(), occupancyId = randomUUID();
+      const occupancyId = randomUUID();
+      const holdId = await this.newHoldIdWithUniqueCode(client, phoneHash);
       const bookingCode = this.bookingCode(holdId);
       await lockRoomOccupancy(client, dto.roomId);
       try {
@@ -146,8 +148,18 @@ export class PublicBookingService {
   }
 
   private keyedHash(context: string, value: string) { return createHmac('sha256', this.secret).update(`${context}:${value}`).digest('hex'); }
-  private bookingCode(holdId: string) { return createHmac('sha256', this.secret).update(`booking-code:${holdId}`).digest('hex').slice(0, 32); }
-  private codeHash(code: string) { return createHash('sha256').update(code).digest('hex'); }
+  private bookingCode(holdId: string) { return deriveBookingCode(this.secret, holdId); }
+  private codeHash(code: string) { return bookingCodeHash(this.secret, code); }
+  /** PD-038: short codes can collide; pick a hold id whose code is not already used by this phone (lookup is phone + code). */
+  private async newHoldIdWithUniqueCode(client: PoolClient, phoneHash: string) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const holdId = randomUUID();
+      const taken = (await client.query(`SELECT 1 FROM booking_holds WHERE created_by IS NULL AND public_phone_hash=$1 AND booking_code_hash=$2 LIMIT 1`,
+        [phoneHash, this.codeHash(this.bookingCode(holdId))])).rowCount;
+      if (!taken) return holdId;
+    }
+    throw new ConflictException('Could not allocate a booking code; retry');
+  }
   private assertKey(key: string) {
     if (!key || !/^[\x21-\x7e]{1,100}$/.test(key)) throw new BadRequestException('Idempotency-Key must contain 1–100 visible ASCII characters');
   }

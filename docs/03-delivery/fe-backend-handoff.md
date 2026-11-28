@@ -218,6 +218,15 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — mã đặt phòng 6 ký tự (BKG-010, PD-038, 2026-11-28)
+
+**Thay đổi phá vỡ phía FE — FE-016 phải lên production cùng lần deploy với BKG-010.**
+
+- `POST /v1/public/booking/holds` → `bookingCode` giờ là **6 ký tự** `^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$` (chữ in hoa + số, không có 0/O/1/I), ví dụ `K7M4XQ`. Replay cùng `Idempotency-Key` trả cùng mã.
+- `POST /v1/public/booking/lookup` nhận `bookingCode` 6 ký tự, **không phân biệt hoa thường**, bỏ qua khoảng trắng và dấu `-` (BE tự chuẩn hoá); mã cũ 32 ký tự hex vẫn nhận. Sai định dạng → 400; sai mã hoặc sai SĐT → 404 như cũ; hạn mức 429 như cũ.
+- FE cần sửa: `cleanBookingCode` (`fe/src/lib/public-booking.ts`) đang chỉ nhận 32 hex → form tra cứu chặn mã mới và `readReceipt` bỏ biên nhận đã lưu. Gợi ý: bỏ khoảng trắng/gạch, nếu khớp 32 hex thì giữ chữ thường, ngược lại viết hoa và kiểm `^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$`. Đổi thông báo "mã đặt phòng gồm 32 ký tự" → "6 ký tự". Ô nhập nên `autocapitalize="characters"`, `maxLength` đủ cho mã cũ (32). Hiển thị mã cỡ lớn, có thể tách `K7M 4XQ` khi hiển thị.
+- Test cần sửa: `fe/test/public-booking.test.mjs`, `fe/e2e/customer.mjs`, `fe/e2e/api-smoke.mjs` (regex `[a-f0-9]{32}`).
+
 ## FE READY — lưu ảnh và giấy tờ (FILE-001, PD-037, 2026-11-28)
 
 Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 46/46 (response đối chiếu `openapi.json`). Upload là `multipart/form-data`, trường file tên `file`, **≤ 4 MB** (413 nếu lớn hơn); loại file kiểm tra theo nội dung (422 nếu sai). **FE nén ảnh trước khi gửi** (cạnh dài ≤ 1600 px, JPEG/WebP ~300–500 KB) để giữ trong hạn mức băng thông miễn phí — vượt hạn mức là Blob bị khoá 30 ngày.

@@ -5673,7 +5673,11 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "bookingCode": {
       "type": "string",
-      "description": "128-bit lookup code. Store securely; returned again only for matching idempotent replay."
+      "minLength": 6,
+      "maxLength": 6,
+      "pattern": "^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$",
+      "example": "K7M4XQ",
+      "description": "Booking code (PD-038): 6 characters, digits 2-9 and upper-case letters without I/O. Needed with the phone number for lookup; returned again only for a matching idempotent replay"
     }
   },
   "required": [
@@ -5704,8 +5708,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "bookingCode": {
       "type": "string",
-      "minLength": 32,
-      "maxLength": 32
+      "minLength": 6,
+      "maxLength": 40,
+      "example": "K7M4XQ",
+      "description": "6-character booking code (case-insensitive; spaces and hyphens ignored). Legacy 32-hex codes issued before PD-038 are still accepted"
     }
   },
   "required": [

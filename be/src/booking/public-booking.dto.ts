@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { BOOKING_CODE_INPUT_PATTERN, normalizeBookingCode } from './booking-code';
 import { IsDateString, IsEmail, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class CreatePublicHoldDto {
@@ -23,12 +25,13 @@ export class PublicHoldResponseDto {
   @ApiProperty() totalAmountVnd!: string;
   @ApiProperty() termsVersion!: string;
   @ApiProperty({ description: 'Deposit the merchant requires before staff can confirm (snapshotted at hold time); "0" when none is required. Paid in person; no online payment' }) depositRequiredVnd!: string;
-  @ApiProperty({ description: '128-bit lookup code. Store securely; returned again only for matching idempotent replay.' }) bookingCode!: string;
+  @ApiProperty({ minLength: 6, maxLength: 6, pattern: '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$', example: 'K7M4XQ', description: 'Booking code (PD-038): 6 characters, digits 2-9 and upper-case letters without I/O. Needed with the phone number for lookup; returned again only for a matching idempotent replay' }) bookingCode!: string;
 }
 
 export class PublicBookingLookupDto {
   @ApiProperty() @IsString() @Matches(/^\+?\d{8,15}$/) phone!: string;
-  @ApiProperty({ minLength: 32, maxLength: 32 }) @IsString() @Matches(/^[a-f0-9]{32}$/) bookingCode!: string;
+  @ApiProperty({ minLength: 6, maxLength: 40, example: 'K7M4XQ', description: '6-character booking code (case-insensitive; spaces and hyphens ignored). Legacy 32-hex codes issued before PD-038 are still accepted' })
+  @Transform(({ value }) => normalizeBookingCode(value)) @IsString() @Matches(BOOKING_CODE_INPUT_PATTERN, { message: 'bookingCode is invalid' }) bookingCode!: string;
 }
 
 export class PublicBookingStatusDto {

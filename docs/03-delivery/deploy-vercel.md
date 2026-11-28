@@ -115,6 +115,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **BKG-010 + FE-016** (PD-038, mã đặt phòng 6 ký tự): không có migration, nhưng **BE và FE phải cùng một lần push** — BE đổi định dạng mã, FE cũ chặn tra cứu với mã không phải 32 hex. Chỉ push khi FE-016 đã commit; smoke: giữ chỗ → mã 6 ký tự → tra cứu bằng chữ thường.
+
 - **OPS-008** (PD-037): nối hai store Blob vào project BE với read-write token, áp migration `20261124050000_file_storage` (chỉ thêm cột nullable và bảng mới — tương thích ngược), push, smoke upload ảnh phòng/logo/PDF rồi xoá thử.
 
 - **OPS-002**: backup/restore cho Prisma Postgres.

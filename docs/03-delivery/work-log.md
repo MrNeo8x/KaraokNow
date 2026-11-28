@@ -2,13 +2,13 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau FILE-001)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau BKG-010)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage). Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
+**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage, `ec53b06` work log, và commit BKG-010 mã đặt phòng 6 ký tự). **Không push BKG-010 khi FE-016 chưa xong** — FE hiện chặn tra cứu với mã mới. Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28, sau FILE-001) `npm run verify` 62/62 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-014) `npm test` 46/46, `next build`, `npm run e2e` 157/157.
+**Kiểm chứng gần nhất:** BE (2026-11-28, sau BKG-010) `npm run verify` 65/65 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-014) `npm test` 46/46, `next build`, `npm run e2e` 157/157.
 
 **Môi trường local** (`be/compose.yaml`, rebuild 2026-11-28): Postgres `:5433` đã áp 27 migration (đến `20261124050000_file_storage`); backend `:3000` chạy `1205321` (có FILE-001), health ready 200. Container không có token Blob → file ghi vào `/app/.storage` trong container (đã kiểm ghi được), **mất khi rebuild** — chỉ để thử. Ảnh public đọc qua `/v1/files/public/…` (FE rewrite). Frontend `:3100` có FE-014 (chưa có FE-015). Đã seed UAT. Worker tắt.
 
@@ -20,7 +20,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
 - *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
-- *Luồng FE:* FE-015 (màn ảnh phòng, logo, giấy tờ; nén ảnh trước khi upload — xem handoff "FE READY — lưu ảnh và giấy tờ"); FE-011; QA-003 phần còn lại; FE-012.
+- *Luồng FE:* **FE-016 trước** (mã đặt phòng 6 ký tự — chặn deploy BKG-010), FE-015 (màn ảnh phòng, logo, giấy tờ; nén ảnh trước khi upload — xem handoff "FE READY — lưu ảnh và giấy tờ"); FE-011; QA-003 phần còn lại; FE-012.
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
@@ -60,6 +60,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: mã đặt phòng 6 ký tự (BKG-010, PD-038)
+
+- Người dùng yêu cầu mã ngắn, dễ nhớ: 6 ký tự gồm số và chữ in hoa. Chọn bảng 32 ký tự bỏ 0/O/1/I (tránh đọc nhầm) — ~1,07 tỉ mã; tra cứu vẫn cần SĐT + mã và giới hạn 10 lần/15 phút mỗi SĐT, nên đoán mã không khả thi. Ghi PD-038.
+- `be/src/booking/booking-code.ts`: mã suy ra từ hold id bằng HMAC (`JWT_SECRET`), replay trả cùng mã, DB chỉ lưu HMAC của mã; khi tạo hold, nếu mã trùng với hold khác cùng SĐT thì sinh hold id mới (tối đa 5 lần). Tra cứu chuẩn hoá (hoa/thường, khoảng trắng, gạch); mã 32 hex cũ vẫn dùng SHA-256 như trước → khách đã có mã cũ không bị ảnh hưởng. Không migration.
+- Kiểm chứng: unit 65/65, E2E 46/46 (định dạng mã, tra cứu chữ thường có gạch, 400 khi chứa `O`, mã cũ vẫn tra được), OpenAPI/Markdown sinh lại.
+- **Phá vỡ FE**: `cleanBookingCode` ở FE chỉ nhận 32 hex → FE-016 `READY`, phải deploy cùng lần. Chưa rebuild container local.
 
 ---
 
