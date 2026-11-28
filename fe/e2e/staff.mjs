@@ -36,6 +36,12 @@ try {
   const ops = page.locator('section[aria-labelledby="booking-ops-title"]');
   const start = new Date(lookup.startAt); const local = d => new Date(d.getTime() + 7 * 3600000).toISOString().slice(0, 16);
   await step('Lịch booking tìm thấy booking', async () => { await ops.getByLabel('Từ thời gian').fill(local(new Date(start.getTime() - 3600000))); await ops.getByLabel('Đến thời gian').fill(local(new Date(start.getTime() + 3600000))); await ops.getByRole('button', { name: 'Xem booking' }).click(); await ops.locator('.booking-row', { hasText: desktop.phone }).waitFor({ timeout: 10000 }); });
+  const calendar = page.locator('section[aria-labelledby="calendar-title"]');
+  const dayOf = iso => new Date(Date.parse(iso) + 7 * 3600000).toISOString().slice(0, 10);
+  const mobileLookup = await (await fetch(BASE + '/v1/public/booking/lookup', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: holds.mobile.phone, bookingCode: holds.mobile.code }) })).json();
+  await step('Lịch phòng: booking đã xác nhận hiện trên dòng thời gian', async () => { await calendar.getByLabel('Ngày xem lịch').fill(dayOf(lookup.startAt)); const block = calendar.locator('.timeline-block.tone-purple', { hasText: desktop.phone }); await block.waitFor(); return await block.getAttribute('aria-label'); });
+  await step('Lịch phòng: hold chưa xác nhận hiện là "Đang giữ chỗ", không trùng booking', async () => { await calendar.getByLabel('Ngày xem lịch').fill(dayOf(mobileLookup.startAt)); await calendar.locator('.timeline-block.tone-amber').first().waitFor(); await calendar.locator('.timeline-block').first().click(); await calendar.locator('.calendar-detail', { hasText: 'Giữ chỗ' }).waitFor(); });
+  await step('Lịch phòng: chế độ danh sách', async () => { await calendar.getByRole('button', { name: 'Danh sách' }).click(); await calendar.locator('table.admin-table tbody tr', { hasText: 'Đang giữ chỗ' }).first().waitFor(); await calendar.getByRole('button', { name: 'Dòng thời gian' }).click(); });
   const row = ops.locator('.booking-row', { hasText: desktop.phone });
   await step('Hiển thị cọc lúc xác nhận', async () => row.getByText(/Cọc khi xác nhận/).innerText());
   await step('Check-in', async () => { await row.getByRole('button', { name: 'Check-in' }).click(); await row.locator('.tag', { hasText: 'Đang sử dụng' }).waitFor(); });
@@ -63,6 +69,12 @@ try {
     await r2.locator('.tag', { hasText: 'Đã hủy' }).waitFor(); return await r2.locator('p.outcome').innerText();
   });
   await step('Màn ân hạn quá giờ trong Giá & chính sách', async () => { await goSection(page, 'Giá & chính sách'); await page.getByRole('heading', { name: 'Ân hạn quá giờ' }).waitFor(); return await page.locator('section[aria-labelledby="overtime-title"] .pill').innerText(); });
+  await step('Lịch phòng: booking đã hủy ẩn mặc định, hiện khi bật bộ lọc', async () => {
+    await goSection(page, 'Lịch & Đặt phòng');
+    await calendar.getByLabel('Ngày xem lịch').fill(dayOf(mobileLookup.startAt)); await page.waitForTimeout(1200);
+    if (await calendar.locator('.timeline-block', { hasText: holds.mobile.phone.slice(-4) }).count()) throw new Error('booking đã hủy vẫn hiện');
+    await calendar.getByLabel(/Hiện đã hủy/).check(); await calendar.locator('.timeline-block.tone-rose').first().waitFor();
+  });
   await step('Audit hiện thao tác mới', async () => { await goSection(page, 'Cài đặt hệ thống'); await page.getByText('Nhật ký audit').click(); await page.locator('table.admin-table code').first().waitFor({ timeout: 10000 }); return await page.locator('table.admin-table code').first().innerText(); });
   await step('Phiên đăng nhập: đánh dấu phiên này', async () => { await page.getByText('Phiên đăng nhập của tôi').click(); await page.locator('.tag', { hasText: 'Phiên này' }).waitFor({ timeout: 10000 }); });
   await page.screenshot({ path: SHOTS + '/staff-admin.png', fullPage: true });

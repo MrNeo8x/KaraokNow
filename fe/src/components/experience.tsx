@@ -20,6 +20,7 @@ import Memberships from './memberships';
 import AuditLog from './audit-log';
 import OpsBacklog from './ops-backlog';
 import OvertimeSettings from './overtime-settings';
+import ReceptionCalendar from './reception-calendar';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
@@ -147,6 +148,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         </div>
       </>}
       {section === 'bookings' && <>
+        {currentBranch && <ReceptionCalendar key={`calendar:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}
         {currentBranch ? <AvailabilityQuote key={`availability-quote:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} /> : <div className="card empty">Chọn chi nhánh để xem phòng trống.</div>}
         <HoldLookup key={`hold-lookup:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         {currentBranch && <BranchHolds key={`branch-holds:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}

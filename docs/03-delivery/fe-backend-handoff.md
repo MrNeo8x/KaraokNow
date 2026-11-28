@@ -174,6 +174,11 @@ Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 41/41.
 - **Lỗi FE tìm ra khi chạy lại sau 23:00 và đã sửa:** `/booking` được prerender lúc build nên ngày "Hôm nay", ngày/giờ mặc định và khung giờ bị khoá được tính theo giờ build; React không sửa thuộc tính `disabled`/`aria-pressed` khi hydrate nên UI giữ giá trị cũ (deploy hôm nay thì vài ngày sau vẫn hiện "Hôm nay" là ngày deploy). Nay chỉ tính trên trình duyệt sau khi mount, cập nhật mỗi phút (`fe/src/lib/booking-time.ts`, 3 unit test).
 - Kết quả: `npm run e2e` 138/138; FE unit 38/38. Mỗi lượt e2e tạo khoảng 6 giữ chỗ công khai, giới hạn mặc định 20/IP/15 phút nên chạy liên tiếp quá 3 lượt sẽ gặp 429 (ghi trong `fe/e2e/README.md`).
 
+### FE INTEGRATED — lịch lễ tân hợp nhất (REC-003, 2026-11-28)
+
+- `fe/src/components/reception-calendar.tsx` dùng `GET /v1/merchant/branches/{branchId}/booking/holds` và `.../booking/bookings` với cùng `from`/`to` (06:00 → 06:00 hôm sau, offset lấy theo `timezone` chi nhánh), đọc mọi trang `limit=100`; bỏ hold `CONFIRMED`. Thu ngân xem được nhờ API-003. Không cần API mới.
+- Kiểm thử: `staff.mjs` (booking đã xác nhận hiện trên timeline, hold chưa xác nhận hiện "Đang giữ chỗ", chế độ danh sách, booking đã hủy ẩn mặc định). `npm run e2e` 142/142.
+
 ## Thay đổi BE ảnh hưởng FE — giới hạn timeout database (OPS-004, 2026-11-28)
 
 - Chờ khoá quá `PG_LOCK_TIMEOUT_MS` (mặc định 5 s, ví dụ giữ cùng phòng đang bị khoá lâu) trả **409** với message `The resource was changed concurrently; retry the request` — FE đã dịch message này.

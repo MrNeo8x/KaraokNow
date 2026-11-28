@@ -2,26 +2,26 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau PAY-007)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau REC-003; gộp bản Luồng BE sau PAY-007)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ (gom nhầm `be/src/jobs/*` của session triển khai, xem nhật ký); BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
+**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: FE REC-003 lịch lễ tân hợp nhất (commit này); BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ; BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004. FE (`cd3cd4a`) `npm run e2e` 138/138.
+**Kiểm chứng gần nhất:** FE (2026-11-28, frontend container rebuild) `npm test` 42/42, `next build`, `npm run e2e` **142/142** (API 54, khách 20, lễ tân/Owner 25, Platform 16, vai trò 27). BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`; smoke: báo cáo tiền mặt, cọc chờ xử lý, tài khoản booking 200; Lễ tân bị chặn báo cáo/đảo bút toán 403), frontend `:3100`. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`), frontend `:3100` có REC-003. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu. Mỗi lượt `npm run e2e` dùng ~6 giữ chỗ công khai trên hạn mức 20/IP/15 phút.
 
-**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay; deploy `73deaec` (12:55) có trước PAY-007 nên production **chắc chắn chưa** có migration `20261124040000_cash_reconciliation` và code OPS-004/API-004/PAY-007; Luồng BE không kiểm được production đã áp `20261124030000_overtime_recording` hay chưa — việc của session triển khai, cần người dùng xác nhận trước khi đụng production.
+**Production (Vercel, OPS-006):** `vn-karaoke-now(-api).vercel.app`. Migration production chạy tay; deploy `73deaec` (12:55) có trước PAY-007 nên production **chắc chắn chưa** có migration `20261124040000_cash_reconciliation` và code OPS-004/API-004/PAY-007, cũng chưa có REC-003; chưa kiểm được production đã áp `20261124030000_overtime_recording` hay chưa — việc của session triển khai, cần người dùng xác nhận trước khi đụng production.
 
-**Đang dở (working tree, chưa commit):** Luồng FE: FE-013 và QA-003 (`overtime-settings.tsx`, `fe/e2e/roles.mjs`, các màn `/platform`, publication, lịch), viết lại `README.md`, các mục FE INTEGRATED/FE ROLE TEST/Yêu cầu BE trong handoff, dòng FE-013/QA-003 trên task board. Luồng BE không có việc dở.
+**Đang dở (working tree, chưa commit):** không có của Luồng FE sau commit này. Luồng BE: không có.
 
-**Trạng thái task** (bản đã commit): `IN_PROGRESS` 0 · `VERIFY` 23 · `READY` 3 (FE-013, REC-003, QA-003) · `BLOCKED` 9 · `BACKLOG` 5 · `DONE` 48. Working tree của Luồng FE đang chuyển FE-013 → `VERIFY` và QA-003 → `IN_PROGRESS` (chưa commit). Chi tiết ở `task-board.md`.
+**Trạng thái task:** xem `task-board.md` (REC-003 → `VERIFY` trong commit này; FE-014 `READY`).
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008 (không cọc theo trường hợp); xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
-- *Luồng FE:* chạy lại `fe/e2e/roles.mjs` với backend mới (Thu ngân giờ đọc được hold/lịch; dùng `GET /merchant/me` để ẩn nút; lễ tân xác nhận hold WEB bằng `publicAcceptedTerms`), cập nhật README theo OPS-005 (`--profile tools|workers`, `SWAGGER_ENABLED`); hoàn tất và commit FE-013 (cấu hình ân hạn, hiển thị phút trễ/overtime, khoá/mở khoá merchant ở `/platform`, cảnh báo Owner khi `tenantStatus=INACTIVE`); REC-003; QA-003 (Branch Manager/Cashier, bàn phím, 429, mất mạng); sửa câu "seed chưa tạo bảng giá" trong README; sau khi commit, rebuild frontend container (`docker compose up -d --build frontend` trong `be/`). FE-014 `READY`: màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt".
+- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (gồm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008; xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
+- *Luồng FE:* **FE-014** màn đối soát tiền mặt (tài khoản booking, phụ thu, đảo bút toán, cọc chờ xử lý, báo cáo ngày) — xem handoff "FE READY — đối soát tiền mặt"; QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
 - *Luồng BE:* BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003 khi có thiết kế production; IAM-004 khi có ZBS. Không có contract nào FE đang phải chờ.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
@@ -78,6 +78,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Script benchmark: luôn dọn dẹp app/pool/container trong `finally` (trước đây treo nếu ghi file kết quả lỗi) và tự tạo thư mục output.
 - Kiểm chứng: unit 47/47, E2E 42/42 (giá trị áp vào phiên PostgreSQL; lock chờ 5 s → 409 rồi gửi lại 201), benchmark sau thay đổi đạt mục tiêu, 0 chồng lấn, 10/10 vòng một người thắng. Backend container local **chưa** rebuild với OPS-004.
 - Không có yêu cầu mới từ FE: API-003 và OPS-005 đã được FE tích hợp (`cd3cd4a`, e2e 138/138); REC-003 FE đang làm không cần API mới.
+
+---
+
+## 2026-11-28 — Luồng FE: lịch lễ tân hợp nhất (REC-003)
+
+- Timeline theo phòng ghép hold + booking (bỏ hold `CONFIRMED`), cửa sổ 06:00 → 06:00 theo múi giờ chi nhánh, buffer dọn phòng gạch chéo, vạch giờ hiện tại, chế độ danh sách, bộ lọc hủy/no-show/hết hạn, chi tiết khi bấm; giá trị thời gian chỉ tính trên trình duyệt (tránh lỗi prerender đã gặp ở `/booking`).
+- Kiểm chứng: FE unit 42/42 (+4 `reception-calendar`), `npm run e2e` 142/142 (`staff.mjs` +4 bước lịch). Ảnh review: `docs/deg/fe-review/d-calendar.png`, `m-calendar.png`.
+- Phiên FE trước (2026-11-26/27, commit `cd3cd4a`): FE-013, ẩn thao tác theo `/me`, `roles.mjs`, sửa lỗi prerender ngày/giờ ở `/booking` (UI giữ giá trị lúc build sau hydrate), README theo OPS-005. Chi tiết trong handoff (FE INTEGRATED API-003/OPS-005, FE ROLE TEST).
 
 ---
 

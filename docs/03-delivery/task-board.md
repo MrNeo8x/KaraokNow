@@ -25,7 +25,7 @@ Khi còn việc dở trong một task gần xong, **tách việc dở thành tas
 - **Frontend** (`fe/`, session Luồng FE): FE unit test 32/32 (2026-11-26). Smoke test API qua proxy FE (`localhost:3100`, container backend/frontend đã rebuild, migrate + seed UAT) đạt 44/44: trang `/booking`, `/merchant`, `/platform`; PLT-001/002, publication, memberships, audit, backlog, sessions; luồng khách hold → cọc PERCENT → xác minh → xác nhận → check-in/out → tra cứu `COMPLETED`. **Kiểm thử trình duyệt** (Chrome headless qua Playwright, cùng ngày, container đã rebuild): khách mobile 390px và desktop (tìm phòng → báo giá → điều khoản → giữ chỗ → booking code và cọc → tra cứu → reload giữ mã, không cuộn ngang); lễ tân/Owner 19/19 (cọc, xác minh, xác nhận đủ cọc, check-in/out, thu tiền mặt, hủy có hoàn tiền, audit, phiên); Platform và phân quyền 14/14 (tạo merchant, Owner bị chặn `/platform`, Owner tạo Lễ tân → đổi mật khẩu bắt buộc → Lễ tân không thấy màn Owner). Lỗi FE phát hiện và đã sửa xem handoff. Script nằm ở `fe/e2e/`, chạy `npm run e2e` (setup UAT → API smoke → 3 bộ trình duyệt).
 - **Chưa có:** kiểm thử screen reader/bàn phím, Safari/Firefox, 429, mất mạng và refresh/logout đồng thời trên trình duyệt; vai trò Branch Manager/Cashier (QA-003), UAT (UAT-001), kết quả CI trên GitHub.
 
-Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 25, `READY` 4, `BLOCKED` 8, `BACKLOG` 3, `DONE` 52.
+Số lượng theo trạng thái: `IN_PROGRESS` 0, `VERIFY` 26, `READY` 3, `BLOCKED` 8, `BACKLOG` 3, `DONE` 52.
 
 ## Luồng Frontend
 
@@ -97,7 +97,7 @@ Nguồn hợp đồng FE: `docs/02-architecture/api-reference.md`, `docs/02-arch
 | BKG-008 | Điều kiện xác nhận không cọc theo trường hợp | Booking | 6 | P1 | BLOCKED | BKG-005, PD-005 | PD-005 cho phép bật không cọc theo kênh/trường hợp; hiện mới theo kênh. Chờ PO định nghĩa "trường hợp" (ví dụ khách quen, khung giờ, giá trị booking) |
 | REC-001 | API lịch lễ tân | Reception | 4 | P0 | VERIFY | BKG-005 | `GET /v1/merchant/branches/{branchId}/booking/bookings` theo chi nhánh, chồng lấn khung giờ, phân trang; booking mang trạng thái `CONFIRMED/CHECKED_IN/COMPLETED/CANCELLED/NO_SHOW`, giờ check-in/out và kết quả hủy; trả mọi trạng thái. Còn QA-003 |
 | REC-002 | Nền ứng dụng lễ tân | Frontend | 4 | P0 | VERIFY | API-002, REC-001 | FE có hold, cọc CASH, xác nhận không cọc/đủ cọc, lịch booking mọi trạng thái, check-in/out, hủy/no-show, CASH với trạng thái loading/lỗi/rỗng (phần mới đang chờ commit ở FE-005). Còn QA-003 và UAT |
-| REC-003 | Lịch lễ tân hợp nhất hold và booking | Frontend | 4 | P0 | READY | REC-001, BKG-006 | Ghép danh sách hold và booking không trùng (bỏ hold `CONFIRMED`), lọc theo trạng thái (ẩn/hiện hủy, no-show), hiển thị theo phòng/khung giờ. API đã đủ |
+| REC-003 | Lịch lễ tân hợp nhất hold và booking | Frontend | 4 | P0 | VERIFY | REC-001, BKG-006 | `reception-calendar.tsx` đầu mục **Lịch & Đặt phòng**: ghép `GET .../booking/holds` và `GET .../booking/bookings` (đọc đủ mọi trang, tối đa 1.000 mục/ngày và báo khi bị cắt), bỏ hold `CONFIRMED` để không trùng booking; cửa sổ 06:00 → 06:00 hôm sau theo múi giờ chi nhánh; dòng thời gian theo phòng (đuôi gạch chéo = buffer dọn phòng, vạch "bây giờ", tự cuộn tới mục đầu/giờ hiện tại) và chế độ danh sách; mặc định ẩn hold hết hạn/đã hủy/no-show, bật lại bằng bộ lọc; bấm mục xem chi tiết và mã. Logic thuần `fe/src/lib/reception-calendar.ts` (4 unit test); `staff.mjs` +4 bước. FE unit 42/42; `npm run e2e` 142/142 (2026-11-28). Còn QA-003 (bàn phím trên timeline) và UAT |
 | PAY-001 | Duyệt cách thanh toán/MoR cho pilot | Product | 5 | P0 | DONE | — | Hoãn thanh toán online trong pilot, chỉ ghi nhận thủ công; chọn provider/MoR sau pilot (`PD-007`) |
 | PAY-002 | Cổng provider thanh toán và adapter sandbox | Payment | 5 | P0 | BLOCKED | Quyết định provider/MoR sau pilot | Thanh toán online ngoài phạm vi pilot |
 | PAY-003 | Webhook inbox, xác minh chữ ký, idempotency | Payment | 5 | P0 | BLOCKED | PAY-002 | Cùng webhook gửi 5 lần chỉ tạo một chuyển trạng thái |
@@ -140,7 +140,7 @@ Cập nhật 2026-11-28. Lịch sử phiên: [`work-log.md`](work-log.md). Các 
 **Luồng FE**
 
 1. FE-005, FE-009, FE-010 đã commit và chuyển `VERIFY`; kiểm thử trình duyệt lặp lại bằng `npm run e2e` trong `fe/` (xem `fe/e2e/README.md`). BE: trả `publicAcceptedTerms` trong hold chi tiết để Lễ tân xác nhận được hold online (xem handoff).
-2. REC-003: lịch lễ tân hợp nhất hold + booking, lọc trạng thái.
+2. REC-003 đã có trên FE (`VERIFY`): lịch lễ tân hợp nhất hold + booking, lọc trạng thái.
 3. QA-003: thêm kịch bản Branch Manager/Cashier (tài khoản có sẵn trong seed), bàn phím/screen reader, 429, mất mạng; sau đó FE-011, FE-012 theo ưu tiên.
 
 **Luồng BE**
