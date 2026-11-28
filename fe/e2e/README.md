@@ -11,7 +11,7 @@ Kiểm thử trình duyệt (Chrome headless qua `playwright-core`) và smoke te
 ## Chạy
 
 ```bash
-npm run e2e                 # setup UAT → API smoke → khách → lễ tân/Owner → Platform + phân quyền → vai trò/khoá merchant/429
+npm run e2e                 # setup UAT → API smoke → khách → lễ tân/Owner → Platform + phân quyền → vai trò/khoá merchant/429 → ảnh/logo/giấy tờ
 node e2e/customer.mjs       # chạy riêng từng bộ
 ```
 

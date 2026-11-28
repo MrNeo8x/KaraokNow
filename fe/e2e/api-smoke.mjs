@@ -70,11 +70,13 @@ if (branch) {
     const phone = '09' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
     const body = { roomId: room.id, startAt, durationMinutes: 120, phone, expectedTotalAmountVnd: q.json.totalAmountVnd, termsVersion: terms.version };
     const key = crypto.randomUUID();
-    const h = await call('POST', '/public/booking/holds', { body, headers: { 'Idempotency-Key': key } }); check('public hold 201 + code + depositRequiredVnd', h.status === 201 && /^[a-f0-9]{32}$/.test(h.json.bookingCode) && typeof h.json.depositRequiredVnd === 'string', h);
+    const h = await call('POST', '/public/booking/holds', { body, headers: { 'Idempotency-Key': key } }); check('public hold 201 + code + depositRequiredVnd', h.status === 201 && /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(h.json.bookingCode) && typeof h.json.depositRequiredVnd === 'string', h);
     const h2 = await call('POST', '/public/booking/holds', { body, headers: { 'Idempotency-Key': key } }); check('idempotent replay same code', [200, 201].includes(h2.status) && h2.json.bookingCode === h.json.bookingCode, h2);
     const h3 = await call('POST', '/public/booking/holds', { body: { ...body, termsVersion: String(Number(terms.version) + 1) }, headers: { 'Idempotency-Key': crypto.randomUUID() } }); check('stale terms 409', h3.status === 409, h3);
     const h4 = await call('POST', '/public/booking/holds', { body: { ...body, expectedTotalAmountVnd: '1' }, headers: { 'Idempotency-Key': crypto.randomUUID() } }); check('wrong price 409', h4.status === 409, h4);
     const lk = await call('POST', '/public/booking/lookup', { body: { phone: '+84' + phone.slice(1), bookingCode: h.json.bookingCode } }); check('lookup with +84 form', lk.status === 200 && lk.json.holdId === h.json.holdId && 'bookingStatus' in lk.json, lk);
+    const lkLower = await call('POST', '/public/booking/lookup', { body: { phone, bookingCode: `${h.json.bookingCode.slice(0, 3).toLowerCase()}-${h.json.bookingCode.slice(3).toLowerCase()}` } }); check('lookup mã chữ thường có dấu gạch', lkLower.status === 200 && lkLower.json.holdId === h.json.holdId, lkLower);
+    const lkBad = await call('POST', '/public/booking/lookup', { body: { phone, bookingCode: 'ABC' } }); check('lookup sai định dạng → 400', lkBad.status === 400, lkBad);
     const lk404 = await call('POST', '/public/booking/lookup', { body: { phone, bookingCode: 'f'.repeat(32) } }); check('lookup wrong code 404', lk404.status === 404, lk404);
 
     // staff path: deposits, verify, confirm, check-in/out

@@ -25,8 +25,8 @@ for (const vp of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop'
     await contact.getByLabel('Số điện thoại').fill(phone.replace(/(\d{4})(\d{3})(\d{3})/, '$1 $2 $3'));
     await contact.getByRole('button', { name: /Giữ phòng/ }).click();
     await page.locator('.booking-code').waitFor({ timeout: 10000 });
-    const code = (await page.locator('.booking-code').innerText()).trim();
-    log(/^[a-f0-9]{32}$/.test(code), `${vp.name}: giữ chỗ, hiện booking code`);
+    const shown = (await page.locator('.booking-code').innerText()).trim(); const code = shown.replace(/\s/g, '');
+    log(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(code) && /^\S{3} \S{3}$/.test(shown), `${vp.name}: giữ chỗ, hiện mã 6 ký tự tách đôi`, shown);
     log(await page.locator('.deposit-callout').isVisible(), `${vp.name}: hiện số cọc cần đóng`, await page.locator('.deposit-callout').innerText().catch(() => ''));
     await page.screenshot({ path: `${SHOTS}/customer-${vp.name}-receipt.png`, fullPage: true });
     // lookup (prefilled after hold)
@@ -34,11 +34,13 @@ for (const vp of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop'
     await lookup.getByRole('button', { name: 'Tra cứu' }).click();
     await lookup.locator('.customer-receipt').waitFor(); log(/chờ nhân viên/.test(await lookup.locator('h3').innerText()), `${vp.name}: tra cứu ra trạng thái giữ chỗ`, await lookup.locator('h3').innerText());
     // wrong code → generic 404 message
+    await lookup.getByLabel('Mã đặt phòng').fill(`${code.slice(0, 3).toLowerCase()}-${code.slice(3).toLowerCase()}`); await lookup.getByRole('button', { name: 'Tra cứu' }).click();
+    await lookup.locator('.customer-receipt h3').waitFor(); log(true, `${vp.name}: tra cứu bằng chữ thường có dấu gạch`);
     await lookup.getByLabel('Mã đặt phòng').fill('f'.repeat(32)); expected404 = true; await lookup.getByRole('button', { name: 'Tra cứu' }).click();
     await lookup.locator('.error').waitFor(); await page.waitForTimeout(300); expected404 = false; log(/Không tìm thấy/.test(await lookup.locator('.error').innerText()), `${vp.name}: sai mã → thông báo chung`);
     // reload keeps receipt (sessionStorage)
     await page.reload(); await page.locator('.booking-code').waitFor({ timeout: 10000 });
-    log((await page.locator('.booking-code').innerText()).trim() === code, `${vp.name}: reload vẫn giữ booking code`);
+    log((await page.locator('.booking-code').innerText()).replace(/\s/g, '') === code, `${vp.name}: reload vẫn giữ booking code`);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     log(overflow <= 0, `${vp.name}: không cuộn ngang`, `overflow=${overflow}px`);
     await page.screenshot({ path: `${SHOTS}/customer-${vp.name}-full.png`, fullPage: true });

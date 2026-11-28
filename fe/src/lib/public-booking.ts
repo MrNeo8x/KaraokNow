@@ -13,9 +13,21 @@ export function cleanPhone(value: string): string | null {
   return /^\+?\d{8,15}$/.test(cleaned) ? cleaned : null;
 }
 
+/** PD-038 alphabet: digits and upper-case letters without 0/O/1/I. */
+const SHORT_CODE = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/;
+const LEGACY_CODE = /^[a-f0-9]{32}$/i;
+
+/** Accepts the 6-character code (any case, spaces/hyphens ignored) or a legacy 32-hex code; null otherwise. */
 export function cleanBookingCode(value: string): string | null {
-  const cleaned = value.trim().toLowerCase().replace(/\s/g, '');
-  return /^[a-f0-9]{32}$/.test(cleaned) ? cleaned : null;
+  const cleaned = value.trim().replace(/[\s-]/g, '');
+  if (LEGACY_CODE.test(cleaned)) return cleaned.toLowerCase();
+  const upper = cleaned.toUpperCase();
+  return SHORT_CODE.test(upper) ? upper : null;
+}
+
+/** Display form: "K7M 4XQ" for short codes (easier to read aloud); legacy codes unchanged. */
+export function formatBookingCode(code: string): string {
+  return SHORT_CODE.test(code) ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
 }
 
 function sameBody(a: PublicHoldBody, b: PublicHoldBody): boolean {

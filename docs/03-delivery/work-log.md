@@ -2,29 +2,39 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau BKG-010)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-015/FE-016)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage, `ec53b06` work log, và commit BKG-010 mã đặt phòng 6 ký tự). **Không push BKG-010 khi FE-016 chưa xong** — FE hiện chặn tra cứu với mã mới. Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
+**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, `1205321` FILE-001, `b8ced68` runbook: Prisma chỉ gắn BE + quy tắc gắn/gỡ storage, `ec53b06` work log, `8029594` BKG-010 mã đặt phòng 6 ký tự, và commit FE-015/FE-016 của Luồng FE). **BKG-010 đã lên production trước FE-016** (session triển khai push `560e3e9`…`8029594`): khách trên production nhận mã 6 ký tự nhưng FE production cũ chặn tra cứu. **Cần push và deploy commit FE-016 này ngay.** Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
 
-**Kiểm chứng gần nhất:** BE (2026-11-28, sau BKG-010) `npm run verify` 65/65 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-014) `npm test` 46/46, `next build`, `npm run e2e` 157/157.
+**Kiểm chứng gần nhất:** BE (2026-11-28, sau BKG-010) `npm run verify` 65/65 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-015/FE-016) `npm test` 51/51, `next build`, `npm run e2e`: API 66/66, khách 22/22, lễ tân 29/29, Platform 16/16, vai trò 28/28, `files.mjs` 10/13 (3 bước hiển thị ảnh chờ BE sửa lỗi phục vụ file local).
 
-**Môi trường local** (`be/compose.yaml`, rebuild 2026-11-28): Postgres `:5433` đã áp 27 migration (đến `20261124050000_file_storage`); backend `:3000` chạy `1205321` (có FILE-001), health ready 200. Container không có token Blob → file ghi vào `/app/.storage` trong container (đã kiểm ghi được), **mất khi rebuild** — chỉ để thử. Ảnh public đọc qua `/v1/files/public/…` (FE rewrite). Frontend `:3100` có FE-014 (chưa có FE-015). Đã seed UAT. Worker tắt.
+**Môi trường local** (`be/compose.yaml`, rebuild 2026-11-28): Postgres `:5433` đã áp 27 migration (đến `20261124050000_file_storage`); backend `:3000` chạy `1205321` (có FILE-001), health ready 200. Container không có token Blob → file ghi vào `/app/.storage` trong container (đã kiểm ghi được), **mất khi rebuild** — chỉ để thử. Ảnh public đọc qua `/v1/files/public/…` (FE rewrite) — **hiện trả 500** vì `sendFile` từ chối thư mục `.storage` (yêu cầu BE trong handoff "FE INTEGRATED (một phần) — ảnh, logo, giấy tờ"). Frontend `:3100` có FE-015/FE-016. Đã seed UAT. Worker tắt.
 
 **Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Luồng FE đang làm FE-015 (`fe/src/components/merchant-documents.tsx`, `merchant-logo.tsx`, `room-media.tsx`, `fe/src/lib/image-compress.ts`, `open-pdf.ts`… chưa commit). `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
+**Đang dở (working tree):** Luồng FE không có sau commit FE-015/FE-016. Luồng BE đã commit IAM-007 (`8d85d55`, giữ phiên qua cookie HttpOnly, API chọn merchant — mở đường cho FE-012). Session triển khai có `docs/03-delivery/deploy-vercel.md` và nhật ký OPS-008 trong work log chưa commit — Luồng FE không commit hộ. `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
 - *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload). Gắn store bằng `vercel storage connect <store> -p vn-karaoke-now-api`; không gắn Blob/Prisma vào project FE (`deploy-vercel.md`).
-- *Luồng FE:* **FE-016 trước** (mã đặt phòng 6 ký tự — chặn deploy BKG-010), FE-015 (màn ảnh phòng, logo, giấy tờ; nén ảnh trước khi upload — xem handoff "FE READY — lưu ảnh và giấy tờ"); FE-011; QA-003 phần còn lại; FE-012.
-- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
+- *Luồng FE:* chạy lại `fe/e2e/files.mjs` sau khi BE sửa lỗi phục vụ file rồi chuyển FE-015 sang `VERIFY`; FE-012 khi BE xong refresh cookie/danh sách tenant (đang làm); FE-011; QA-003 phần còn lại.
+- *Luồng BE:* sửa `files.controller.ts` (`sendFile(file, { dotfiles: 'allow' })` hoặc thư mục mặc định không có dấu chấm; `NotFoundError` → 404); BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
 
+
+
+
+---
+
+## 2026-11-28 — Luồng FE: ảnh/logo/giấy tờ (FE-015) và mã đặt phòng 6 ký tự (FE-016)
+
+- FE-016 (`VERIFY`): mã 6 ký tự PD-038 trên trang khách, vẫn nhận mã cũ 32 hex; phải deploy cùng BKG-010.
+- FE-015 (`BLOCKED` chờ BE): thư viện ảnh phòng có nén trên trình duyệt (5,1 MB → 276 KB, xoá EXIF), logo (Marketplace, sidebar, `/booking`), giấy tờ PDF (Owner, Platform Admin), fallback khi ảnh lỗi. Kho local của BE trả 500 khi phục vụ file (`sendFile` + thư mục `.storage`) — đã ghi yêu cầu trong handoff.
+- Kiểm chứng: FE unit 51/51, `next build`; `npm run e2e`: API 66/66, khách 22/22, lễ tân 29/29, Platform 16/16, vai trò 28/28, `files.mjs` 10/13 (3 bước hiển thị ảnh chờ BE).
 
 ---
 

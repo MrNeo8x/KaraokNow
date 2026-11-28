@@ -238,6 +238,15 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - FE cần sửa: `cleanBookingCode` (`fe/src/lib/public-booking.ts`) đang chỉ nhận 32 hex → form tra cứu chặn mã mới và `readReceipt` bỏ biên nhận đã lưu. Gợi ý: bỏ khoảng trắng/gạch, nếu khớp 32 hex thì giữ chữ thường, ngược lại viết hoa và kiểm `^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$`. Đổi thông báo "mã đặt phòng gồm 32 ký tự" → "6 ký tự". Ô nhập nên `autocapitalize="characters"`, `maxLength` đủ cho mã cũ (32). Hiển thị mã cỡ lớn, có thể tách `K7M 4XQ` khi hiển thị.
 - Test cần sửa: `fe/test/public-booking.test.mjs`, `fe/e2e/customer.mjs`, `fe/e2e/api-smoke.mjs` (regex `[a-f0-9]{32}`).
 
+### FE INTEGRATED — mã đặt phòng 6 ký tự (FE-016, BKG-010, 2026-11-28)
+
+- `fe/src/lib/public-booking.ts`: `cleanBookingCode` theo gợi ý handoff, `formatBookingCode` (`K7M 4XQ`); trang khách hiển thị mã tách đôi, ô tra cứu tự viết hoa, thông báo 6 ký tự. Kiểm thử: unit 51/51, `customer.mjs` 22/22, `api-smoke.mjs` 66/66. FE-016 cần deploy cùng BKG-010.
+
+### FE INTEGRATED (một phần) — ảnh, logo, giấy tờ (FE-015, FILE-001, 2026-11-28)
+
+- Upload qua `FormData` (client không tự đặt `Content-Type`), ảnh nén trước khi gửi; PDF mở bằng `requestBlob` có token; Platform Admin xem giấy tờ trên listing. `fe/e2e/files.mjs` 10/13.
+- **Yêu cầu BE (lỗi FILE-001 trên kho local):** `GET /v1/files/public/{pathname}` trả **500** dù file tồn tại. `be/src/platform/storage/files.controller.ts` gọi `response.sendFile(file)` với đường dẫn trong `STORAGE_LOCAL_DIR` mặc định `.storage`; thư viện `send` mặc định `dotfiles: 'ignore'` nên ném `NotFoundError`, `ApiExceptionFilter` trả 500 (log: `request_failed … errorName: NotFoundError`). Đề xuất `response.sendFile(file, { dotfiles: 'allow' })` (hoặc thư mục mặc định không bắt đầu bằng dấu chấm), và ánh xạ `NotFoundError` của `send` thành 404. Ảnh phòng, logo trong admin và logo trên `/booking` chưa hiển thị được ở local cho tới khi sửa; ba bước đỏ trong `files.mjs` sẽ xanh khi sửa.
+
 ## FE READY — lưu ảnh và giấy tờ (FILE-001, PD-037, 2026-11-28)
 
 Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 46/46 (response đối chiếu `openapi.json`). Upload là `multipart/form-data`, trường file tên `file`, **≤ 4 MB** (413 nếu lớn hơn); loại file kiểm tra theo nội dung (422 nếu sai). **FE nén ảnh trước khi gửi** (cạnh dài ≤ 1600 px, JPEG/WebP ~300–500 KB) để giữ trong hạn mức băng thông miễn phí — vượt hạn mức là Blob bị khoá 30 ngày.

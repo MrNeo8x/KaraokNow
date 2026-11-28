@@ -5,9 +5,9 @@ import { CalendarDays, Check, CheckCircle2, ClipboardList, Copy, Home, MapPin, M
 import { ApiError, request } from '@/lib/api';
 import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle';
 import { SLOTS, firstSlot, initialChoice, slotOpen, upcomingDates } from '@/lib/booking-time';
-import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
+import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, formatBookingCode, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
-type Branch = { id: string; merchantId: string; merchantName: string; name: string; timezone: string };
+type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string };
 type Room = { id: string; branchId?: string; name: string; capacity: number };
 type Page<T> = { items: T[]; hasMore: boolean };
 type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
@@ -129,7 +129,7 @@ export default function CustomerBooking() {
   async function lookupBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLookup(null); setLookupError('');
     const cleanedPhone = cleanPhone(lookupPhone); const code = cleanBookingCode(lookupCode);
-    if (!cleanedPhone || !code) { setLookupError('Nhập số điện thoại đã dùng khi đặt và mã đặt phòng gồm 32 ký tự.'); return; }
+    if (!cleanedPhone || !code) { setLookupError('Nhập số điện thoại đã dùng khi đặt và mã đặt phòng gồm 6 ký tự (chữ và số).'); return; }
     setLookingUp(true);
     try { setLookup(await request<Lookup>('/public/booking/lookup', { method: 'POST', body: JSON.stringify({ phone: cleanedPhone, bookingCode: code }) })); }
     catch (err) {
@@ -173,7 +173,7 @@ export default function CustomerBooking() {
       {receipt ? <section className="app-card success-card" role="status" aria-live="polite">
         <span className="success-icon"><Check size={36} aria-hidden /></span><h2>Giữ chỗ thành công!</h2>
         <p>{statusLabel[receipt.status] ?? receipt.status}</p>
-        <label className="app-label">Mã đặt phòng — hãy lưu lại để tra cứu<code className="booking-code">{receipt.bookingCode}</code></label>
+        <label className="app-label">Mã đặt phòng — hãy lưu lại để tra cứu<code className="booking-code" aria-label={`Mã đặt phòng ${receipt.bookingCode.split('').join(' ')}`}>{formatBookingCode(receipt.bookingCode)}</code></label>
         <div className="summary"><div><span>Thời gian</span><strong>{when(receipt.startAt, branch?.timezone)}</strong></div><div><span>Thời lượng</span><strong>{durationLabel(receipt.durationMinutes)}</strong></div><div><span>Giữ chỗ đến</span><strong>{when(receipt.expiresAt, branch?.timezone)}</strong></div><div><span>Điều khoản</span><strong>Phiên bản {receipt.termsVersion}</strong></div><div className="total"><span>Tổng tiền</span><strong>{money(receipt.totalAmountVnd)}</strong></div></div>
         {receipt.depositRequiredVnd && receipt.depositRequiredVnd !== '0' ? <p className="deposit-callout">Cần đặt cọc <strong>{money(receipt.depositRequiredVnd)}</strong> bằng tiền mặt tại quầy trước khi nhân viên xác nhận. Không có thanh toán online.</p> : receipt.depositRequiredVnd === '0' ? <p>Không yêu cầu đặt cọc.</p> : null}
         <p>Nhân viên sẽ gọi số {receipt.phone} để xác minh; giữ chỗ chưa phải đặt phòng đã xác nhận.</p>
@@ -183,7 +183,7 @@ export default function CustomerBooking() {
       <section className="app-card" id="booking" aria-labelledby="customer-booking-title">
         <h2 id="customer-booking-title"><span className="step-no">1</span>Chọn quán</h2>
         {loading && branches.length === 0 ? <p role="status">Đang tải danh mục…</p> : branches.length === 0 ? <div className="empty">Chưa có địa điểm được công khai.</div>
-          : <div className="branch-list" role="group" aria-label="Địa điểm">{branches.map((item, index) => <button type="button" key={item.id} className="branch-option" aria-pressed={item.id === branchId} onClick={() => setBranchId(item.id)}><img src={fixedRoomImages[index % fixedRoomImages.length]} alt="" /><span><strong>{item.merchantName}</strong><small><MapPin size={12} aria-hidden /> {item.name}</small></span></button>)}</div>}
+          : <div className="branch-list" role="group" aria-label="Địa điểm">{branches.map((item, index) => <button type="button" key={item.id} className="branch-option" aria-pressed={item.id === branchId} onClick={() => setBranchId(item.id)}><img src={item.merchantLogoUrl ?? fixedRoomImages[index % fixedRoomImages.length]} alt={item.merchantLogoUrl ? `Logo ${item.merchantName}` : ''} className={item.merchantLogoUrl ? 'merchant-logo' : undefined} onError={event => { const image = event.currentTarget; const fallback = fixedRoomImages[index % fixedRoomImages.length]; if (!image.src.endsWith(fallback)) { image.src = fallback; image.className = ''; image.alt = ''; } }} /><span><strong>{item.merchantName}</strong><small><MapPin size={12} aria-hidden /> {item.name}</small></span></button>)}</div>}
       </section>
       <form className="app-card" onSubmit={findAvailability} aria-labelledby="customer-time-title">
         <h2 id="customer-time-title"><span className="step-no">2</span>Chọn ngày &amp; giờ</h2>
@@ -216,8 +216,8 @@ export default function CustomerBooking() {
       {pending && !(availability && selectedRoom && quote) && <div className="notice" role="status">Có một yêu cầu giữ phòng chưa xác định kết quả ({when(pending.body.startAt, branch?.timezone)} · {pending.body.durationMinutes} phút · {money(pending.body.expectedTotalAmountVnd)}). <div className="hold-actions"><button type="button" className="primary" disabled={holding || retryAt > Date.now()} onClick={() => void send(pending)}>{holding ? 'Đang gửi…' : 'Gửi lại yêu cầu'}</button><button type="button" className="secondary" disabled={holding} onClick={discardPending}>Bỏ yêu cầu này</button></div></div>}
       {holdError && !(availability && selectedRoom && quote) && <div className="error" role="alert">{holdError}</div>}
       </>}
-      <section className="app-card customer-lookup" id="lookup" aria-labelledby="customer-lookup-title"><h2 id="customer-lookup-title"><ClipboardList size={18} aria-hidden /> Đơn của tôi</h2><p>Tra cứu bằng số điện thoại đã dùng và mã đặt phòng 32 ký tự.</p>
-        <form className="fields contact-fields" onSubmit={lookupBooking}><label>Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} required maxLength={24} /></label><label>Mã đặt phòng<input value={lookupCode} onChange={event => setLookupCode(event.target.value)} required maxLength={40} autoComplete="off" spellCheck={false} /></label><button className="primary" disabled={lookingUp || lookupRetryAt > Date.now()}>{lookingUp ? 'Đang tra cứu…' : 'Tra cứu'}</button></form>
+      <section className="app-card customer-lookup" id="lookup" aria-labelledby="customer-lookup-title"><h2 id="customer-lookup-title"><ClipboardList size={18} aria-hidden /> Đơn của tôi</h2><p>Tra cứu bằng số điện thoại đã dùng và mã đặt phòng 6 ký tự (ví dụ K7M 4XQ).</p>
+        <form className="fields contact-fields" onSubmit={lookupBooking}><label>Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} required maxLength={24} /></label><label>Mã đặt phòng<input value={lookupCode} onChange={event => setLookupCode(event.target.value)} required maxLength={40} autoCapitalize="characters" placeholder="K7M 4XQ" autoComplete="off" spellCheck={false} /></label><button className="primary" disabled={lookingUp || lookupRetryAt > Date.now()}>{lookingUp ? 'Đang tra cứu…' : 'Tra cứu'}</button></form>
         {lookupError && <div className="error" role="alert">{lookupError}</div>}
         {lookup && <div className="order-card customer-receipt" role="status"><div className="order-head"><strong>{branches.find(item => item.id === lookup.branchId)?.merchantName ?? 'Đặt phòng'}</strong><span className={`pill ${pillTone(lookupStatus)}`}>{lookup.bookingStatus ? 'Booking' : 'Giữ chỗ'}</span></div><h3>{lookup.bookingStatus ? bookingStatusLabel[lookup.bookingStatus] ?? lookup.bookingStatus : statusLabel[lookup.status] ?? lookup.status}</h3><p>{branches.find(item => item.id === lookup.branchId)?.name ?? 'Địa điểm'} · {catalogRooms.find(item => item.id === lookup.roomId)?.name ?? 'Phòng đã chọn'}</p><p><CalendarDays size={13} aria-hidden /> {when(lookup.startAt, branches.find(item => item.id === lookup.branchId)?.timezone)} · {durationLabel(lookup.durationMinutes)} · <strong>{money(lookup.totalAmountVnd)}</strong></p>{lookup.depositRequiredVnd && lookup.depositRequiredVnd !== '0' && <p>Cọc yêu cầu: {money(lookup.depositRequiredVnd)} · đã ghi nhận: {money(lookup.depositRecordedVnd ?? '0')}{lookup.status === 'HELD' && BigInt(lookup.depositRecordedVnd ?? '0') < BigInt(lookup.depositRequiredVnd) ? ' · vui lòng đặt cọc tiền mặt tại quầy' : ''}</p>}<small>Điều khoản phiên bản {lookup.termsVersion}{lookup.bookingId ? ` · Mã booking: ${lookup.bookingId}` : ''}</small></div>}
       </section>

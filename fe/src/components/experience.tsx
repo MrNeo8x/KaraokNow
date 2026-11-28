@@ -22,6 +22,8 @@ import OpsBacklog from './ops-backlog';
 import OvertimeSettings from './overtime-settings';
 import ReceptionCalendar from './reception-calendar';
 import CashReconciliation from './cash-reconciliation';
+import MerchantLogoCard, { type MerchantLogo } from './merchant-logo';
+import MerchantDocuments from './merchant-documents';
 import MySessions from './my-sessions';
 import { ApiError, request } from '@/lib/api';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
@@ -36,7 +38,7 @@ type Room = { id: string; name: string; code: string; capacity: number; status: 
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
   const page = initialPage;
   type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
-  const [me, setMe] = useState<Me | null>(null);
+  const [me, setMe] = useState<Me | null>(null); const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [merchantSection, selectMerchant] = useSection(MERCHANT_IDS, 'overview');
   const [platformSection, selectPlatform] = useSection(PLATFORM_IDS, 'listings');
   const [session, setSession] = useState<Session | null>(null);
@@ -73,6 +75,14 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     const controller = new AbortController();
     request<Me>('/merchant/me', { signal: controller.signal }, session.accessToken, activeTenant)
       .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError('Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
+    return () => controller.abort();
+  }, [session, activeTenant, page]);
+
+  // Merchant logo for the sidebar (every merchant role may read it).
+  useEffect(() => {
+    if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setLogoUrl(null); return; }
+    const controller = new AbortController();
+    request<MerchantLogo>('/merchant/catalog/logo', { signal: controller.signal }, session.accessToken, activeTenant).then(value => setLogoUrl(value.url)).catch(() => { if (!controller.signal.aborted) setLogoUrl(null); });
     return () => controller.abort();
   }, [session, activeTenant, page]);
 
@@ -125,7 +135,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const roomStatus = (status: string) => status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : status === 'MAINTENANCE' ? <span className="pill amber">Bảo trì</span> : <span className="pill gray">Ngừng hoạt động</span>;
   const branchKey = `${activeTenant}:${branch}`;
 
-  return <AdminShell product="Business" nav={activeTenant ? nav : []} active={section} onSelect={selectMerchant}
+  return <AdminShell product="Business" logoUrl={activeTenant ? logoUrl : null} nav={activeTenant ? nav : []} active={section} onSelect={selectMerchant}
     title={activeTenant ? titles[section] : 'Chọn merchant'} subtitle={activeTenant ? (currentBranch ? `${currentBranch.name} · ${currentBranch.timezone}` : 'Chưa chọn chi nhánh') : 'Nhập Tenant ID được cấp để mở dữ liệu'}
     actions={activeTenant && branches.length > 0 ? <label className="sr-label"><span className="visually-hidden">Chi nhánh</span><select aria-label="Chi nhánh" value={branch} onChange={e => { setRooms([]); setBranch(e.target.value); }}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label> : undefined}
     footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && <button type="button" onClick={() => { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); }}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
@@ -177,6 +187,8 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
       {section === 'marketplace' && <>
         <CatalogPublication key={`publication:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <PublicBookingTerms key={`terms:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
+        <MerchantLogoCard key={`logo:${activeTenant}`} token={session.accessToken} tenant={activeTenant} onChanged={value => setLogoUrl(value.url)} />
+        <MerchantDocuments key={`documents:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
       </>}
       {section === 'settings' && <>
         <section className="card tenant-card"><div className="kpi-head"><span className="kpi-icon"><ShieldCheck size={18} aria-hidden /></span>Merchant đang mở</div><p>Tenant {activeTenant}. Đổi sang merchant khác bằng Tenant ID.</p>{tenantForm}</section>

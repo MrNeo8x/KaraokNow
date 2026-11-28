@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanPhone, cleanBookingCode, prepareAttempt, isRetryable, readAttempt, readReceipt, save, clear, PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY } from '../src/lib/public-booking.ts';
+import { cleanPhone, cleanBookingCode, formatBookingCode, prepareAttempt, isRetryable, readAttempt, readReceipt, save, clear, PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY } from '../src/lib/public-booking.ts';
 
 const body = { roomId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', startAt: '2036-01-01T18:00:00+07:00', durationMinutes: 120, phone: '0912345678', expectedTotalAmountVnd: '180000', termsVersion: '1' };
 const key = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -13,9 +13,15 @@ test('làm sạch số điện thoại theo quy tắc backend', () => {
   assert.equal(cleanPhone('09a2345678'), null);
 });
 
-test('mã booking phải là 32 ký tự hex', () => {
+test('mã đặt phòng 6 ký tự (PD-038) và mã cũ 32 hex', () => {
+  assert.equal(cleanBookingCode(' k7m-4xq '), 'K7M4XQ');
+  assert.equal(cleanBookingCode('K7M 4XQ'), 'K7M4XQ');
+  assert.equal(cleanBookingCode('K0M4XQ'), null); // 0 is not in the alphabet
+  assert.equal(cleanBookingCode('K7M4X'), null);
   assert.equal(cleanBookingCode(' ABCDEF0123456789abcdef0123456789 '), 'abcdef0123456789abcdef0123456789');
   assert.equal(cleanBookingCode('xyz'), null);
+  assert.equal(formatBookingCode('K7M4XQ'), 'K7M 4XQ');
+  assert.equal(formatBookingCode('abcdef0123456789abcdef0123456789'), 'abcdef0123456789abcdef0123456789');
 });
 
 test('giữ idempotency key khi body giống hệt, tạo key mới khi body đổi', () => {
@@ -48,4 +54,11 @@ test('lưu, đọc và bỏ qua dữ liệu khôi phục hỏng', () => {
   assert.deepEqual(readReceipt(store), receipt);
   save(store, PUBLIC_HOLD_RECEIPT_KEY, { ...receipt, bookingCode: 'short' });
   assert.equal(readReceipt(store), null);
+});
+
+test('biên nhận với mã 6 ký tự vẫn đọc lại được', () => {
+  const store = memory(); const id = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const receipt = { holdId: id, branchId: id, roomId: body.roomId, startAt: body.startAt, durationMinutes: 120, reservedEndAt: body.startAt, expiresAt: body.startAt, status: 'HELD', totalAmountVnd: '180000', termsVersion: '1', bookingCode: 'K7M4XQ', phone: '0912345678' };
+  save(store, PUBLIC_HOLD_RECEIPT_KEY, receipt);
+  assert.deepEqual(readReceipt(store), receipt);
 });

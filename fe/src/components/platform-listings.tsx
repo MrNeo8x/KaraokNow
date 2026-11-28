@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { ApiError, request } from '@/lib/api';
+import { formatBytes } from '@/lib/image-compress';
+import { openPrivatePdf } from '@/lib/open-pdf';
+
+type ListingDocument = { id: string; title: string; sizeBytes: number; uploadedAt: string };
 
 type Listing = { tenantId: string; merchantCode: string; merchantName: string; tenantStatus: string; published: boolean; platformApproved: boolean; platformDecidedBy: string | null; platformDecidedAt: string | null; activeBranchCount: number; termsConfigured: boolean; updatedAt: string; version: string };
 type Page = { items: Listing[]; limit: number; offset: number; hasMore: boolean };
@@ -13,6 +17,7 @@ export default function PlatformListings({ token }: { token: string }) {
   const [filter, setFilter] = useState<Filter>('PENDING'); const [offset, setOffset] = useState(0); const [revision, setRevision] = useState(0);
   const [page, setPage] = useState<Page | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [forbidden, setForbidden] = useState(false); const [notice, setNotice] = useState('');
   const [notes, setNotes] = useState<Record<string, string>>({}); const [reasons, setReasons] = useState<Record<string, string>>({}); const [acting, setActing] = useState('');
+  const [documents, setDocuments] = useState<Record<string, ListingDocument[] | 'loading' | string>>({});
 
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError(''); setForbidden(false);
@@ -40,6 +45,19 @@ export default function PlatformListings({ token }: { token: string }) {
     } finally { setActing(''); }
   }
 
+  async function toggleDocuments(listing: Listing) {
+    if (documents[listing.tenantId] !== undefined) { setDocuments(current => { const next = { ...current }; delete next[listing.tenantId]; return next; }); return; }
+    setDocuments(current => ({ ...current, [listing.tenantId]: 'loading' }));
+    try { const items = await request<ListingDocument[]>(`/platform/merchants/${encodeURIComponent(listing.tenantId)}/documents`, {}, token); setDocuments(current => ({ ...current, [listing.tenantId]: items })); }
+    catch (err) { setDocuments(current => ({ ...current, [listing.tenantId]: (err as Error).message })); }
+  }
+
+  async function viewDocument(listing: Listing, item: ListingDocument) {
+    setError('');
+    try { await openPrivatePdf(`/platform/merchants/${encodeURIComponent(listing.tenantId)}/documents/${encodeURIComponent(item.id)}/file`, item.title, token); }
+    catch (err) { setError((err as Error).message); }
+  }
+
   const when = (value: string | null) => value ? new Date(value).toLocaleString('vi-VN') : '—';
   if (forbidden) return <section className="card amenities"><h2>Duyệt listing</h2><div className="error" role="alert">Tài khoản này không có quyền Platform Admin. Quyền chỉ được cấp qua dữ liệu hệ thống.</div></section>;
   return <section className="card amenities" aria-labelledby="platform-listings-title">
@@ -49,7 +67,10 @@ export default function PlatformListings({ token }: { token: string }) {
     {loading ? <p role="status">Đang tải listing…</p> : page && (page.items.length === 0 ? <div className="empty">{filter === 'PENDING' ? 'Không có merchant chờ duyệt.' : 'Không có listing.'}</div> : <div className="booking-list">{page.items.map(listing => <article className="booking-row" key={listing.tenantId}>
       <div><strong>{listing.merchantName}</strong> <span className={listing.platformApproved ? 'tag' : 'tag warn'}>{listing.platformApproved ? 'Đã duyệt' : listing.published ? 'Chờ duyệt' : 'Chưa publish'}</span>
         <p>Mã: {listing.merchantCode} · Tenant: {listing.tenantId}<br />Trạng thái tenant: {listing.tenantStatus} · {listing.activeBranchCount} chi nhánh hoạt động · Điều khoản: {listing.termsConfigured ? 'đã cấu hình' : 'chưa cấu hình'}<br />Quyết định gần nhất: {when(listing.platformDecidedAt)} · Cập nhật: {when(listing.updatedAt)}</p>
-        {listing.published && (listing.activeBranchCount === 0 || !listing.termsConfigured) && <small>Lưu ý: {listing.activeBranchCount === 0 ? 'chưa có chi nhánh hoạt động' : ''}{listing.activeBranchCount === 0 && !listing.termsConfigured ? ' · ' : ''}{!listing.termsConfigured ? 'chưa có điều khoản công khai, khách sẽ không gửi được giữ chỗ' : ''}.</small>}</div>
+        {listing.published && (listing.activeBranchCount === 0 || !listing.termsConfigured) && <small>Lưu ý: {listing.activeBranchCount === 0 ? 'chưa có chi nhánh hoạt động' : ''}{listing.activeBranchCount === 0 && !listing.termsConfigured ? ' · ' : ''}{!listing.termsConfigured ? 'chưa có điều khoản công khai, khách sẽ không gửi được giữ chỗ' : ''}.</small>}
+        <div className="listing-documents"><button type="button" className="link-button" aria-expanded={documents[listing.tenantId] !== undefined} onClick={() => void toggleDocuments(listing)}>{documents[listing.tenantId] !== undefined ? 'Ẩn giấy tờ' : 'Xem giấy tờ merchant'}</button>
+          {documents[listing.tenantId] === 'loading' ? <p role="status">Đang tải giấy tờ…</p> : typeof documents[listing.tenantId] === 'string' ? <div className="error" role="alert">{documents[listing.tenantId] as string}</div> : Array.isArray(documents[listing.tenantId]) && ((documents[listing.tenantId] as ListingDocument[]).length === 0 ? <p><small>Merchant chưa tải giấy tờ nào.</small></p> : <ul className="ledger">{(documents[listing.tenantId] as ListingDocument[]).map(item => <li key={item.id}><div className="ledger-line"><span><strong>{item.title}</strong><br /><small>{new Date(item.uploadedAt).toLocaleString('vi-VN')} · {formatBytes(item.sizeBytes)}</small></span><button type="button" className="link-button" onClick={() => void viewDocument(listing, item)}>Xem PDF</button></div></li>)}</ul>)}
+        </div></div>
       <div className="payment-form">{listing.platformApproved
         ? <><label>Lý do thu hồi (bắt buộc)<input maxLength={500} value={reasons[listing.tenantId] ?? ''} onChange={event => setReasons(current => ({ ...current, [listing.tenantId]: event.target.value }))} /></label><button type="button" className="secondary" disabled={acting === listing.tenantId} onClick={() => void decide(listing, 'revoke')}>Thu hồi duyệt</button></>
         : <><label>Ghi chú duyệt (không bắt buộc)<input maxLength={500} value={notes[listing.tenantId] ?? ''} onChange={event => setNotes(current => ({ ...current, [listing.tenantId]: event.target.value }))} /></label><button type="button" className="primary" disabled={acting === listing.tenantId || !listing.published || listing.tenantStatus !== 'ACTIVE'} onClick={() => void decide(listing, 'approve')}>Duyệt listing</button></>}</div>

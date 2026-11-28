@@ -17,17 +17,17 @@ export function useSection(ids: string[], fallback: string): [string, (id: strin
   return [section, select];
 }
 
-export default function AdminShell({ product, nav, active, onSelect, title, subtitle, actions, footer, children }: {
-  product: string; nav: NavItem[]; active: string; onSelect: (id: string) => void;
+export default function AdminShell({ product, nav, active, onSelect, title, subtitle, actions, footer, children, logoUrl }: {
+  product: string; logoUrl?: string | null; nav: NavItem[]; active: string; onSelect: (id: string) => void;
   title: string; subtitle?: ReactNode; actions?: ReactNode; footer?: ReactNode; children: ReactNode;
 }) {
-  const [drawer, setDrawer] = useState(false);
+  const [drawer, setDrawer] = useState(false); const [logoFailed, setLogoFailed] = useState<string | null>(null);
   const select = (id: string) => { onSelect(id); setDrawer(false); window.scrollTo({ top: 0 }); };
   const tabs = nav.slice(0, 3);
   let lastGroup: string | undefined;
   return <div className={drawer ? 'admin drawer-open' : 'admin'}>
     <aside className="admin-sidebar" aria-label="Điều hướng quản trị">
-      <a className="admin-logo" href="/"><span className="logo-mark"><Mic2 size={20} aria-hidden /></span><span><strong>KaraokeNow</strong><small>{product}</small></span></a>
+      <a className="admin-logo" href="/">{logoUrl && logoFailed !== logoUrl ? <span className="logo-mark has-logo"><img src={logoUrl} alt="" onError={() => setLogoFailed(logoUrl)} /></span> : <span className="logo-mark"><Mic2 size={20} aria-hidden /></span>}<span><strong>KaraokeNow</strong><small>{product}</small></span></a>
       <nav className="admin-nav">{nav.map(item => {
         const heading = item.group && item.group !== lastGroup ? <div className="nav-group" key={`g:${item.group}`}>{item.group}</div> : null; lastGroup = item.group;
         const Icon = item.icon;

@@ -74,3 +74,19 @@ test('dịch thông báo tranh chấp đồng thời và merchant bị khoá', a
   globalThis.fetch = async () => Response.json({ error: { code: 'CONFLICT', message: 'Merchant is suspended; new holds are not accepted' } }, { status: 409 });
   await assert.rejects(request('/merchant/booking/holds', { method: 'POST', body: '{}' }), /bị Platform khoá/);
 });
+
+test('FormData không bị gắn Content-Type JSON; 413 báo vượt 4 MB', async () => {
+  const { request: req } = await import('../src/lib/api.ts');
+  globalThis.fetch = async (url, options) => { assert.equal(options.headers.has('content-type'), false); assert.ok(options.body instanceof FormData); return Response.json({ id: 'm1' }, { status: 201 }); };
+  const form = new FormData(); form.append('file', new Blob(['x'], { type: 'image/png' }), 'a.png');
+  assert.deepEqual(await req('/merchant/rooms/r/media/upload', { method: 'POST', body: form }, 't', 'x'), { id: 'm1' });
+  globalThis.fetch = async () => new Response('Payload Too Large', { status: 413 });
+  await assert.rejects(req('/merchant/catalog/logo', { method: 'PUT', body: form }), error => { assert.match(error.message, /4 MB/); assert.equal(error.status, 413); return true; });
+});
+
+test('requestBlob trả Blob và gửi kèm token', async () => {
+  const { requestBlob } = await import('../src/lib/api.ts');
+  globalThis.fetch = async (url, options) => { assert.equal(options.headers.get('authorization'), 'Bearer t'); return new Response(new Uint8Array([37, 80, 68, 70]), { status: 200, headers: { 'content-type': 'application/pdf' } }); };
+  const blob = await requestBlob('/merchant/documents/d/file', 't', 'x');
+  assert.equal(blob.type, 'application/pdf'); assert.equal(blob.size, 4);
+});

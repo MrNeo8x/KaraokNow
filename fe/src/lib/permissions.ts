@@ -13,6 +13,7 @@ const MATRIX = {
   'money.reverse': ['OWNER', 'BRANCH_MANAGER'], // full reversal of a deposit, CASH payment or surcharge
   'cash.report': ['OWNER', 'BRANCH_MANAGER', 'CASHIER'], // daily cash report and unresolved expired-hold deposits
   'deposit.resolve': ['OWNER', 'BRANCH_MANAGER'], // record refund/retention of an expired hold's deposit
+  'venue.manage': ['OWNER', 'BRANCH_MANAGER'], // rooms, amenities and room photos
   'owner.admin': ['OWNER'], // memberships, publication, public terms, audit, ops backlog, price plans
 } as const satisfies Record<string, readonly Role[]>;
 export type Permission = keyof typeof MATRIX;
