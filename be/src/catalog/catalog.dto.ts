@@ -34,6 +34,7 @@ export class PublicBranchDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) merchantId!: string;
   @ApiProperty() merchantName!: string;
+  @ApiProperty({ nullable: true, type: String, description: 'Public logo URL (PD-037); null when the merchant has none' }) merchantLogoUrl!: string | null;
   @ApiProperty() name!: string;
   @ApiProperty() timezone!: string;
 }

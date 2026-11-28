@@ -308,6 +308,118 @@ Response được khai báo:
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/MerchantMeDto"} |
 | 403 | No active membership in X-Tenant-ID | Chưa khai báo schema |
 
+### GET /v1/merchant/documents
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/MerchantDocumentDto"}} |
+
+### POST /v1/merchant/documents
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`multipart/form-data`
+
+```json
+{
+  "$ref": "#/components/schemas/UploadMerchantDocumentDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | PDF stored in the private Blob store | {"$ref":"#/components/schemas/MerchantDocumentDto"} |
+| 409 | Merchant already has 10 documents | Chưa khai báo schema |
+| 413 | File larger than 4 MB | Chưa khai báo schema |
+| 422 | Not a PDF | Chưa khai báo schema |
+
+### GET /v1/merchant/documents/{id}/file
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | PDF bytes | Chưa khai báo schema |
+
+### DELETE /v1/merchant/documents/{id}
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 204 | Document and its file deleted | Chưa khai báo schema |
+
+### GET /v1/platform/merchants/{tenantId}/documents
+
+Nhóm: platform merchants
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Documents of any merchant, for listing review | {"type":"array","items":{"$ref":"#/components/schemas/MerchantDocumentDto"}} |
+
+### GET /v1/platform/merchants/{tenantId}/documents/{id}/file
+
+Nhóm: platform merchants
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| path | `tenantId` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | PDF bytes | Chưa khai báo schema |
+
 ### POST /v1/merchant/branches
 
 Nhóm: merchant venues
@@ -668,6 +780,36 @@ Response được khai báo:
 | HTTP | Mô tả | Schema |
 |---|---|---|
 | 201 | Chưa mô tả | {"$ref":"#/components/schemas/RoomMediaResponseDto"} |
+
+### POST /v1/merchant/rooms/{id}/media/upload
+
+Nhóm: merchant venues
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+| path | `id` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`multipart/form-data`
+
+```json
+{
+  "$ref": "#/components/schemas/UploadRoomMediaDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 201 | Photo stored in the public Blob store and added to the room (PD-037) | {"$ref":"#/components/schemas/RoomMediaResponseDto"} |
+| 409 | Room already has 10 media entries | Chưa khai báo schema |
+| 413 | File larger than 4 MB | Chưa khai báo schema |
+| 422 | Not a JPEG, PNG or WebP image | Chưa khai báo schema |
 
 ### PATCH /v1/merchant/rooms/{id}/media/{mediaId}
 
@@ -2200,6 +2342,66 @@ Response được khai báo:
 |---|---|---|
 | 200 | Chưa mô tả | {"$ref":"#/components/schemas/PublicBookingTermsResponseDto"} |
 
+### GET /v1/merchant/catalog/logo
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Chưa mô tả | {"$ref":"#/components/schemas/MerchantLogoDto"} |
+
+### PUT /v1/merchant/catalog/logo
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`multipart/form-data`
+
+```json
+{
+  "$ref": "#/components/schemas/UploadLogoDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Replaces the logo; the previous file is deleted | {"$ref":"#/components/schemas/MerchantLogoDto"} |
+| 413 | File larger than 4 MB | Chưa khai báo schema |
+| 422 | Not a JPEG, PNG or WebP image | Chưa khai báo schema |
+
+### DELETE /v1/merchant/catalog/logo
+
+Nhóm: merchant files
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 204 | Logo removed (no-op when none) | Chưa khai báo schema |
+
 ### GET /v1/platform/catalog/listings
 
 Nhóm: platform listing approval
@@ -2776,6 +2978,77 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
 }
 ```
 
+### MerchantDocumentDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string"
+    },
+    "contentType": {
+      "type": "string",
+      "enum": [
+        "application/pdf"
+      ]
+    },
+    "sizeBytes": {
+      "type": "number"
+    },
+    "uploadedBy": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "uploadedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "tenantId",
+    "title",
+    "contentType",
+    "sizeBytes",
+    "uploadedBy",
+    "uploadedAt"
+  ]
+}
+```
+
+### UploadMerchantDocumentDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "format": "binary",
+      "description": "PDF, at most 4 MB"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 200,
+      "description": "What the document is (business licence, fire safety…)"
+    }
+  },
+  "required": [
+    "file",
+    "title"
+  ]
+}
+```
+
 ### CreateBranchDto
 
 ```json
@@ -3073,6 +3346,24 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "displayOrder": {
       "type": "number"
+    },
+    "url": {
+      "type": "string",
+      "nullable": true,
+      "description": "Public URL of an uploaded photo (PD-037); null for metadata-only entries"
+    },
+    "contentType": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    "sizeBytes": {
+      "type": "number",
+      "nullable": true
     }
   },
   "required": [
@@ -3080,7 +3371,10 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "roomId",
     "assetRef",
     "altText",
-    "displayOrder"
+    "displayOrder",
+    "url",
+    "contentType",
+    "sizeBytes"
   ]
 }
 ```
@@ -3110,6 +3404,34 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
   },
   "required": [
     "assetRef"
+  ]
+}
+```
+
+### UploadRoomMediaDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "format": "binary",
+      "description": "JPEG, PNG or WebP, at most 4 MB; compress on the client (PD-037)"
+    },
+    "altText": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "displayOrder": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Defaults to the number of existing media entries"
+    }
+  },
+  "required": [
+    "file"
   ]
 }
 ```
@@ -6438,6 +6760,11 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "merchantName": {
       "type": "string"
     },
+    "merchantLogoUrl": {
+      "type": "string",
+      "nullable": true,
+      "description": "Public logo URL (PD-037); null when the merchant has none"
+    },
     "name": {
       "type": "string"
     },
@@ -6449,6 +6776,7 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "id",
     "merchantId",
     "merchantName",
+    "merchantLogoUrl",
     "name",
     "timezone"
   ]
@@ -6703,6 +7031,67 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "currency",
     "totalAmountVnd",
     "bookingDurationPolicy"
+  ]
+}
+```
+
+### MerchantLogoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "configured": {
+      "type": "boolean"
+    },
+    "url": {
+      "type": "string",
+      "nullable": true,
+      "description": "Public Blob URL shown in the customer catalog"
+    },
+    "contentType": {
+      "type": "string",
+      "nullable": true,
+      "enum": [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+      ]
+    },
+    "sizeBytes": {
+      "type": "number",
+      "nullable": true
+    },
+    "updatedAt": {
+      "type": "string",
+      "nullable": true,
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "configured",
+    "url",
+    "contentType",
+    "sizeBytes",
+    "updatedAt"
+  ]
+}
+```
+
+### UploadLogoDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "file": {
+      "type": "string",
+      "format": "binary",
+      "description": "JPEG, PNG or WebP, at most 4 MB (PD-037)"
+    }
+  },
+  "required": [
+    "file"
   ]
 }
 ```

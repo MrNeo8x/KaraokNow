@@ -4,7 +4,7 @@ import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers
 import { hash } from 'bcryptjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { Pool } from 'pg';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
@@ -13,7 +13,8 @@ import { NOTIFICATION_ADAPTER, NotificationAdapter, NotificationRequest } from '
 import { OutboxService } from '../src/outbox/outbox.service';
 import { OutboxWorker } from '../src/outbox/outbox.worker';
 import { HoldService } from '../src/booking/hold.service';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { assertMatchesContract } from './openapi-contract';
 
 const TENANT_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -44,6 +45,7 @@ describe('Authentication, membership, RBAC and venue API', () => {
     postgres = await new PostgreSqlContainer('postgres:17-alpine').start();
     process.env.DATABASE_URL = postgres.getConnectionUri();
     process.env.JWT_SECRET = 'integration-test-secret-at-least-32-characters';
+    process.env.STORAGE_LOCAL_DIR = mkdtempSync(join(tmpdir(), 'karaokenow-storage-'));
     execFileSync(resolve('node_modules/.bin/node-pg-migrate'), ['up', '-m', 'migrations'], {
       cwd: resolve('.'), env: { ...process.env }, stdio: 'pipe'
     });
@@ -1747,6 +1749,103 @@ describe('Authentication, membership, RBAC and venue API', () => {
       if (previous.header === undefined) delete process.env.CLIENT_IP_HEADER; else process.env.CLIENT_IP_HEADER = previous.header;
     }
   });
+
+  it('stores room photos, the merchant logo and private merchant PDFs with type, size, count and role checks (PD-037)', async () => {
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(2048, 7)]);
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(1024, 3)]);
+    const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(1500, 65)]);
+    const server = app.getHttpServer();
+    const owner = (method: 'get' | 'post' | 'put' | 'delete', p: string) => request(server)[method](p).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);
+    const branch = (await authorized('post', '/v1/merchant/branches').send({ code: 'FILES', name: 'Files', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const room = (await authorized('post', '/v1/merchant/rooms').send({ branchId: branch.id, code: 'FILES-R', name: 'Files room', capacity: 6 }).expect(201)).body;
+    const uploadPath = `/v1/merchant/rooms/${room.id}/media/upload`;
+
+    // Room photos
+    const media = (await owner('post', uploadPath).attach('file', jpeg, { filename: 'room.jpg', contentType: 'image/jpeg' }).field('altText', 'Phòng nhìn từ cửa').expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/rooms/{id}/media/upload', 201, media);
+    expect(media).toMatchObject({ roomId: room.id, contentType: 'image/jpeg', sizeBytes: jpeg.length, altText: 'Phòng nhìn từ cửa', displayOrder: 0 });
+    expect(media.url).toBe(`/v1/files/public/${media.assetRef}`);
+    expect(media.assetRef).toMatch(new RegExp(`^rooms/${TENANT_A}/${room.id}/[0-9a-f-]{36}\\.jpg$`));
+    const served = await request(server).get(media.url).buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on('data', c => chunks.push(c)); res.on('end', () => cb(null, Buffer.concat(chunks))); }).expect(200);
+    expect(served.headers['content-type']).toBe('image/jpeg');
+    expect(Buffer.compare(served.body, jpeg)).toBe(0);
+    await owner('post', uploadPath).attach('file', pdf, { filename: 'fake.jpg', contentType: 'image/jpeg' }).expect(422);
+    await owner('post', uploadPath).attach('file', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), { filename: 'x.svg', contentType: 'image/svg+xml' }).expect(422);
+    await owner('post', uploadPath).field('altText', 'no file').expect(400);
+    await owner('post', uploadPath).attach('file', Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(4 * 1024 * 1024)]), { filename: 'big.jpg' }).expect(413);
+    const cashier = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'files-cashier@example.com',$1,'Files Cashier','ACTIVE') RETURNING id`, [await hash('Cashier-password-123', 4)])).rows[0];
+    const cashierMember = (await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES(gen_random_uuid(),$1,$2,'ACTIVE') RETURNING id`, [TENANT_A, cashier.id])).rows[0];
+    await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES($1,'CASHIER')`, [cashierMember.id]);
+    await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES($1,$2,$3)`, [cashierMember.id, TENANT_A, branch.id]);
+    const cashierToken = (await request(server).post('/v1/auth/login').send({ email: 'files-cashier@example.com', password: 'Cashier-password-123' }).expect(200)).body.accessToken;
+    await request(server).post(uploadPath).set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).attach('file', jpeg, { filename: 'r.jpg' }).expect(403);
+    for (let i = 0; i < 9; i++) await authorized('post', `/v1/merchant/rooms/${room.id}/media`).send({ assetRef: `rooms/meta-${i}.jpg`, displayOrder: i + 1 }).expect(201);
+    await owner('post', uploadPath).attach('file', png, { filename: 'eleventh.png' }).expect(409);
+    await authorized('get', `/v1/merchant/rooms/${room.id}/media`).expect(200).expect(({ body }) => {
+      expect(body).toHaveLength(10);
+      assertMatchesContract(doc, 'get', '/v1/merchant/rooms/{id}/media', 200, body);
+    });
+    await authorized('delete', `/v1/merchant/rooms/${room.id}/media/${media.id}`).expect(204);
+    await request(server).get(media.url).expect(404);
+
+    // Merchant logo
+    await owner('get', '/v1/merchant/catalog/logo').expect(200).expect(({ body }) => expect(body).toEqual({ configured: false, url: null, contentType: null, sizeBytes: null, updatedAt: null }));
+    const first = (await owner('put', '/v1/merchant/catalog/logo').attach('file', png, { filename: 'logo.png' }).expect(200)).body;
+    assertMatchesContract(doc, 'put', '/v1/merchant/catalog/logo', 200, first);
+    expect(first).toMatchObject({ configured: true, contentType: 'image/png', sizeBytes: png.length });
+    await request(server).put('/v1/merchant/catalog/logo').set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).attach('file', png, { filename: 'l.png' }).expect(403);
+    await owner('put', '/v1/merchant/catalog/logo').attach('file', pdf, { filename: 'logo.png' }).expect(422);
+    const second = (await owner('put', '/v1/merchant/catalog/logo').attach('file', jpeg, { filename: 'logo.jpg' }).expect(200)).body;
+    expect(second.url).not.toBe(first.url);
+    await request(server).get(first.url).expect(404);
+    await request(server).get(second.url).expect(200);
+    const catalog = (await pool.query('SELECT published,platform_approved FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=true,platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    else await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [TENANT_A, OWNER_ID]);
+    try {
+      const listed = (await request(server).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/public/branches', 200, listed);
+      expect(listed.items.find((item: { id: string }) => item.id === branch.id)).toMatchObject({ merchantLogoUrl: second.url });
+    } finally {
+      if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=$2,platform_approved=$3 WHERE tenant_id=$1', [TENANT_A, catalog.published, catalog.platform_approved]);
+      else await pool.query('DELETE FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A]);
+    }
+    await owner('delete', '/v1/merchant/catalog/logo').expect(204);
+    await request(server).get(second.url).expect(404);
+    await owner('get', '/v1/merchant/catalog/logo').expect(200).expect(({ body }) => expect(body.configured).toBe(false));
+
+    // Private merchant documents
+    await owner('post', '/v1/merchant/documents').attach('file', pdf, { filename: 'gp.pdf' }).expect(400);
+    await owner('post', '/v1/merchant/documents').field('title', 'Giấy phép').attach('file', jpeg, { filename: 'gp.pdf' }).expect(422);
+    const pdfDoc = (await owner('post', '/v1/merchant/documents').field('title', 'Giấy phép kinh doanh số 0312345678').attach('file', pdf, { filename: 'gp.pdf' }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/documents', 201, pdfDoc);
+    expect(pdfDoc).toMatchObject({ tenantId: TENANT_A, contentType: 'application/pdf', sizeBytes: pdf.length, uploadedBy: OWNER_ID });
+    const download = async (req: request.Test) => req.buffer(true).parse((res, cb) => { const chunks: Buffer[] = []; res.on('data', c => chunks.push(c)); res.on('end', () => cb(null, Buffer.concat(chunks))); });
+    const ownerFile = await download(owner('get', `/v1/merchant/documents/${pdfDoc.id}/file`).expect(200));
+    expect(ownerFile.headers).toMatchObject({ 'content-type': 'application/pdf', 'cache-control': 'private, no-store' });
+    expect(Buffer.compare(ownerFile.body, pdf)).toBe(0);
+    await request(server).get('/v1/merchant/documents').set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    await request(server).get(`/v1/merchant/documents/${pdfDoc.id}/file`).set('Authorization', `Bearer ${cashierToken}`).set('X-Tenant-ID', TENANT_A).expect(403);
+    const adminId = (await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES(gen_random_uuid(),'docs-admin@example.com',$1,'Docs Admin','ACTIVE') RETURNING id`, [await hash('Docs-password-123', 4)])).rows[0].id;
+    await pool.query('INSERT INTO platform_admins(user_id) VALUES($1)', [adminId]);
+    const adminToken = (await request(server).post('/v1/auth/login').send({ email: 'docs-admin@example.com', password: 'Docs-password-123' }).expect(200)).body.accessToken;
+    const adminList = (await request(server).get(`/v1/platform/merchants/${TENANT_A}/documents`).set('Authorization', `Bearer ${adminToken}`).expect(200)).body;
+    assertMatchesContract(doc, 'get', '/v1/platform/merchants/{tenantId}/documents', 200, adminList);
+    expect(adminList.map((d: { id: string }) => d.id)).toContain(pdfDoc.id);
+    const adminFile = await download(request(server).get(`/v1/platform/merchants/${TENANT_A}/documents/${pdfDoc.id}/file`).set('Authorization', `Bearer ${adminToken}`).expect(200));
+    expect(Buffer.compare(adminFile.body, pdf)).toBe(0);
+    await request(server).get(`/v1/platform/merchants/${TENANT_B}/documents/${pdfDoc.id}/file`).set('Authorization', `Bearer ${adminToken}`).expect(404);
+    await request(server).get(`/v1/platform/merchants/${TENANT_A}/documents`).set('Authorization', `Bearer ${ownerToken}`).expect(403);
+    for (let i = 1; i < 10; i++) await owner('post', '/v1/merchant/documents').field('title', `Hồ sơ ${i}`).attach('file', pdf, { filename: `d${i}.pdf` }).expect(201);
+    await owner('post', '/v1/merchant/documents').field('title', 'Hồ sơ 11').attach('file', pdf, { filename: 'd11.pdf' }).expect(409);
+    await owner('delete', `/v1/merchant/documents/${pdfDoc.id}`).expect(204);
+    await owner('get', `/v1/merchant/documents/${pdfDoc.id}/file`).expect(404);
+    await owner('delete', `/v1/merchant/documents/${pdfDoc.id}`).expect(404);
+    const audit = await pool.query(`SELECT action,after_data FROM audit_logs WHERE tenant_id=$1 AND action IN ('MERCHANT_DOCUMENT_UPLOADED','MERCHANT_LOGO_UPDATED','ROOM_MEDIA_UPLOADED')`, [TENANT_A]);
+    expect(audit.rows.filter(r => r.action === 'MERCHANT_DOCUMENT_UPLOADED')).toHaveLength(10);
+    expect(JSON.stringify(audit.rows)).not.toContain('0312345678');
+  }, 60000);
 
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)

@@ -30,4 +30,13 @@ export class RoomMediaResponseDto {
   @ApiProperty({ description: 'Storage reference only; binary upload/fetch is out of scope' }) assetRef!: string;
   @ApiProperty({ nullable: true, type: String }) altText!: string | null;
   @ApiProperty() displayOrder!: number;
+  @ApiProperty({ nullable: true, type: String, description: 'Public URL of an uploaded photo (PD-037); null for metadata-only entries' }) url!: string | null;
+  @ApiProperty({ nullable: true, type: String, enum: ['image/jpeg', 'image/png', 'image/webp'] }) contentType!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) sizeBytes!: number | null;
+}
+
+export class UploadRoomMediaDto {
+  @ApiProperty({ type: 'string', format: 'binary', description: 'JPEG, PNG or WebP, at most 4 MB; compress on the client (PD-037)' }) file!: unknown;
+  @ApiProperty({ required: false, maxLength: 200 }) altText?: string;
+  @ApiProperty({ required: false, minimum: 0, maximum: 10000, description: 'Defaults to the number of existing media entries' }) displayOrder?: number;
 }

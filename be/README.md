@@ -25,6 +25,10 @@ Run `npm run holds:expire` in a separate supervised process while using holds. I
 
 Run `npm run outbox:work` as a separate supervised process when dispatching events. Owner can query `GET /v1/merchant/notifications/outbox/backlog` for tenant-scoped queue counts. Before applying migration `20261123050000_outbox_claim_token`, stop old outbox workers and restart them with the updated code; see `../docs/02-architecture/transactional-outbox.md`. No live notification provider is configured.
 
+### File storage (PD-037)
+
+Room photos and the merchant logo go to the public Vercel Blob store, merchant PDF documents to the private store. Set `BLOB_PUBLIC_READ_WRITE_TOKEN` (or `BLOB_READ_WRITE_TOKEN`) and `BLOB_PRIVATE_READ_WRITE_TOKEN` on Vercel. Without tokens (local, tests) files are written under `STORAGE_LOCAL_DIR` (default `be/.storage`, git-ignored) and public files are served at `/v1/files/public/*`; on Vercel a missing token makes uploads return 503. Uploads are multipart field `file`, at most 4 MB, type checked by content.
+
 ### Docker images and operations (OPS-005)
 
 `Dockerfile` has two targets: `runtime` (default; API only, production dependencies) and `tools` (migrations and workers; includes `node-pg-migrate`, `ts-node`, `migrations/` and `scripts/`). With Compose:

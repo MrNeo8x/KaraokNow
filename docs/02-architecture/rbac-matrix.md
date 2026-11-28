@@ -25,6 +25,10 @@ This is the conservative authorization baseline implemented for the current venu
 | Reverse a deposit, CASH payment or surcharge | Yes, all tenant branches | Assigned only | No | No |
 | List unresolved expired-hold deposits; read daily cash report | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Resolve an expired-hold deposit (refund/keep) | Yes, all tenant branches | Assigned only | No | No |
+| Upload/delete room photos (public store) | Yes, all tenant branches | Assigned only | No | No |
+| Read the merchant logo | Yes | Yes | Yes | Yes |
+| Upload/remove the merchant logo | Yes | No | No | No |
+| Upload/list/download/delete merchant PDF documents (private store) | Yes | No | No | No |
 
 Platform listing approval is outside the merchant matrix. `GET /v1/platform/catalog/listings` and approve/revoke require a global, non-revoked `platform_admins` grant (no `X-Tenant-ID`), provisioned only through data. A Platform Admin who has an active membership in the target tenant is rejected, so merchant users cannot approve their own listing. The same global grant allows `GET/POST /v1/platform/merchants` to list merchants and onboard a merchant with its first Owner (PD-029), and `POST /v1/platform/merchants/{tenantId}/suspend|reactivate` (PD-031; rejected when the admin belongs to that merchant). A suspended merchant's staff keep their merchant permissions for existing holds/bookings but cannot create new holds.
 
@@ -35,3 +39,5 @@ JWT proves the user identity. `X-Tenant-ID` selects the working tenant, but acce
 Password reset, email verification and external identity providers are not implemented. MFA is explicitly deferred until after the pilot (PD-018); password rate-limit and lockout controls remain in place.
 
 Cashier read access to holds and bookings (API-003, 2026-11-26) was added so cashiers can reach the hold/booking they record deposits and CASH against; it grants no create, confirm, check-in/out or outcome rights. Cashiers seeing customer phone and email was confirmed by PO on 2026-11-28 (PD-032).
+
+Platform Admins may list and download any merchant's PDF documents (`/v1/platform/merchants/{tenantId}/documents`) for listing review (PD-037).

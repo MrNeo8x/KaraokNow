@@ -69,6 +69,8 @@ Stack Docker UAT (`be/compose.yaml`): Postgres `:5433`, backend `:3000` (Swagger
 - Benchmark: `npm run bench:booking` (cần Docker); chạy lại sau thay đổi ở đường giữ phòng/xác nhận và so với `docs/04-quality/booking-benchmark.md`. macOS không có lệnh `timeout`; đừng bọc lệnh bằng `timeout`.
 - Pool/timeout PostgreSQL có giới hạn mặc định (OPS-004, `be/src/platform/database/pool-config.ts`): mọi transaction và chờ khoá phải xong trong `PG_LOCK_TIMEOUT_MS` (5 s) / `PG_STATEMENT_TIMEOUT_MS` (15 s). Test cố tình giữ khoá lâu hơn sẽ nhận 409 (`55P03`).
 - Số điện thoại public được chuẩn hoá (`be/src/booking/phone.ts`): `0…`, `84…`, `+840…` → `+84…`.
+- File (PD-037) đi qua `ObjectStorageService` (`be/src/platform/storage/`): không gọi `@vercel/blob` trực tiếp ở chỗ khác; kiểm tra loại bằng `requireFile` (magic bytes), ≤ 4 MB (giới hạn body 4,5 MB của Vercel Function). E2E dùng backend local trong thư mục tạm (`STORAGE_LOCAL_DIR`). Dependency runtime mới của `be/` phải có bản CommonJS và ghim chính xác.
+- Git index dùng chung giữa các session: chạy `git diff --cached --name-only` ngay trước `git commit` — file người khác đã stage sẽ lọt vào commit của mình.
 
 ## Trạng thái task
 

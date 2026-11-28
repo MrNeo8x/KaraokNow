@@ -17,6 +17,8 @@ import { BookingModule } from './booking/booking.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ListingApprovalModule } from './listing-approval/listing-approval.module';
 import { JobsModule } from './jobs/jobs.module';
+import { StorageModule } from './platform/storage/storage.module';
+import { MerchantDocumentsModule } from './merchant-documents/merchant-documents.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { JobsModule } from './jobs/jobs.module';
     HttpPlatformModule,
     AuthModule,
     MembershipModule,
+    StorageModule,
+    MerchantDocumentsModule,
     VenueModule,
     AuditModule,
     AvailabilityModule,

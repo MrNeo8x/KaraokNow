@@ -23,6 +23,7 @@ Luồng request: trình duyệt → FE (`/v1/*` được Next.js rewrite) → BE
 | BE | `JWT_SECRET`, `CRON_SECRET` | Sensitive, sinh ngẫu nhiên, không lưu ở đâu khác; `vercel env pull` **không** trả giá trị thật. Cần dùng `CRON_SECRET` (gọi cron/chẩn đoán tay) thì đổi giá trị bằng `vercel env update` rồi deploy lại. Đổi `JWT_SECRET` = mọi phiên đăng nhập mất hiệu lực |
 | BE | `SWAGGER_ENABLED=false`, `PG_POOL_MAX=5` | Không bật Swagger trên production |
 | BE | `CLIENT_IP_HEADER=x-real-ip` | OPS-007: IP khách cho hạn mức công khai. Vercel ghi đè header này ở edge (đã đo: không giả mạo được, giữ đúng IP qua FE rewrite). Không đặt `TRUST_PROXY_HOPS` (`req.ip` trên Vercel là `127.0.0.1`), không dùng `cf-connecting-ip` |
+| BE | `BLOB_PUBLIC_READ_WRITE_TOKEN` (hoặc `BLOB_READ_WRITE_TOKEN`), `BLOB_PRIVATE_READ_WRITE_TOKEN` | PD-037: token read-write của store `vn-karaoke-now-blob-pub` (ảnh phòng, logo) và `vn-karaoke-now-blob-pri` (giấy tờ PDF). Nối store vào `vn-karaoke-now-api` với custom prefix `BLOB_PUBLIC` / `BLOB_PRIVATE` và **tick tạo read-write token**; nếu tên biến Vercel tạo khác thì đặt đúng hai tên trên. Thiếu token → API upload trả 503 (BE không ghi xuống đĩa của function), các API khác vẫn chạy. **Chưa đặt** — xem OPS-008 |
 | FE | `BACKEND_API_ORIGIN=https://vn-karaoke-now-api.vercel.app` | Đọc lúc **build**; đổi xong phải redeploy FE |
 
 Biến mới: thêm cho cả `production` và `preview` (`vercel env add <TÊN> <env> --project <project>`), ghi vào bảng trên và `be/.env.example`. Biến bắt buộc mới mà thiếu trên Vercel → function crash khi khởi động (`validateEnvironment`).
@@ -111,6 +112,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 - `task-board.md`: cập nhật task liên quan; thay đổi hạ tầng thì sửa file này.
 
 ## 10. Việc còn mở
+
+- **OPS-008** (PD-037): nối hai store Blob vào project BE với read-write token, áp migration `20261124050000_file_storage` (chỉ thêm cột nullable và bảng mới — tương thích ngược), push, smoke upload ảnh phòng/logo/PDF rồi xoá thử.
 
 - **OPS-002**: backup/restore cho Prisma Postgres.
 - Project FE đang nhận biến database do Prisma gắn (FE không dùng) — có thể gỡ kết nối storage khỏi `vn-karaoke-now`.

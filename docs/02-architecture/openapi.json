@@ -419,6 +419,258 @@
         ]
       }
     },
+    "/v1/merchant/documents": {
+      "get": {
+        "operationId": "MerchantDocumentController_list",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MerchantDocumentDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      },
+      "post": {
+        "operationId": "MerchantDocumentController_upload",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadMerchantDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "PDF stored in the private Blob store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantDocumentDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Merchant already has 10 documents"
+          },
+          "413": {
+            "description": "File larger than 4 MB"
+          },
+          "422": {
+            "description": "Not a PDF"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      }
+    },
+    "/v1/merchant/documents/{id}/file": {
+      "get": {
+        "operationId": "MerchantDocumentController_file",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF bytes",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      }
+    },
+    "/v1/merchant/documents/{id}": {
+      "delete": {
+        "operationId": "MerchantDocumentController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Document and its file deleted"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/documents": {
+      "get": {
+        "operationId": "PlatformMerchantDocumentController_list",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documents of any merchant, for listing review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MerchantDocumentDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      }
+    },
+    "/v1/platform/merchants/{tenantId}/documents/{id}/file": {
+      "get": {
+        "operationId": "PlatformMerchantDocumentController_file",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF bytes",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "platform merchants"
+        ]
+      }
+    },
     "/v1/merchant/branches": {
       "post": {
         "operationId": "VenueController_createBranch",
@@ -1170,6 +1422,68 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
+    "/v1/merchant/rooms/{id}/media/upload": {
+      "post": {
+        "operationId": "VenueController_uploadRoomMedia",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadRoomMediaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Photo stored in the public Blob store and added to the room (PD-037)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomMediaResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Room already has 10 media entries"
+          },
+          "413": {
+            "description": "File larger than 4 MB"
+          },
+          "422": {
+            "description": "Not a JPEG, PNG or WebP image"
           }
         },
         "security": [
@@ -4702,6 +5016,116 @@
         ]
       }
     },
+    "/v1/merchant/catalog/logo": {
+      "get": {
+        "operationId": "MerchantLogoController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantLogoDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      },
+      "put": {
+        "operationId": "MerchantLogoController_replace",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadLogoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replaces the logo; the previous file is deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantLogoDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File larger than 4 MB"
+          },
+          "422": {
+            "description": "Not a JPEG, PNG or WebP image"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      },
+      "delete": {
+        "operationId": "MerchantLogoController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Logo removed (no-op when none)"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant files"
+        ]
+      }
+    },
     "/v1/platform/catalog/listings": {
       "get": {
         "operationId": "ListingApprovalController_list",
@@ -5434,6 +5858,67 @@
           "platformAdmin"
         ]
       },
+      "MerchantDocumentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "application/pdf"
+            ]
+          },
+          "sizeBytes": {
+            "type": "number"
+          },
+          "uploadedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "title",
+          "contentType",
+          "sizeBytes",
+          "uploadedBy",
+          "uploadedAt"
+        ]
+      },
+      "UploadMerchantDocumentDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "PDF, at most 4 MB"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "What the document is (business licence, fire safety…)"
+          }
+        },
+        "required": [
+          "file",
+          "title"
+        ]
+      },
       "CreateBranchDto": {
         "type": "object",
         "properties": {
@@ -5673,6 +6158,24 @@
           },
           "displayOrder": {
             "type": "number"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public URL of an uploaded photo (PD-037); null for metadata-only entries"
+          },
+          "contentType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sizeBytes": {
+            "type": "number",
+            "nullable": true
           }
         },
         "required": [
@@ -5680,7 +6183,10 @@
           "roomId",
           "assetRef",
           "altText",
-          "displayOrder"
+          "displayOrder",
+          "url",
+          "contentType",
+          "sizeBytes"
         ]
       },
       "CreateRoomMediaDto": {
@@ -5705,6 +6211,29 @@
         },
         "required": [
           "assetRef"
+        ]
+      },
+      "UploadRoomMediaDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "JPEG, PNG or WebP, at most 4 MB; compress on the client (PD-037)"
+          },
+          "altText": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "displayOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Defaults to the number of existing media entries"
+          }
+        },
+        "required": [
+          "file"
         ]
       },
       "UpdateRoomMediaDto": {
@@ -8638,6 +9167,11 @@
           "merchantName": {
             "type": "string"
           },
+          "merchantLogoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public logo URL (PD-037); null when the merchant has none"
+          },
           "name": {
             "type": "string"
           },
@@ -8649,6 +9183,7 @@
           "id",
           "merchantId",
           "merchantName",
+          "merchantLogoUrl",
           "name",
           "timezone"
         ]
@@ -8868,6 +9403,57 @@
           "currency",
           "totalAmountVnd",
           "bookingDurationPolicy"
+        ]
+      },
+      "MerchantLogoDto": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Public Blob URL shown in the customer catalog"
+          },
+          "contentType": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp"
+            ]
+          },
+          "sizeBytes": {
+            "type": "number",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "configured",
+          "url",
+          "contentType",
+          "sizeBytes",
+          "updatedAt"
+        ]
+      },
+      "UploadLogoDto": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "JPEG, PNG or WebP, at most 4 MB (PD-037)"
+          }
+        },
+        "required": [
+          "file"
         ]
       },
       "ListingResponseDto": {

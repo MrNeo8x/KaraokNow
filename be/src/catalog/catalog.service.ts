@@ -60,8 +60,9 @@ export class CatalogService {
   }
   async branches(query: CatalogQueryDto) {
     const limit = query.limit ?? 50, offset = query.offset ?? 0;
-    const rows = (await this.db.query(`SELECT b.id,t.id AS "merchantId",t.name AS "merchantName",b.name,b.timezone
+    const rows = (await this.db.query(`SELECT b.id,t.id AS "merchantId",t.name AS "merchantName",l.url AS "merchantLogoUrl",b.name,b.timezone
       FROM branches b JOIN tenants t ON t.id=b.tenant_id JOIN tenant_public_catalog c ON c.tenant_id=t.id
+      LEFT JOIN merchant_logos l ON l.tenant_id=t.id
       WHERE c.published=true AND c.platform_approved=true AND t.status='ACTIVE' AND b.status='ACTIVE'
       ORDER BY b.name,b.id LIMIT $1 OFFSET $2`, [limit+1,offset])).rows;
     return { items: rows.slice(0,limit), limit, offset, hasMore: rows.length > limit };

@@ -1,11 +1,12 @@
 import { ForbiddenException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { Actor } from '../platform/auth/auth.types';
+import { ObjectStorageService } from '../platform/storage/object-storage.service';
 import { VenueService } from './venue.service';
 
 describe('VenueService authorization', () => {
   const query = jest.fn();
-  const service = new VenueService({ query } as unknown as Pool);
+  const service = new VenueService({ query } as unknown as Pool, new ObjectStorageService());
   const manager: Actor = {
     userId: 'user-a', tenantId: 'tenant-a', membershipId: 'membership-a',
     roles: ['BRANCH_MANAGER'], branchIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']

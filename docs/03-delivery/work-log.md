@@ -2,30 +2,28 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-014)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng BE — sau FILE-001)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`** (chưa push lên remote, CI GitHub chưa có kết quả). Gần nhất: FE FE-014 đối soát tiền mặt (commit này); BE `02202cd`/`44a388e` OPS-007 (IP khách sau rewrite Vercel, runbook); FE `ab345fb` REC-003 lịch lễ tân hợp nhất; BE `4af700b` PAY-007 đối soát tiền mặt (PD-036); deploy `73deaec` OPS-006 Vercel + Prisma Postgres + cron; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004 schema OpenAPI đầy đủ; BE `f1d8027` OPS-004 pool/timeout; FE `cd3cd4a` FE-013, ẩn thao tác theo `/me`, `roles.mjs`.
+**Code trên `main`** (chưa push: `560e3e9` FE-014, `ca8d662` runbook deploy, và commit FILE-001 này). Gần nhất: BE FILE-001 lưu ảnh/giấy tờ trên Vercel Blob (PD-037); FE `560e3e9` FE-014 đối soát tiền mặt; BE `02202cd`/`44a388e` OPS-007; FE `ab345fb` REC-003; BE `4af700b` PAY-007; deploy `73deaec` OPS-006; BE `7e5c050` PD-032…PD-035; BE `617198a` API-004; BE `f1d8027` OPS-004.
 
-**Kiểm chứng gần nhất:** FE (2026-11-28, frontend container rebuild) `npm test` 46/46, `next build`, `npm run e2e` **157/157** (API 64, khách 20, lễ tân/Owner 29, Platform 16, vai trò 28). BE (2026-11-28) `npm run verify` 52/52 unit, `npm run test:e2e` 44/44 (gồm contract OpenAPI và PAY-007), benchmark đạt sau OPS-004.
+**Kiểm chứng gần nhất:** BE (2026-11-28, sau FILE-001) `npm run verify` 62/62 unit + drift OpenAPI/Markdown, `npm run test:e2e` **46/46** (gồm upload ảnh/logo/PDF và contract OpenAPI), migration `20261124050000_file_storage` up → down → up. FE (2026-11-28, FE-014) `npm test` 46/46, `next build`, `npm run e2e` 157/157.
 
-**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (đã áp migration `20261124040000_cash_reconciliation`), frontend `:3100` có FE-014. Đã seed UAT. Worker tắt. Dữ liệu e2e tích luỹ (merchant `SMOKE_/UI_/SUSP_`, hold/booking/tiền mặt giả) — đừng dùng báo cáo tiền mặt local để đối chiếu. Mỗi lượt `npm run e2e` dùng ~6 giữ chỗ công khai trên hạn mức 20/IP/15 phút.
+**Môi trường local** (`be/compose.yaml`): Postgres `:5433`, backend `:3000` chạy code `4af700b` (chưa có FILE-001 — cần `npm run db:migrate` rồi `docker compose up -d --build backend`; container không có token Blob nên ghi file vào `STORAGE_LOCAL_DIR` trong container, mất khi rebuild), frontend `:3100` có FE-014. Đã seed UAT. Worker tắt.
 
-**Production (Vercel, OPS-006/007):** `vn-karaoke-now(-api).vercel.app` chạy `44a388e` (gồm PAY-007, REC-003, OPS-007). Migration production chạy tay; đã có đủ 26 migration (đến `20261124040000_cash_reconciliation`). Env BE thêm `CLIENT_IP_HEADER=x-real-ip`; `CRON_SECRET` đã đổi giá trị 2026-11-28. Quy trình bắt buộc: `docs/03-delivery/deploy-vercel.md`.
+**Production (Vercel):** chạy `44a388e`; 26 migration (đến `20261124040000_cash_reconciliation`); env BE có `CLIENT_IP_HEADER=x-real-ip`. **Chưa có FILE-001**: trước khi push commit này phải làm OPS-008 — nối store `vn-karaoke-now-blob-pub`/`vn-karaoke-now-blob-pri` vào `vn-karaoke-now-api` với read-write token (`BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`) và áp migration `20261124050000_file_storage` (tương thích ngược). Push mà chưa migrate sẽ làm lỗi API phòng/catalog (truy vấn cột mới). Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree, chưa commit):** không có của Luồng FE sau commit này. Session khác (BE/triển khai) đang có `AGENTS.md`, `README.md`, `docs/03-delivery/deploy-vercel.md` chưa commit và `docs/merchaint/img.png` đã stage — Luồng FE không commit hộ.
-
-**Trạng thái task:** xem `task-board.md` (FE-014 → `VERIFY` trong commit này).
+**Đang dở (working tree):** không có của Luồng BE sau commit này. `docs/merchaint/img.png` đã stage bởi session khác — không commit hộ.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chạy UAT theo `docs/04-quality/uat-checklist.md` (gồm nhóm H đối soát tiền mặt) và ký nhận; trả lời BKG-008; xác nhận quy mô bộ dữ liệu benchmark. Các giả định cọc, duyệt lại khi publish, overtime và quyền SĐT của Thu ngân đã chốt PD-032…PD-035.
-- *Luồng FE:* FE-011 (sinh type từ OpenAPI sau API-004); QA-003 phần còn lại (bàn phím/screen reader gồm timeline lịch, Safari/Firefox, mất mạng, refresh/logout đồng thời); FE-012 cần quyết định lưu phiên; FE-011 có thể làm sau API-004.
-- *Session triển khai:* OPS-007 xong (xem nhật ký 2026-11-28 OPS-007). Lần deploy sau theo `docs/03-delivery/deploy-vercel.md`.
-- *Luồng BE:* BKG-008 khi có PO định nghĩa "trường hợp"; OPS-002/OPS-003; IAM-004 khi có ZBS.
+- *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (thêm nhóm I ảnh và giấy tờ); trả lời BKG-008; xác nhận quy mô dữ liệu benchmark.
+- *Session triển khai:* OPS-008 (store Blob + token + migration + push + smoke upload).
+- *Luồng FE:* FE-015 (màn ảnh phòng, logo, giấy tờ; nén ảnh trước khi upload — xem handoff "FE READY — lưu ảnh và giấy tờ"); FE-011; QA-003 phần còn lại; FE-012.
+- *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP.
 
-**Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger.
+**Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
 
 
 ---
@@ -54,6 +52,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
 - Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
 - Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
+## 2026-11-28 — Luồng BE: lưu ảnh và giấy tờ trên Vercel Blob (FILE-001, PD-037)
+
+- PO chốt PD-037: Vercel Blob gói Hobby; upload qua BE (FE nén ảnh), ≤ 4 MB; store public `vn-karaoke-now-blob-pub` (ảnh phòng ≤ 10/phòng, logo merchant), store private `vn-karaoke-now-blob-pri` (PDF của merchant ≤ 10, Owner tải/xoá, Owner + Platform Admin xem). Người dùng đã tạo sẵn cả hai store.
+- Tài liệu Vercel (đọc 2026-11-28): Hobby 1 GB, 10 GB băng thông, 2.000 thao tác ghi/tháng; vượt → khoá 30 ngày, không tính tiền; function body ≤ 4,5 MB; đọc private bằng `get(pathname, { access: 'private', token })`; hai store trên một project phải truyền `token` từng lệnh. `@vercel/blob` 2.9.0 có bản CommonJS — ghim chính xác.
+- Code: `be/src/platform/storage/` (service chọn Vercel Blob/thư mục local, magic bytes, route `/v1/files/public/*` cho local), `be/src/catalog/merchant-logo.ts`, `be/src/merchant-documents/`, upload ảnh trong `venue`; migration `20261124050000_file_storage` (up → down → up đã kiểm). Trên Vercel thiếu token → 503, không ghi đĩa function.
+- Kiểm chứng: unit 62/62, E2E 46/46.
+- Chưa có trên production: OPS-008 giao session triển khai (nối store với read-write token, migrate, push, smoke). FE-015 `READY` cho màn upload.
 
 ---
 

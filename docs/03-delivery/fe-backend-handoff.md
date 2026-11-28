@@ -218,6 +218,17 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — lưu ảnh và giấy tờ (FILE-001, PD-037, 2026-11-28)
+
+Contract đã qua build, OpenAPI drift check và PostgreSQL Docker E2E 46/46 (response đối chiếu `openapi.json`). Upload là `multipart/form-data`, trường file tên `file`, **≤ 4 MB** (413 nếu lớn hơn); loại file kiểm tra theo nội dung (422 nếu sai). **FE nén ảnh trước khi gửi** (cạnh dài ≤ 1600 px, JPEG/WebP ~300–500 KB) để giữ trong hạn mức băng thông miễn phí — vượt hạn mức là Blob bị khoá 30 ngày.
+
+- **Ảnh phòng** (Owner, Branch Manager): `POST /v1/merchant/rooms/{id}/media/upload` trường `file` (JPEG/PNG/WebP) + tuỳ chọn `altText`, `displayOrder` → 201 `RoomMediaResponseDto` có thêm `url`, `contentType`, `sizeBytes` (media cũ chỉ có metadata: ba trường này `null`). Tối đa 10 media/phòng (409). `DELETE …/media/{mediaId}` xoá luôn file.
+- **Logo merchant**: `GET /v1/merchant/catalog/logo` (mọi vai trò) → `{configured,url,contentType,sizeBytes,updatedAt}`; `PUT` (Owner) multipart `file` thay logo (file cũ bị xoá); `DELETE` (Owner) 204. Catalog công khai `GET /v1/public/branches` có thêm `merchantLogoUrl` (null nếu chưa có).
+- **Giấy tờ PDF** (Owner): `GET /v1/merchant/documents`; `POST` multipart `file` (PDF) + `title` (bắt buộc, ≤ 200) → 201; tối đa 10/merchant (409); `GET /v1/merchant/documents/{id}/file` trả **byte PDF** (`Cache-Control: private, no-store`) — gọi bằng `fetch` có token rồi mở blob, không dùng `<a href>` trực tiếp vì cần header `Authorization`; `DELETE /v1/merchant/documents/{id}` 204.
+- **Platform Admin**: `GET /v1/platform/merchants/{tenantId}/documents` và `…/{id}/file` (không gửi `X-Tenant-ID`).
+- URL ảnh: production là URL Vercel Blob tuyệt đối (CDN); local là đường dẫn tương đối `/v1/files/public/…` (đi qua rewrite FE). Dùng nguyên giá trị `url`, không tự ghép.
+- Trên production cần OPS-008 (nối store + migration) trước khi dùng; trước đó upload trả 503.
+
 ## Ưu tiên tiếp theo
 
 Cập nhật 2026-11-26; chi tiết trong `work-log.md` và hàng đợi ở `task-board.md`.

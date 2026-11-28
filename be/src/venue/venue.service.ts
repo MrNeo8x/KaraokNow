@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient, QueryResultRow } from 'pg';
 import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
+import { EXTENSIONS, IMAGE_TYPES } from '../platform/storage/file-type';
+import { ObjectStorageService, StorageBackend } from '../platform/storage/object-storage.service';
+import { UploadedFileLike, requireFile } from '../platform/storage/uploaded-file';
+
+const MEDIA_FIELDS = `id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder",
+  storage_url AS url,content_type AS "contentType",size_bytes AS "sizeBytes"`;
+/** PD-037: at most 10 media entries per room. */
+export const MAX_ROOM_MEDIA = 10;
 import {
   BranchStatusDto, CreateBranchDto, CreateRoomAmenityDto, CreateRoomDto,
   CreateRoomMediaDto, RoomStatusDto, UpdateBranchDto, UpdateRoomAmenityDto, UpdateRoomDto, UpdateRoomMediaDto
@@ -11,11 +19,11 @@ import {
 export interface Branch { id: string; code: string; name: string; timezone: string; status: string }
 export interface Room { id: string; branchId: string; code: string; name: string; capacity: number; status: string }
 export interface RoomAmenity { id: string; roomId: string; label: string; createdAt: Date }
-export interface RoomMedia { id: string; roomId: string; assetRef: string; altText: string | null; displayOrder: number }
+export interface RoomMedia { id: string; roomId: string; assetRef: string; altText: string | null; displayOrder: number; url: string | null; contentType: string | null; sizeBytes: number | null }
 
 @Injectable()
 export class VenueService {
-  constructor(@Inject(PG_POOL) private readonly db: Pool) {}
+  constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly storage: ObjectStorageService) {}
 
   async createBranch(actor: Actor, dto: CreateBranchDto): Promise<Branch> {
     this.validateTimezone(dto.timezone);
@@ -148,7 +156,7 @@ export class VenueService {
   async listRoomMedia(actor: Actor, roomId: string): Promise<RoomMedia[]> {
     await this.getRoom(actor, roomId);
     return (await this.db.query<RoomMedia>(
-      `SELECT id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder"
+      `SELECT ${MEDIA_FIELDS}
        FROM room_media WHERE tenant_id=$1 AND room_id=$2 ORDER BY display_order,created_at,id`,
       [actor.tenantId, roomId])).rows;
   }
@@ -159,7 +167,7 @@ export class VenueService {
       const result = await client.query<RoomMedia>(
         `INSERT INTO room_media(id,tenant_id,branch_id,room_id,asset_ref,alt_text,display_order)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder"`,
+         RETURNING ${MEDIA_FIELDS}`,
         [id, actor.tenantId, room.branchId, roomId, dto.assetRef.trim(), dto.altText ?? null, dto.displayOrder ?? 0]);
       return result.rows[0];
     });
@@ -168,23 +176,53 @@ export class VenueService {
   async updateRoomMedia(actor: Actor, roomId: string, mediaId: string, dto: UpdateRoomMediaDto): Promise<RoomMedia> {
     await this.getRoom(actor, roomId);
     return this.updateEntity<RoomMedia>(actor, 'ROOM_MEDIA_UPDATED', 'ROOM_MEDIA', mediaId,
-      `SELECT id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder"
+      `SELECT ${MEDIA_FIELDS}
        FROM room_media WHERE tenant_id=$1 AND room_id=$2 AND id=$3 FOR UPDATE`,
       `UPDATE room_media SET asset_ref=COALESCE($4,asset_ref),
          alt_text=CASE WHEN $5::boolean THEN $6::varchar ELSE alt_text END,
          display_order=COALESCE($7,display_order),updated_at=now()
        WHERE tenant_id=$1 AND room_id=$2 AND id=$3
-       RETURNING id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder"`,
+       RETURNING ${MEDIA_FIELDS}`,
       [dto.assetRef?.trim() ?? null, dto.altText !== undefined, dto.altText ?? null, dto.displayOrder ?? null],
       [roomId, mediaId]);
   }
 
   async deleteRoomMedia(actor: Actor, roomId: string, mediaId: string): Promise<void> {
     await this.getRoom(actor, roomId);
+    const stored = (await this.db.query<{ asset_ref: string; storage_backend: StorageBackend | null }>(
+      'SELECT asset_ref,storage_backend FROM room_media WHERE tenant_id=$1 AND room_id=$2 AND id=$3', [actor.tenantId, roomId, mediaId])).rows[0];
     await this.deleteEntity(actor, 'ROOM_MEDIA_DELETED', 'ROOM_MEDIA', mediaId,
-      `SELECT id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder"
+      `SELECT ${MEDIA_FIELDS}
        FROM room_media WHERE tenant_id=$1 AND room_id=$2 AND id=$3 FOR UPDATE`,
       'DELETE FROM room_media WHERE tenant_id=$1 AND room_id=$2 AND id=$3', [roomId, mediaId]);
+    // After commit; an orphaned object is preferable to a media row pointing at a deleted file.
+    if (stored?.storage_backend) await this.storage.remove('public', stored.asset_ref, stored.storage_backend).catch(() => undefined);
+  }
+
+  /** PD-037: upload a room photo (JPEG/PNG/WebP ≤ 4 MB, type checked by magic bytes) to the public store. */
+  async uploadRoomMedia(actor: Actor, roomId: string, file: UploadedFileLike | undefined, altText?: string, displayOrder?: number): Promise<RoomMedia> {
+    const room = await this.getRoom(actor, roomId);
+    const { buffer, type } = requireFile(file, IMAGE_TYPES);
+    const count = Number((await this.db.query('SELECT count(*) FROM room_media WHERE tenant_id=$1 AND room_id=$2', [actor.tenantId, roomId])).rows[0].count);
+    if (count >= MAX_ROOM_MEDIA) throw new ConflictException(`A room can have at most ${MAX_ROOM_MEDIA} media entries`);
+    const id = randomUUID();
+    const pathname = `rooms/${actor.tenantId}/${roomId}/${id}.${EXTENSIONS[type]}`;
+    const stored = await this.storage.put('public', pathname, buffer, type);
+    try {
+      return await this.mutate(actor, 'ROOM_MEDIA_UPLOADED', 'ROOM_MEDIA', id, async (client, mediaId) => {
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`room-media:${roomId}`]);
+        const current = Number((await client.query('SELECT count(*) FROM room_media WHERE tenant_id=$1 AND room_id=$2', [actor.tenantId, roomId])).rows[0].count);
+        if (current >= MAX_ROOM_MEDIA) throw new ConflictException(`A room can have at most ${MAX_ROOM_MEDIA} media entries`);
+        return (await client.query<RoomMedia>(
+          `INSERT INTO room_media(id,tenant_id,branch_id,room_id,asset_ref,alt_text,display_order,storage_url,content_type,size_bytes,storage_backend)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING ${MEDIA_FIELDS}`,
+          [mediaId, actor.tenantId, room.branchId, roomId, stored.pathname, altText?.trim() || null, displayOrder ?? count,
+            stored.url, type, buffer.length, stored.backend])).rows[0];
+      });
+    } catch (error) {
+      await this.storage.remove('public', stored.pathname, stored.backend).catch(() => undefined);
+      throw error;
+    }
   }
 
   private assertBranchAccess(actor: Actor, branchId: string): void {

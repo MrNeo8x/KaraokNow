@@ -1,6 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { BranchResponseDto, RoomAmenityResponseDto, RoomMediaResponseDto, RoomResponseDto } from './venue-response.dto';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Req, UseGuards, BadRequestException, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UPLOAD_LIMITS, type UploadedFileLike } from '../platform/storage/uploaded-file';
+import { BranchResponseDto, RoomAmenityResponseDto, RoomMediaResponseDto, RoomResponseDto, UploadRoomMediaDto } from './venue-response.dto';
 import type { AuthenticatedRequest } from '../platform/auth/auth.types';
 import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
@@ -86,6 +88,19 @@ export class VenueController {
   @ApiResponse({ status: 201, type: RoomMediaResponseDto })
   createRoomMedia(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CreateRoomMediaDto) {
     return this.venues.createRoomMedia(req.actor, id, dto);
+  }
+  @Post('rooms/:id/media/upload') @RequireRoles('OWNER','BRANCH_MANAGER')
+  @UseInterceptors(FileInterceptor('file', UPLOAD_LIMITS)) @ApiConsumes('multipart/form-data') @ApiBody({ type: UploadRoomMediaDto })
+  @ApiResponse({ status: 201, type: RoomMediaResponseDto, description: 'Photo stored in the public Blob store and added to the room (PD-037)' })
+  @ApiResponse({ status: 409, description: 'Room already has 10 media entries' })
+  @ApiResponse({ status: 413, description: 'File larger than 4 MB' })
+  @ApiResponse({ status: 422, description: 'Not a JPEG, PNG or WebP image' })
+  uploadRoomMedia(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: UploadedFileLike | undefined,
+                  @Body() body: { altText?: string; displayOrder?: string }) {
+    const order = body?.displayOrder === undefined || body.displayOrder === '' ? undefined : Number(body.displayOrder);
+    if (order !== undefined && (!Number.isInteger(order) || order < 0 || order > 10000)) throw new BadRequestException('displayOrder must be an integer between 0 and 10000');
+    if (body?.altText !== undefined && String(body.altText).length > 200) throw new BadRequestException('altText must be at most 200 characters');
+    return this.venues.uploadRoomMedia(req.actor, id, file, body?.altText, order);
   }
   @Patch('rooms/:id/media/:mediaId') @RequireRoles('OWNER','BRANCH_MANAGER')
   @ApiResponse({ status: 200, type: RoomMediaResponseDto })

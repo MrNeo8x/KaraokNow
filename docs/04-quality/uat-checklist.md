@@ -1,6 +1,6 @@
 # Checklist UAT nhiều merchant (UAT-001)
 
-Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-036` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
+Phiên bản: 2026-11-26. Phạm vi theo quyết định `UAT-PD-001`…`UAT-PD-012` và `PD-025`…`PD-037` trong [`decision-log.md`](../00-product/decision-log.md). Ma trận yêu cầu: [`requirement-traceability.md`](requirement-traceability.md).
 
 ## 1. Phạm vi
 
@@ -138,6 +138,17 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 | H5 | Branch Manager | Hủy một booking đã thu tiền với tiền hoàn; xem tài khoản | Phải thu = 0, trạng thái "Đã đóng", báo số giữ lại = đã thu − đã hoàn | PD-027, PD-036 | | |
 | H6 | Cashier | Cuối ngày mở báo cáo tiền mặt của chi nhánh | Tổng cọc, tiền mặt, đảo, hoàn và tiền mặt ròng khớp két; có tách theo từng nhân viên | PD-036 | | |
 
+### I. Ảnh và giấy tờ (PD-037)
+
+| ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
+|---|---|---|---|---|---|---|
+| I1 | Owner, Khách | Tải ảnh phòng từ điện thoại (ảnh gốc > 4 MB) | FE nén trước khi gửi; ảnh hiện trong danh sách phòng của merchant và trang khách | PD-037 | | |
+| I2 | Owner | Tải file PDF hoặc SVG đặt tên `.jpg`; tải ảnh thứ 11 cho một phòng | Bị từ chối với thông báo rõ; phòng không vượt 10 ảnh | PD-037 | | |
+| I3 | Owner | Xoá một ảnh đã tải | Ảnh biến khỏi danh sách và không còn mở được bằng URL cũ (có thể trễ tới 60 giây do CDN) | PD-037 | | |
+| I4 | Owner, Khách | Tải logo; thay logo khác | Logo hiện trên danh sách chi nhánh của khách; logo cũ không còn | PD-037 | | |
+| I5 | Owner, Lễ tân | Owner tải giấy phép kinh doanh (PDF); Lễ tân thử mở mục giấy tờ | Owner xem/tải lại được; Lễ tân không thấy | PD-037 | | |
+| I6 | Platform Admin | Mở giấy tờ của merchant khi duyệt listing | Xem được PDF; merchant khác không lẫn | PD-037 | | |
+
 ### G. Phân quyền và tách merchant
 
 | ID | Vai trò | Bước | Kết quả mong đợi | Căn cứ | Kết quả | Ghi chú |
@@ -155,7 +166,7 @@ Mức độ lỗi: **Nghiêm trọng** (sai tiền, booking chồng, lộ dữ l
 
 ## 6. Tiêu chí kết thúc
 
-- 100% ca nhóm C, D, F, G và H đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
+- 100% ca nhóm C, D, F, G, H và I đạt; không còn lỗi **Nghiêm trọng** hay **Cao** đang mở.
 - Lỗi Trung bình/Thấp còn mở có hướng xử lý và được PO chấp nhận bằng văn bản.
 - Các giả định trước đây (B1, D2, E3) đã được PO chốt ngày 2026-11-28 (PD-033…PD-035); nếu UAT cho thấy cần đổi, ghi thành yêu cầu sửa và quyết định mới.
 - Kết quả, người thực hiện và ngày được ghi vào bảng; task board cập nhật UAT-001 và các task `VERIFY` liên quan.
