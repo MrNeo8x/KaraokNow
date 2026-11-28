@@ -11,3 +11,4 @@ coverage/
 graphify-out/
 
 be/.storage/
+be/backups/

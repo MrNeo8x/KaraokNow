@@ -122,6 +122,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **OPS-010** (PD-047): backup production hằng đêm qua GitHub Actions — người dùng thêm secret `PROD_DATABASE_URL`, `BACKUP_PASSPHRASE`; runbook `docs/03-delivery/ops-002-backup-restore.md` (cũng là quy trình khôi phục khi sự cố).
+
 - **IAM-009** (PD-045 phiên hỗ trợ Super Admin): **migration `20261124090000_support_sessions` trước push** (cột `platform_admins.super_admin` mặc định false + bảng `support_sessions`). Sau migrate, người dùng **chỉ định Super Admin đầu tiên**; session triển khai chạy một lệnh duy nhất `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL` (không seed dữ liệu khác). Các Super Admin sau cấp qua API/UI.
 
 - **RPT-001** (báo cáo): không migration, không env. Truy vấn tổng hợp trên bảng booking/tiền hiện có; theo dõi thời gian phản hồi khi dữ liệu lớn.

@@ -1,0 +1,54 @@
+name: Production DB backup
+
+# OPS-002 / PD-047: nightly encrypted logical backup of the production database, verified by a restore drill.
+# Needs repository secrets PROD_DATABASE_URL (direct PostgreSQL URL, read-only role if available) and BACKUP_PASSPHRASE.
+# Without them the run is skipped with a notice. Only the encrypted dump, its checksum and per-table row counts are uploaded.
+
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 02:00 Vietnam time
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::notice::PROD_DATABASE_URL or BACKUP_PASSPHRASE is not configured; backup skipped."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - name: Encrypted backup
+        if: steps.secrets.outputs.ready == 'true'
+        run: be/scripts/ops/db-backup.sh "$RUNNER_TEMP/backup"
+      - name: Restore drill (checksum, row counts, migrations, RTO)
+        if: steps.secrets.outputs.ready == 'true'
+        run: be/scripts/ops/db-restore-drill.sh "$(ls "$RUNNER_TEMP"/backup/*.dump.enc)" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload encrypted backup
+        if: steps.secrets.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: karaokenow-db-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/backup/*.dump.enc
+            ${{ runner.temp }}/backup/*.sha256
+            ${{ runner.temp }}/backup/*.counts.tsv
+          retention-days: 30
+          if-no-files-found: error

@@ -14,16 +14,25 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** `d76ad76`; **30 migration** (đến `20261124080000_branch_opening_hours`); Blob đã gắn; env BE `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. **Lần push tới (chứa `c4de3f1`):** (1) áp `20261124090000_support_sessions` lên Prisma trước (cột `platform_admins.super_admin` mặc định false + bảng mới — tương thích ngược); (2) **chờ Luồng FE chạy `npm run types:generate` (FE-021)** rồi push cùng, nếu không FE `types:check` đỏ vì `MerchantMeDto`/`PlatformUserDto` đổi; (3) sau deploy, theo chỉ định của người dùng chạy đúng một lệnh `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL` (không seed khác); (4) smoke `POST /v1/platform/support-sessions` không auth → 401. Còn chờ: nhập địa chỉ/SĐT/link/giờ mở cửa cho `LA_KHE`, `THANH_HA` (MAJESTIC) qua giao diện; kiểm màn báo cáo/giờ mở cửa/địa chỉ bằng tài khoản thật. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có; OPS-002 (backup/diễn tập khôi phục) **tạm dừng, chưa có file** — kế hoạch: script `pg_dump` qua container `postgres:17` (định dạng custom, checksum + bảng đếm dòng), script diễn tập khôi phục vào Postgres tạm đo RTO, runbook; chạy trên production cần quyền Prisma và quyết định nơi lưu bản sao (có dữ liệu cá nhân, phải mã hoá). `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE.
+**Đang dở (working tree):** Luồng BE không có. OPS-002 xong (script + workflow + runbook); OPS-010 chờ secret GitHub. `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE.
 
 **Việc tiếp theo**
 
-- *Người dùng / PO:* chỉ định Super Admin đầu tiên trên production; đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm I–Q; xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ trên production; quyết định nơi lưu và mã hoá bản backup (OPS-002).
+- *Người dùng / PO:* chỉ định Super Admin đầu tiên trên production; đăng ký uptime monitor (OPS-009); UAT `docs/04-quality/uat-checklist.md` nhóm I–Q; xem lại định nghĩa số liệu báo cáo (PD-044); trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ trên production; thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` vào GitHub rồi chạy tay workflow backup (OPS-010, runbook `ops-002-backup-restore.md`).
 - *Session triển khai:* các bước "Lần push tới" ở trên.
 - *Luồng FE:* **FE-021** phiên hỗ trợ Super Admin (nút Hỗ trợ + lý do, banner chỉ xem theo `readOnly`/`support`, danh sách/kết thúc phiên, cấp/thu hồi Super Admin) và cho người kiêm Platform Admin + Owner chuyển qua lại hai khu (PD-046); handoff "FE READY — phiên hỗ trợ Super Admin".
-- *Luồng BE:* OPS-002 (làm tiếp phần chạy được ở local); BKG-008 khi có PO; IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
+- *Luồng BE:* BKG-008 khi có PO; IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng BE: backup và diễn tập khôi phục (OPS-002, PD-047)
+
+- PO chọn GitHub Actions hằng đêm, mã hoá, giữ 30 ngày → PD-047 (RPO ≤ 24 h, RTO ≤ 1 h).
+- Script `be/scripts/ops/db-backup.sh`, `db-restore-drill.sh` (`npm run db:backup`, `db:restore-drill`), workflow `.github/workflows/db-backup.yml` (bỏ qua khi thiếu secret), runbook `docs/03-delivery/ops-002-backup-restore.md`, `.gitignore` thêm `be/backups/`.
+- Diễn tập trên DB local: thường và mã hoá đều `counts_match=yes` (42 bảng, 4.093 dòng, 31 migration), `restore_seconds=1`; sai passphrase và file bị sửa đều exit 1. Bản thử đã xoá.
+- Chưa chạy production: OPS-010 `BLOCKED` chờ người dùng thêm secret. Chưa xác minh `pg_dump` qua kết nối trực tiếp của Prisma Postgres — sẽ thấy ở lần chạy đầu.
 
 ---
 
