@@ -3,13 +3,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { confirmationMode, depositAmountError } from '@/lib/booking-lifecycle';
-import { useCan } from './permissions-context';
+import { exemptionText } from '@/lib/deposit-exemption';
+import { useCan, useReadOnly } from './permissions-context';
+import ReasonDialog, { type ReasonRequest } from './reason-dialog';
 
 export type DetailedHold = { id: string; branchId: string; roomId: string; channel: string; startAt: string; durationMinutes: number; reservedEndAt: string; expiresAt: string; bufferMinutes: number; status: 'HELD' | 'EXPIRED' | 'CONFIRMED'; customerPhone?: string | null; customerEmail?: string | null; priceSnapshot?: { totalAmountVnd?: string; currency?: string } | null; phoneVerifiedAt?: string | null; phoneVerifiedBy?: string | null; depositPolicySnapshot?: DepositSnapshot | null; publicAcceptedTerms?: string | null };
 export type DepositSnapshot = { mode: 'NONE' | 'FIXED' | 'PERCENT'; fixedAmountVnd: string | null; percent: string | null; policyVersion: string | null; requiredAmountVnd: string };
 export type DepositEntry = { id: string; amountVnd: string; note: string | null; recordedAt: string; reversed?: boolean };
 export type DepositStatus = { holdId: string; holdStatus: string; depositPolicySnapshot: DepositSnapshot | null; requiredAmountVnd: string; totalRecordedVnd: string; remainingVnd: string; depositSatisfied: boolean; items: DepositEntry[] };
 const money = (value: string) => `${BigInt(value).toLocaleString('vi-VN')} ₫`;
+type Exemption = { holdId: string; exempt: boolean; reasons: string[]; waiver: { reason: string; recordedBy: string; recordedAt: string } | null; canWaive: boolean };
 type Quote = { priceSnapshot: { totalAmountVnd: string; currency: string; timezone: string; calculation: { priceRuleCode: string } } };
 
 export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: DetailedHold; token: string; tenant: string; onUpdated: (hold: DetailedHold) => void }) {
@@ -20,7 +23,8 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
   const [deposits, setDeposits] = useState<DepositStatus | null>(null); const [depositError, setDepositError] = useState(''); const [depositRevision, setDepositRevision] = useState(0);
   const [depositAmount, setDepositAmount] = useState(''); const [depositNote, setDepositNote] = useState(''); const [depositKey, setDepositKey] = useState(() => crypto.randomUUID()); const [depositForbidden, setDepositForbidden] = useState(false);
-  const allowed = useCan(); const canManage = allowed('hold.manage');
+  const allowed = useCan(); const canManage = allowed('hold.manage'); const readOnly = useReadOnly();
+  const [exemption, setExemption] = useState<Exemption | null>(null); const [waiverDialog, setWaiverDialog] = useState<ReasonRequest | null>(null);
   const [reversing, setReversing] = useState<{ id: string; reason: string } | null>(null);
   const hasSnapshot = Boolean(hold.priceSnapshot);
   // A web hold must be confirmed with exactly the terms the guest accepted. Prefer the hold's own copy when the backend
@@ -45,6 +49,27 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
       .then(setDeposits).catch(err => { if (!controller.signal.aborted) { setDeposits(null); setDepositError((err as Error).message); } });
     return () => controller.abort();
   }, [hold.id, hasSnapshot, depositRevision, token, tenant]);
+
+  // PD-050: deposit exemption cases evaluated by the backend for this hold (refreshes with the deposit status).
+  useEffect(() => {
+    if (!hasSnapshot || hold.status !== 'HELD') { setExemption(null); return; }
+    const controller = new AbortController();
+    request<Exemption>(`/merchant/booking/holds/${encodeURIComponent(hold.id)}/deposit-exemption`, { signal: controller.signal }, token, tenant)
+      .then(setExemption).catch(() => { if (!controller.signal.aborted) setExemption(null); });
+    return () => controller.abort();
+  }, [hold.id, hold.status, hasSnapshot, depositRevision, token, tenant]);
+  function askWaiver() {
+    setWaiverDialog({ title: 'Miễn cọc cho giữ chỗ này', description: 'Giữ chỗ được xác nhận mà không cần đủ cọc. Ghi rõ lý do (vd khách đoàn quen, quản lý đồng ý); lý do được lưu kèm booking.', confirmLabel: 'Miễn cọc', run: async reason => {
+      const next = await request<Exemption>(`/merchant/booking/holds/${encodeURIComponent(hold.id)}/deposit-waiver`, { method: 'POST', body: JSON.stringify({ reason }) }, token, tenant);
+      setExemption(next); setMessage('Đã miễn cọc cho giữ chỗ này.'); setDepositRevision(value => value + 1);
+    } });
+  }
+  async function cancelWaiver() {
+    if (!window.confirm('Huỷ miễn cọc? Giữ chỗ lại cần đủ cọc (hoặc trường hợp miễn khác) để xác nhận.')) return;
+    setBusy(true); setError(''); setMessage('');
+    try { await request(`/merchant/booking/holds/${encodeURIComponent(hold.id)}/deposit-waiver`, { method: 'DELETE' }, token, tenant); setMessage('Đã huỷ miễn cọc.'); setDepositRevision(value => value + 1); }
+    catch (err) { setError((err as Error).message); } finally { setBusy(false); }
+  }
 
   function editDeposit(update: () => void) { update(); setDepositKey(crypto.randomUUID()); }
   async function reverseDeposit(item: DepositEntry) {
@@ -120,7 +145,14 @@ export default function HoldDetails({ hold, token, tenant, onUpdated }: { hold: 
         {hold.status === 'HELD' && allowed('deposit.record') && !depositForbidden && BigInt(deposits.remainingVnd) > 0n && <form className="action-form" onSubmit={recordDeposit}><label>Cọc tiền mặt (VND)<input inputMode="numeric" value={depositAmount} onChange={event => editDeposit(() => setDepositAmount(event.target.value))} placeholder={deposits.remainingVnd} required /></label><label>Ghi chú<input maxLength={500} value={depositNote} onChange={event => editDeposit(() => setDepositNote(event.target.value))} /></label><button className="primary" disabled={busy}>Ghi nhận cọc</button></form>}
       </>}
       <small>Chỉ ghi nhận tiền mặt đã thu tại quầy; không có thanh toán online. Hoàn cọc khi hold hết hạn xử lý ngoài hệ thống.</small></div>}
-    {canManage && hold.status === 'HELD' && hold.phoneVerifiedAt && hold.priceSnapshot && (() => { const mode = confirmationMode(deposits?.depositPolicySnapshot, deposits?.depositSatisfied); return <div className="action-form"><label>Điều khoản hủy đã thống nhất<textarea value={terms} onChange={event => setTerms(event.target.value)} readOnly={termsSource === 'accepted' || termsSource === 'current'} minLength={1} maxLength={5000} rows={3} required placeholder="Nhập đúng điều khoản đã thông báo cho khách" /></label>{termsSource === 'accepted' && <small>Điều khoản khách đã đồng ý khi đặt online.</small>}{termsSource === 'current' && <small>Đã điền điều khoản công khai hiện tại. Hold này được khách đặt online; nếu Owner đã sửa điều khoản sau thời điểm khách đặt, xác nhận sẽ bị từ chối.</small>}{isWeb && termsSource === 'unavailable' && <small>Hold đặt online: cần nhập chính xác điều khoản khách đã đồng ý. Chỉ Owner xem được điều khoản công khai hiện tại.</small>}<button type="button" className="primary" disabled={busy || !terms.trim() || !deposits || mode === 'DEPOSIT_MISSING' || mode === 'NO_SNAPSHOT'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận…' : mode === 'DEPOSIT_COVERED' ? 'Xác nhận booking (đã đủ cọc)' : mode === 'DEPOSIT_MISSING' ? 'Cần đủ cọc trước khi xác nhận' : 'Xác nhận booking không đặt cọc'}</button><small>{mode === 'NO_DEPOSIT' ? 'Chỉ khả dụng nếu kênh đã bật xác nhận không đặt cọc.' : mode === 'DEPOSIT_MISSING' ? 'Ghi nhận đủ cọc tiền mặt ở trên để mở xác nhận.' : 'Backend kiểm tra lại số cọc khi xác nhận.'}</small></div>; })()}
+    {exemption && hold.status === 'HELD' && (exemption.exempt || exemption.canWaive) && <div className="exemption-panel">
+      {exemption.exempt ? <span className="tag">{exemptionText(exemption.reasons)}</span> : <span>Chưa thuộc trường hợp miễn cọc nào.</span>}
+      {exemption.waiver && <small>Lý do miễn: {exemption.waiver.reason} · {new Date(exemption.waiver.recordedAt).toLocaleString('vi-VN')}</small>}
+      {!readOnly && exemption.canWaive && (exemption.waiver ? <button type="button" className="link-button danger" disabled={busy} onClick={() => void cancelWaiver()}>Huỷ miễn cọc</button>
+        : !(deposits?.depositPolicySnapshot && deposits.depositPolicySnapshot.mode !== 'NONE' && deposits.depositSatisfied) && <button type="button" className="secondary" disabled={busy} onClick={askWaiver}>Miễn cọc</button>)}
+    </div>}
+    <ReasonDialog request={waiverDialog} onClose={() => setWaiverDialog(null)} />
+    {canManage && hold.status === 'HELD' && hold.phoneVerifiedAt && hold.priceSnapshot && (() => { const mode = confirmationMode(deposits?.depositPolicySnapshot, deposits?.depositSatisfied, exemption?.exempt); return <div className="action-form"><label>Điều khoản hủy đã thống nhất<textarea value={terms} onChange={event => setTerms(event.target.value)} readOnly={termsSource === 'accepted' || termsSource === 'current'} minLength={1} maxLength={5000} rows={3} required placeholder="Nhập đúng điều khoản đã thông báo cho khách" /></label>{termsSource === 'accepted' && <small>Điều khoản khách đã đồng ý khi đặt online.</small>}{termsSource === 'current' && <small>Đã điền điều khoản công khai hiện tại. Hold này được khách đặt online; nếu Owner đã sửa điều khoản sau thời điểm khách đặt, xác nhận sẽ bị từ chối.</small>}{isWeb && termsSource === 'unavailable' && <small>Hold đặt online: cần nhập chính xác điều khoản khách đã đồng ý. Chỉ Owner xem được điều khoản công khai hiện tại.</small>}<button type="button" className="primary" disabled={busy || !terms.trim() || !deposits || mode === 'DEPOSIT_MISSING' || mode === 'NO_SNAPSHOT'} onClick={() => void confirm()}>{busy ? 'Đang xác nhận…' : mode === 'DEPOSIT_COVERED' ? 'Xác nhận booking (đã đủ cọc)' : mode === 'EXEMPT' ? 'Xác nhận booking (được miễn cọc)' : mode === 'DEPOSIT_MISSING' ? 'Cần đủ cọc trước khi xác nhận' : 'Xác nhận booking không đặt cọc'}</button><small>{mode === 'EXEMPT' ? 'Lý do miễn cọc được lưu vào booking.' : mode === 'NO_DEPOSIT' ? 'Chỉ khả dụng nếu kênh đã bật xác nhận không đặt cọc.' : mode === 'DEPOSIT_MISSING' ? 'Ghi nhận đủ cọc tiền mặt ở trên để mở xác nhận.' : 'Backend kiểm tra lại số cọc khi xác nhận.'}</small></div>; })()}
     {hold.status !== 'CONFIRMED' && <p>Việc lưu thông tin hoặc ghi nhận cuộc gọi không xác nhận booking và không xử lý thanh toán.</p>}
   </div>;
 }

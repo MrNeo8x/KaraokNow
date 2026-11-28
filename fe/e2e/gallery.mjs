@@ -1,4 +1,4 @@
-// FE-022 / VEN-006 (PD-048): merchant gallery (Owner) and branch gallery (Owner/Branch Manager), at most 10 photos each,
+// FE-022 / VEN-006 (PD-048) + FE-023 / VEN-007 (PD-049): merchant gallery (Owner) and branch gallery (Owner/Branch Manager), at most 10 photos each,
 // browser compression, alt text/order, role gating and the photo strip on /booking. Deletes every photo it creates.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -78,6 +78,28 @@ try {
     if (count !== expected || !first.includes('Mặt tiền E2E') && branches[index].photos[0]?.altText !== first || last !== 'Sảnh chính E2E (đã sửa)') throw new Error(`count=${count}/${expected} first=${first} last=${last}`);
     await strip.screenshot({ path: `${SHOTS}/gallery-booking.png` }); return `${count} ảnh`;
   });
+
+  // FE-023 / VEN-007 (PD-049): real room photos replace the fixed illustration in the guest room list.
+  const room = (await api('GET', `/public/branches/${BRANCH}/rooms`)).json.items?.[0] ?? (await api('GET', `/public/branches/${BRANCH}/rooms`)).json[0];
+  const roomMedia = [];
+  await step(guest, 'Ảnh phòng thật: thẻ phòng dùng ảnh đầu tiên, có nhãn số ảnh và dải ảnh khi chọn phòng', async () => {
+    for (const alt of ['Phòng E2E ảnh 1', 'Phòng E2E ảnh 2']) {
+      const form = new FormData(); form.append('file', new Blob([small], { type: 'image/png' }), 'room.png'); form.append('altText', alt); form.append('displayOrder', String(roomMedia.length));
+      const response = await fetch(`${BASE}/v1/merchant/rooms/${room.id}/media/upload`, { method: 'POST', headers: { authorization: `Bearer ${ownerToken}`, 'x-tenant-id': TENANT }, body: form });
+      if (response.status !== 201) throw new Error(`upload ${response.status}`); roomMedia.push((await response.json()).id);
+    }
+    await guest.reload(); await guest.locator('.branch-option', { hasText: 'KaraokeNow UAT Hồ Chí Minh' }).click();
+    const day = new Date(Date.now() + (60 + Math.floor(Math.random() * 300)) * 86400000).toISOString().slice(0, 10);
+    await guest.getByLabel('Ngày', { exact: true }).fill(day); await guest.getByRole('group', { name: 'Giờ bắt đầu' }).getByRole('button', { name: '20:00' }).click();
+    await guest.getByRole('button', { name: /Tìm phòng trống/ }).click(); await guest.getByRole('heading', { name: 'Phòng còn trống' }).waitFor();
+    const card = guest.locator('.room-option', { hasText: room.name }); const image = card.locator('.room-photo img');
+    if ((await image.getAttribute('alt')) !== 'Phòng E2E ảnh 1') throw new Error(`alt=${await image.getAttribute('alt')}`);
+    await card.locator('.photo-count', { hasText: '2 ảnh' }).waitFor(); await card.click();
+    const strip = guest.getByRole('list', { name: `Ảnh ${room.name}` }); await strip.waitFor(); if ((await strip.locator('li').count()) !== 2) throw new Error('dải ảnh phòng không đủ 2 ảnh');
+    const others = guest.locator('.room-option', { hasNotText: room.name }).locator('img').first(); const fallback = (await others.count()) ? await others.getAttribute('src') : '/rooms/';
+    await guest.screenshot({ path: `${SHOTS}/gallery-room-photos.png`, fullPage: true }); return `phòng khác: ${fallback}`;
+  });
+  for (const id of roomMedia) await api('DELETE', `/merchant/rooms/${room.id}/media/${id}`, { token: ownerToken, tenant: TENANT });
 
   const manager = await signIn(MANAGER);
   await step(manager.page, 'Quản lý chi nhánh: quản lý được ảnh chi nhánh được giao (xoá một ảnh)', async () => {

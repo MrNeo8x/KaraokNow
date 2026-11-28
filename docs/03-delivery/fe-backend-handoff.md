@@ -228,9 +228,20 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Xác nhận (`POST …/holds/{id}/confirm`) nay thành công cả khi chưa đủ cọc hoặc kênh chưa bật không cọc **nếu** `exempt`; `confirmationPolicySnapshot.depositExemptionReasons` có mặt khi được miễn. Không miễn thì 409 như cũ.
 - Production cần migration `20261124110000_deposit_exemptions` trước khi push.
 
+### FE INTEGRATED — miễn cọc theo trường hợp (FE-024, BKG-008, 2026-11-28)
+
+- Giá & chính sách → "Miễn cọc theo trường hợp" (`deposit-exemption-settings.tsx`): đọc mọi vai trò, sửa khi `policy.update`; gửi đủ trường bằng `PUT`; kiểm tra trước như DTO (ngưỡng 1–15 chữ số, ≤ 14 khung, `to` > `from` cùng ngày, khách quen 1–100, 7–730 ngày, luôn có OWNER).
+- Hold (`hold-details.tsx`): đọc `/holds/{id}/deposit-exemption` cùng trạng thái cọc; nhãn "Được miễn cọc: giá trị nhỏ / giờ vắng / khách quen / duyệt miễn thủ công", lý do miễn; "Miễn cọc" (hộp thoại lý do) khi `canWaive` và còn thiếu cọc; "Huỷ miễn cọc" khi có waiver; nút xác nhận mở với nhãn "(được miễn cọc)" khi `exempt`. Ẩn nút trong phiên hỗ trợ chỉ xem.
+- Booking (`booking-operations.tsx`): nhãn lý do miễn từ `confirmationPolicySnapshot.depositExemptionReasons`. Thông báo BE mới đã dịch.
+- Kiểm thử: unit `deposit-exemption.test.mjs`; e2e `fe/e2e/exemption.mjs` 12/12 (Lễ tân đọc/không sửa, 409 khung giờ, kiểm tra form, lưu, hold thiếu cọc → miễn → huỷ → Lễ tân được cấp quyền miễn → xác nhận → snapshot + nhãn trong lịch booking, ngưỡng tiền tự động "AMOUNT", đặt lại chính sách). Đã `npm run types:generate`.
+
 ## FE READY — ảnh phòng cho khách (VEN-007, PD-049, 2026-11-28)
 
 **OpenAPI đổi → `npm run types:generate`.** E2E 59/59. `GET /v1/public/branches/{id}/rooms` → mỗi phòng có thêm `photos: [{ url, altText }]` đã sắp theo `displayOrder` (tối đa 10), chỉ ảnh đã tải file thật; phòng chưa có ảnh → `[]` (giữ ảnh mặc định). Dùng nguyên `url`. Không migration — deploy được ngay khi FE sinh lại type.
+
+### FE INTEGRATED — ảnh phòng cho khách (FE-023, VEN-007, 2026-11-28)
+
+`customer-booking.tsx`: `Room.photos` từ `GET /public/branches/{id}/rooms`; thẻ phòng dùng ảnh đầu (lỗi tải → ảnh SVG mặc định), nhãn "N ảnh"; phòng đang chọn có > 1 ảnh → dải ảnh cuộn ngang (`PhotoStrip`, dùng chung với thư viện chi nhánh). Phòng `photos: []` giữ ảnh mặc định. e2e trong `fe/e2e/gallery.mjs`. Đã `npm run types:generate`.
 
 ## FE READY — thư viện ảnh merchant và chi nhánh (VEN-006, PD-048, 2026-11-28)
 

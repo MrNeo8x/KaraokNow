@@ -24,6 +24,10 @@ const FRIENDLY: [RegExp, string | ((match: RegExpMatchArray) => string)][] = [
   [/grant platform admin first/i, 'Người dùng phải là Platform Admin trước khi được cấp Super Admin.'],
   [/use your own membership/i, 'Bạn là thành viên của merchant này: mở merchant bằng tài khoản thành viên của mình, không dùng phiên hỗ trợ.'],
   [/no active membership for tenant/i, 'Tài khoản không có quyền trong merchant này (hoặc phiên hỗ trợ đã kết thúc).'],
+  [/may not waive deposits/i, 'Vai trò của bạn không được duyệt miễn cọc ở merchant này.'],
+  [/a confirmed hold keeps its waiver/i, 'Giữ chỗ đã xác nhận: không huỷ được miễn cọc.'],
+  [/each off-peak window must end after it starts/i, 'Mỗi khung giờ vắng phải kết thúc sau giờ bắt đầu trong cùng ngày.'],
+  [/hold has expired or is already confirmed/i, 'Giữ chỗ đã hết hạn hoặc đã được xác nhận.'],
   [/support session not found/i, 'Không tìm thấy phiên hỗ trợ.'],
   [/merchant is suspended/i, 'Merchant đang bị Platform khoá: không nhận giữ chỗ mới. Các giữ chỗ và booking hiện có vẫn xử lý được.'],
 ];

@@ -24,9 +24,11 @@ export function depositAmountError(value: string, remainingVnd: string): string 
   return null;
 }
 
-/** NONE needs the channel no-deposit permission; FIXED/PERCENT need the recorded deposit to cover the snapshot. */
-export function confirmationMode(snapshot: { mode: string } | null | undefined, depositSatisfied: boolean | undefined): 'NO_SNAPSHOT' | 'NO_DEPOSIT' | 'DEPOSIT_MISSING' | 'DEPOSIT_COVERED' {
+/** NONE needs the channel no-deposit permission; FIXED/PERCENT need the recorded deposit to cover the snapshot — unless a
+ * deposit-exemption case applies (PD-050), which also lets the backend confirm without the channel permission. */
+export function confirmationMode(snapshot: { mode: string } | null | undefined, depositSatisfied: boolean | undefined, exempt = false): 'NO_SNAPSHOT' | 'NO_DEPOSIT' | 'DEPOSIT_MISSING' | 'DEPOSIT_COVERED' | 'EXEMPT' {
   if (!snapshot) return 'NO_SNAPSHOT';
-  if (snapshot.mode === 'NONE') return 'NO_DEPOSIT';
-  return depositSatisfied ? 'DEPOSIT_COVERED' : 'DEPOSIT_MISSING';
+  if (snapshot.mode !== 'NONE' && depositSatisfied) return 'DEPOSIT_COVERED';
+  if (exempt) return 'EXEMPT';
+  return snapshot.mode === 'NONE' ? 'NO_DEPOSIT' : 'DEPOSIT_MISSING';
 }

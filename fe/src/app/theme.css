@@ -453,3 +453,19 @@ main.admin-content { margin: 0; }
 .branch-gallery li { position: relative; flex: 0 0 min(72%, 260px); scroll-snap-align: start; border-radius: 12px; overflow: hidden; background: var(--brand-50); }
 .branch-gallery img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
 .branch-gallery span { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 10px 7px; font-size: 12px; color: #fff; background: linear-gradient(transparent, rgba(20, 12, 40, .72)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* FE-023: real room photos on /booking (PD-049) */
+.room-photo { position: relative; display: block; line-height: 0; }
+.room-photo .photo-count { position: absolute; right: 4px; bottom: 4px; padding: 1px 6px; border-radius: 999px; background: rgba(20, 12, 40, .72); color: #fff; font-size: 10.5px; line-height: 1.6; font-weight: 600; }
+/* FE-024: case-level deposit exemptions (PD-050) */
+.exemption-form { display: grid; gap: 14px; margin-top: 12px; }
+.exemption-form fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 14px; min-width: 0; }
+.exemption-windows { display: grid; gap: 8px; }
+.exemption-windows small, .exemption-form > fieldset > small { color: var(--muted); font-size: 12px; }
+.exemption-window { display: grid; grid-template-columns: minmax(0, 1fr) 120px 120px auto; gap: 10px; align-items: end; padding: 10px; border: 1px solid var(--border); border-radius: 12px; }
+.weekday-picks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.weekday-picks .check-row { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.weekday-picks input { width: auto; margin: 0; }
+.fields-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.exemption-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0; padding: 10px 12px; border-radius: 12px; background: var(--success-bg); }
+.exemption-panel small { color: var(--text-2); }
+@media (max-width: 700px) { .exemption-window { grid-template-columns: 1fr 1fr; } .exemption-window .weekday-picks { grid-column: 1 / -1; } }

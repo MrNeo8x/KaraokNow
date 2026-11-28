@@ -30,6 +30,7 @@ import MerchantReports from './merchant-reports';
 import MySessions from './my-sessions';
 import SupportSessions from './support-sessions';
 import VenueGallery from './venue-gallery';
+import DepositExemptionSettings from './deposit-exemption-settings';
 import { ApiError, request, setReadOnlyGuard } from '@/lib/api';
 import { minutesLeft, supportTenantFromSearch } from '@/lib/support';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
@@ -278,6 +279,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
         <OvertimeSettings key={`overtime:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <DepositSettings key={`deposit-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
         <NoDepositSettings key={`no-deposit-settings:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
+        <DepositExemptionSettings key={`deposit-exemptions:${activeTenant}`} token={session.accessToken} tenant={activeTenant} />
       </>}
       {section === 'users' && isOwner !== false && <Memberships key={`members:${activeTenant}`} token={session.accessToken} tenant={activeTenant} branches={branches} />}
       {section === 'marketplace' && <>

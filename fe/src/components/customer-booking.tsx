@@ -11,7 +11,7 @@ import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cle
 
 export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null; bookingPolicy?: BookingPolicy; photos?: VenuePhoto[]; merchantPhotos?: VenuePhoto[] };
 export type VenuePhoto = { url: string; altText: string | null };
-export type Room = { id: string; branchId?: string; name: string; capacity: number };
+export type Room = { id: string; branchId?: string; name: string; capacity: number; photos?: VenuePhoto[] };
 type Page<T> = { items: T[]; hasMore: boolean };
 export type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
 export type Quote = { branchId: string; roomId: string; timezone: string; startAt: string; endAt: string; durationMinutes: number; currency: 'VND'; totalAmountVnd: string; bookingDurationPolicy: { durationStepMinutes: number; minDurationMinutes: number; maxDurationMinutes: number } };
@@ -35,12 +35,18 @@ function openingLabel(branch: Branch): string {
   return `Mở cửa ${branch.openingTime}–${branch.closingTime}${branch.closingTime <= branch.openingTime ? ' (qua nửa đêm)' : ''}`;
 }
 
-/** Branch photos first, then the merchant's (PD-048); hidden when there are none or every image fails to load. */
-function BranchGallery({ branch }: { branch?: Branch }) {
+/** Horizontal photo strip (PD-048 branch/merchant galleries, PD-049 room photos); images that fail to load are dropped. */
+function PhotoStrip({ photos, label, fallbackAlt }: { photos: VenuePhoto[]; label: string; fallbackAlt: string }) {
   const [broken, setBroken] = useState<Record<string, boolean>>({});
-  const photos = [...(branch?.photos ?? []), ...(branch?.merchantPhotos ?? [])].filter(photo => !broken[photo.url]);
-  if (!branch || photos.length === 0) return null;
-  return <ul className="branch-gallery" aria-label={`Ảnh ${branch.merchantName} – ${branch.name}`}>{photos.map((photo, index) => <li key={`${photo.url}:${index}`}><img src={photo.url} alt={photo.altText ?? `Ảnh ${branch.name}`} loading="lazy" onError={() => setBroken(current => ({ ...current, [photo.url]: true }))} />{photo.altText && <span>{photo.altText}</span>}</li>)}</ul>;
+  const shown = photos.filter(photo => !broken[photo.url]);
+  if (shown.length === 0) return null;
+  return <ul className="branch-gallery" aria-label={label}>{shown.map((photo, index) => <li key={`${photo.url}:${index}`}><img src={photo.url} alt={photo.altText ?? fallbackAlt} loading="lazy" onError={() => setBroken(current => ({ ...current, [photo.url]: true }))} />{photo.altText && <span>{photo.altText}</span>}</li>)}</ul>;
+}
+
+/** Branch photos first, then the merchant's (PD-048). */
+function BranchGallery({ branch }: { branch?: Branch }) {
+  if (!branch) return null;
+  return <PhotoStrip photos={[...(branch.photos ?? []), ...(branch.merchantPhotos ?? [])]} label={`Ảnh ${branch.merchantName} – ${branch.name}`} fallbackAlt={`Ảnh ${branch.name}`} />;
 }
 
 function BranchContact({ branch, compact = false }: { branch?: Branch; compact?: boolean }) {
@@ -207,6 +213,7 @@ export default function CustomerBooking() {
 
   const branch = branches.find(item => item.id === branchId); const rooms = availability?.rooms ?? []; const selectedRoom = rooms.find(item => item.id === roomId);
   const roomImage = (id: string) => fixedRoomImages[Math.max(0, catalogRooms.findIndex(item => item.id === id)) % fixedRoomImages.length];
+  const roomPhotos = (id: string) => catalogRooms.find(item => item.id === id)?.photos ?? []; // PD-049: real photos, else the fixed illustration
   const today = dates[0]?.value ?? '';
   const lookupStatus = lookup ? (lookup.bookingStatus ?? lookup.status) : null;
   const pillTone = (value: string | null) => value === 'CANCELLED' || value === 'NO_SHOW' || value === 'EXPIRED' ? 'rose' : value === 'COMPLETED' ? 'gray' : value === 'HELD' ? 'amber' : 'green';
@@ -250,9 +257,10 @@ export default function CustomerBooking() {
         <h2 id="customer-rooms-title"><span className="step-no">3</span>Phòng còn trống</h2>
         <p><CalendarDays size={13} aria-hidden /> {when(availability.startAt, branch?.timezone)} · {durationLabel(availability.durationMinutes)} · {guests} khách{availability.appliedBufferMinutes ? ` · dọn phòng ${availability.appliedBufferMinutes} phút` : ''}</p>
         {rooms.length === 0 ? <div className="empty">Không có phòng phù hợp còn trống trong thời gian đã chọn.</div> : <div className="room-list">{rooms.map(room => { const value = quotes[room.id]; const priced = value && value !== 'unavailable' ? value : null; return <button type="button" key={room.id} className="room-option" aria-pressed={roomId === room.id} disabled={value === 'unavailable'} onClick={() => { setRoomId(room.id); setAcceptedTerms(null); setHoldError(''); }}>
-          <img src={roomImage(room.id)} alt={`Ảnh minh họa cố định cho ${room.name}`} />
+          {roomPhotos(room.id).length ? <span className="room-photo"><img src={roomPhotos(room.id)[0].url} alt={roomPhotos(room.id)[0].altText ?? `Ảnh ${room.name}`} loading="lazy" onError={event => { const image = event.currentTarget; const fallback = roomImage(room.id); if (!image.src.endsWith(fallback)) { image.src = fallback; image.alt = `Ảnh minh họa cố định cho ${room.name}`; } }} />{roomPhotos(room.id).length > 1 && <small className="photo-count">{roomPhotos(room.id).length} ảnh</small>}</span> : <img src={roomImage(room.id)} alt={`Ảnh minh họa cố định cho ${room.name}`} />}
           <span><strong>{room.name}</strong><small>Tối đa {room.capacity} người</small><span className="room-price">{priced ? `${money(priced.totalAmountVnd)} / ${durationLabel(priced.durationMinutes)}` : value === 'unavailable' ? 'Chưa có giá cho khung giờ này' : searching ? 'Đang tính giá…' : ''}</span></span>
           <span className="room-pick">{roomId === room.id ? 'Đã chọn' : 'Chọn'}</span></button>; })}</div>}
+        {rooms.some(room => room.id === roomId) && roomPhotos(roomId).length > 1 && <PhotoStrip key={roomId} photos={roomPhotos(roomId)} label={`Ảnh ${catalogRooms.find(item => item.id === roomId)?.name ?? 'phòng'}`} fallbackAlt="Ảnh phòng" />}
       </section>}
       {availability && selectedRoom && quote && <section className="app-card" aria-labelledby="customer-confirm-title">
         <h2 id="customer-confirm-title"><span className="step-no">4</span>Xác nhận đặt phòng</h2>

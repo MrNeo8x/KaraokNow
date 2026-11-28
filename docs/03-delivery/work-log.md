@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng BE — sau BKG-008)
+## Trạng thái hiện tại (cập nhật 2026-11-28 tối, Luồng FE — sau FE-023/FE-024; phần còn lại theo Luồng BE sau BKG-008)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -14,16 +14,25 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** code tới `cb63c9a` (gồm VEN-007); Prisma **32 migration** (đến `20261124100000_venue_photos`). MAJESTIC có dữ liệu demo công khai (ảnh stock). 2/2 Platform Admin là Super Admin. Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Backup workflow chờ secret (OPS-010). Preview Vercel dùng chung DB production. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Session triển khai: mục nhật ký "dữ liệu demo Karaoke Majestic" trong `work-log.md` chưa commit — không commit hộ.
+**Đang dở (working tree):** Luồng BE không có. Luồng FE: không có (FE-023/FE-024 đã commit, `VERIFY`). Session triển khai: mục nhật ký "dữ liệu demo Karaoke Majestic" trong `work-log.md` chưa commit — không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* thêm secret backup và chạy tay workflow (OPS-010); đăng ký uptime monitor (OPS-009); UAT nhóm A–S (thêm S: miễn cọc theo trường hợp); thay ảnh demo Majestic bằng ảnh thật; quyết định làm sạch email/lý do trong audit cũ; cân nhắc staging tách DB.
 - *Session triển khai:* lần push chứa `23837c3`: áp `20261124110000_deposit_exemptions` trước, push cùng FE-024 (và FE-023 nếu chưa), smoke `GET /v1/merchant/booking/deposit-exemptions` không auth → 401; commit nhật ký demo Majestic.
-- *Luồng FE:* **FE-023** ảnh phòng thật trên trang khách, **FE-024** màn miễn cọc theo trường hợp (handoff "FE READY — miễn cọc theo trường hợp"); chạy `types:generate` trước.
+- *Luồng FE:* không còn task FE `READY` (FE-023, FE-024 `VERIFY`).
 - *Luồng BE:* không còn task không bị chặn — IAM-004 (ZBS), OPS-010 (secret), PAY-002–004 (sau pilot).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng FE: ảnh phòng cho khách (FE-023) và miễn cọc theo trường hợp (FE-024)
+
+- Người dùng: "BE xong, FE làm tiếp" → FE-023 (VEN-007, PD-049) và FE-024 (BKG-008, PD-050). Sinh lại `api-types.gen.ts` tới `23837c3`.
+- FE-023: thẻ phòng trên `/booking` dùng ảnh thật + nhãn số ảnh, dải ảnh khi chọn phòng; phòng chưa có ảnh giữ ảnh mặc định.
+- FE-024: màn chính sách miễn cọc (Giá & chính sách), khung miễn cọc trên hold (nhãn lý do, Miễn cọc/Huỷ theo `canWaive`, xác nhận khi được miễn), nhãn lý do miễn trên booking.
+- Kiểm chứng: unit 75/75, `tsc`, `types:check`, `next build`; e2e `exemption.mjs` 12/12, `gallery.mjs` 12/12; `npm run e2e` các bộ còn lại đạt (API 66, vị trí 7, giờ mở cửa 11, khách 26, lễ tân 29, Platform 16, files 13, phiên 9, user Platform 12, báo cáo 15, hỗ trợ 16, ảnh 12); `roles`/`exemption` trong lượt đầy đủ dừng ở bước tạo hold vì 429 (hết 20 giữ chỗ/15 phút sau nhiều lần chạy) — chạy lại sau khi hạn mức hồi.
 
 ---
 
@@ -57,7 +66,7 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - `venue-gallery.tsx` dùng chung: "Ảnh merchant" (Marketplace, Owner) và "Ảnh chi nhánh" (Phòng hát, Owner/Quản lý chi nhánh; vai trò khác chỉ xem), nén ảnh trên trình duyệt, mô tả/thứ tự, xoá, giới hạn 10. Trang khách: dải ảnh chi nhánh + merchant dưới thông tin chi nhánh.
 - Phiên hỗ trợ: thông báo "phiên đã kết thúc" nhất quán (403 của `/merchant/branches` không còn ghi đè bằng câu tiếng Anh); dịch `No active membership for tenant`.
 - Sửa test: `customer`, `branch-location`, `opening-hours` chọn đích danh chi nhánh UAT — merchant Majestic (session triển khai công khai trên DB local) đứng đầu danh sách nên các bộ này từng giữ chỗ nhầm chi nhánh.
-- Kiểm chứng: unit 71/71, `tsc`, `types:check`, `next build`; e2e `gallery.mjs` 11/11, `support.mjs` 16/16 (3 lần), các bộ khác đạt ở lượt đầy đủ trước khi Majestic được công khai. Lượt đầy đủ sau khi sửa chọn chi nhánh bị 429 (hết hạn mức 20 giữ chỗ/15 phút do chạy nhiều lần); lượt chạy lại đang chạy lúc commit — xem mục nhật ký sau.
+- Kiểm chứng: unit 71/71, `tsc`, `types:check`, `next build`; e2e `gallery.mjs` 11/11, `support.mjs` 16/16 (3 lần), các bộ khác đạt ở lượt đầy đủ trước khi Majestic được công khai. Lượt đầy đủ sau khi sửa chọn chi nhánh bị 429 (hết hạn mức 20 giữ chỗ/15 phút do chạy nhiều lần); chạy lại sau khi hạn mức hồi: `npm run e2e` **259/259** (API 66, vị trí 7, giờ mở cửa 11, khách 26, lễ tân 29, Platform 16, vai trò 28, files 13, phiên 9, user Platform 12, báo cáo 15, hỗ trợ 16, thư viện ảnh 11).
 - Lưu ý: không rebuild container backend sau khi session triển khai `docker cp` ảnh Majestic (ảnh ở `/app/.storage`, mất khi rebuild); ảnh vẫn trả 200.
 
 ---

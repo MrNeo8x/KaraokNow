@@ -1620,6 +1620,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/merchant/booking/deposit-exemptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositExemptionController_get"];
+        /** @description Replaces the merchant case-level deposit exemption policy (PD-050) */
+        put: operations["DepositExemptionController_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/booking/holds/{id}/deposit-exemption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["DepositExemptionController_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/booking/holds/{id}/deposit-waiver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Waives the deposit of one hold with a reason; allowed for the roles in waiverRoles (Owner always). Idempotent */
+        post: operations["DepositExemptionController_waive"];
+        delete: operations["DepositExemptionController_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/merchant/catalog/publication": {
         parameters: {
             query?: never;
@@ -2974,6 +3024,8 @@ export interface components {
             requiredDepositVnd?: string;
             /** @description Deposit-required path only: hold deposits recorded at confirmation */
             depositRecordedVnd?: string;
+            /** @description Present only when a case allowed confirmation without the (full) deposit or the channel no-deposit permission (PD-050) */
+            depositExemptionReasons?: ("AMOUNT" | "OFF_PEAK" | "REGULAR_CUSTOMER" | "MANUAL_WAIVER")[];
         };
         BookingOutcomeDto: {
             /** @enum {string} */
@@ -3427,6 +3479,78 @@ export interface components {
             /** @description Same totals per staff member who recorded the entries */
             byRecorder: components["schemas"]["CashRecorderTotalsDto"][];
         };
+        OffPeakWindowDto: {
+            /**
+             * @description ISO weekdays, 1 = Monday … 7 = Sunday
+             * @example [
+             *       1,
+             *       2,
+             *       3,
+             *       4,
+             *       5
+             *     ]
+             */
+            weekdays: number[];
+            /**
+             * @description Start time HH:mm (branch local time), inclusive
+             * @example 10:00
+             */
+            from: string;
+            /**
+             * @description End time HH:mm, exclusive, later than from (same day)
+             * @example 17:00
+             */
+            to: string;
+        };
+        DepositExemptionPolicyDto: {
+            /** @description False while the merchant has never saved a policy (defaults shown) */
+            configured: boolean;
+            maxAmountVnd: string | null;
+            offPeakWindows: components["schemas"]["OffPeakWindowDto"][];
+            regularMinCompleted: number | null;
+            regularLookbackDays: number;
+            waiverRoles: ("OWNER" | "BRANCH_MANAGER" | "RECEPTIONIST" | "CASHIER")[];
+            version: string | null;
+        };
+        UpdateDepositExemptionPolicyDto: {
+            /**
+             * @description Bookings with total ≤ this amount need no deposit; null = off
+             * @example 300000
+             */
+            maxAmountVnd: string | null;
+            /** @description Bookings starting inside one of these windows need no deposit; [] = off */
+            offPeakWindows: components["schemas"]["OffPeakWindowDto"][];
+            /**
+             * @description Regular customer: at least this many COMPLETED bookings and no NO_SHOW within the lookback; null = off
+             * @example 3
+             */
+            regularMinCompleted: number | null;
+            /** @example 90 */
+            regularLookbackDays: number;
+            /** @description Roles that may waive the deposit of a single hold (OWNER always included) */
+            waiverRoles: ("OWNER" | "BRANCH_MANAGER" | "RECEPTIONIST" | "CASHIER")[];
+        };
+        WaiverInfoDto: {
+            reason: string;
+            /** Format: uuid */
+            recordedBy: string;
+            /** Format: date-time */
+            recordedAt: string;
+        };
+        DepositExemptionStatusDto: {
+            /** Format: uuid */
+            holdId: string;
+            /** @description True when at least one case applies: confirmation needs no deposit and no channel no-deposit permission */
+            exempt: boolean;
+            reasons: ("AMOUNT" | "OFF_PEAK" | "REGULAR_CUSTOMER" | "MANUAL_WAIVER")[];
+            waiver: components["schemas"]["WaiverInfoDto"] | null;
+            /** @description Whether the caller may waive or revoke the waiver of this hold */
+            canWaive: boolean;
+        };
+        DepositWaiverDto: {
+            /** @example Khách đoàn công ty quen, quản lý đồng ý */
+            reason: string;
+        };
         PublicationResponseDto: {
             published: boolean;
             /** @description Separate platform approval; cannot be changed through the merchant API */
@@ -3513,6 +3637,8 @@ export interface components {
             branchId: string;
             name: string;
             capacity: number;
+            /** @description Uploaded room photos in display order, at most 10 (VEN-007); metadata-only media without a file is omitted */
+            photos: components["schemas"]["PublicPhotoDto"][];
         };
         PublicRoomListDto: {
             limit: number;
@@ -7270,6 +7396,145 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CashReportDto"];
                 };
+            };
+        };
+    };
+    DepositExemptionController_get: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositExemptionPolicyDto"];
+                };
+            };
+        };
+    };
+    DepositExemptionController_put: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDepositExemptionPolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositExemptionPolicyDto"];
+                };
+            };
+            /** @description An off-peak window ends before it starts */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositExemptionController_status: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositExemptionStatusDto"];
+                };
+            };
+        };
+    };
+    DepositExemptionController_waive: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepositWaiverDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DepositExemptionStatusDto"];
+                };
+            };
+            /** @description Role not allowed to waive, or branch outside scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Hold expired or already confirmed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    DepositExemptionController_revoke: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Tenant-ID": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waiver removed (no-op when none) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
