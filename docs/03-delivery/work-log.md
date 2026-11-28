@@ -29,6 +29,14 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Session triển khai: FE-021 trên production
+
+- Kiểm tra điều kiện FE-021: production phục vụ `148cbde` (chứa `c4de3f1`), `/v1/platform/support-sessions` 401 không auth (route có; cảnh báo "404" trong work log BE ghi lúc Vercel còn build), `20261124090000_support_sessions` đã áp, 2/2 Platform Admin là Super Admin.
+- `e0daab2` (FE-021) đã được push trước khi session này push; không migration/dependency/env mới sau `148cbde`. Kiểm tra worktree sạch tại `e0daab2`: BE verify 73/73, E2E 57/57; FE 71/71, `types:check` khớp, `tsc`, `build`. Hai project READY `e0daab2`; smoke: trang/health 200, `/docs` + cron 404, `/v1/health/jobs` ok, support-sessions 401.
+- Chưa: Super Admin thử mở phiên hỗ trợ (chỉ đọc) vào merchant trên trình duyệt.
+
+---
+
 ## 2026-11-28 — Luồng FE: phiên hỗ trợ Super Admin và chuyển khu (FE-021)
 
 - Người dùng: "Tiếp tục công việc BE đã [xong]" → FE-021 (IAM-009/010, PD-045/046). Sinh lại `api-types.gen.ts` tới `c4de3f1`.
