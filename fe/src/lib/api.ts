@@ -18,6 +18,12 @@ const FRIENDLY: [RegExp, string | ((match: RegExpMatchArray) => string)][] = [
   [/already a tenant member/i, 'Người dùng này đã là thành viên của merchant.'],
   [/branch-scoped roles require at least one branch/i, 'Vai trò theo chi nhánh cần ít nhất một chi nhánh.'],
   [/^nothing to change$/i, 'Không có thay đổi nào để lưu.'],
+  [/support sessions are read-only/i, 'Phiên hỗ trợ chỉ được xem: không thay đổi được dữ liệu của merchant.'],
+  [/super admin role is required/i, 'Chỉ Super Admin mới thực hiện được thao tác này.'],
+  [/at least one active super admin/i, 'Phải còn ít nhất một Super Admin đang hoạt động.'],
+  [/grant platform admin first/i, 'Người dùng phải là Platform Admin trước khi được cấp Super Admin.'],
+  [/use your own membership/i, 'Bạn là thành viên của merchant này: mở merchant bằng tài khoản thành viên của mình, không dùng phiên hỗ trợ.'],
+  [/support session not found/i, 'Không tìm thấy phiên hỗ trợ.'],
   [/merchant is suspended/i, 'Merchant đang bị Platform khoá: không nhận giữ chỗ mới. Các giữ chỗ và booking hiện có vẫn xử lý được.'],
 ];
 export function friendlyMessage(message: string): string {
@@ -47,7 +53,17 @@ function buildHeaders(init: RequestInit, token?: string, tenant?: string): Heade
   return headers;
 }
 
+// Set by the merchant area while a Super Admin support session is open (PD-045): writes fail fast in the browser.
+let readOnlyGuard = false;
+export const READ_ONLY_MESSAGE = 'Phiên hỗ trợ chỉ được xem: không thay đổi được dữ liệu của merchant.';
+/** Merchant API calls that change data; blocked in the browser while a support session is read-only. */
+export function isMerchantWrite(path: string, method = 'GET'): boolean {
+  return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase()) && path.startsWith('/merchant/');
+}
+export function setReadOnlyGuard(on: boolean): void { readOnlyGuard = on; }
+
 export async function request<T>(path: string, init: RequestInit = {}, token?: string, tenant?: string): Promise<T> {
+  if (readOnlyGuard && isMerchantWrite(path, init.method)) throw new ApiError(READ_ONLY_MESSAGE, 403);
   const response = await fetch(`/v1${path}`, { ...init, headers: buildHeaders(init, token, tenant) });
   if (!response.ok) throw await toApiError(response);
   return response.status === 204 ? undefined as T : response.json();

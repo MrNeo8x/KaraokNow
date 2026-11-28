@@ -413,6 +413,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/users/{id}/super-admin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformUsersController_grantSuper"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/users/{id}/super-admin/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformUsersController_revokeSuper"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/platform/users/{id}/platform-admin/revoke": {
         parameters: {
             query?: never;
@@ -1748,6 +1780,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/support-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["SupportSessionController_list"];
+        put?: never;
+        /** @description Opens (or returns the already active) read-only support session into a merchant for 60 minutes. Then call merchant APIs with X-Tenant-ID = tenantId: GET only, contact data masked */
+        post: operations["SupportSessionController_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/support-sessions/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["SupportSessionController_end"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1852,6 +1917,13 @@ export interface components {
             roles?: ("OWNER" | "BRANCH_MANAGER" | "RECEPTIONIST" | "CASHIER")[];
             branchIds?: string[];
         };
+        SupportContextDto: {
+            /** Format: uuid */
+            sessionId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            reason: string;
+        };
         MerchantMeDto: {
             /** Format: uuid */
             userId: string;
@@ -1865,13 +1937,20 @@ export interface components {
              * @enum {string}
              */
             tenantStatus: "ACTIVE" | "INACTIVE";
-            /** Format: uuid */
-            membershipId: string;
+            /**
+             * Format: uuid
+             * @description null in a Super Admin support session
+             */
+            membershipId: string | null;
             roles: ("OWNER" | "BRANCH_MANAGER" | "RECEPTIONIST" | "CASHIER")[];
             /** @description Granted branches; Owner sees every branch regardless of this list */
             branchIds: string[];
             /** @description True when the user also holds the global Platform Admin grant */
             platformAdmin: boolean;
+            /** @description True in a support session: every write is rejected (PD-045) */
+            readOnly: boolean;
+            /** @description Set when a Super Admin is viewing through a support session */
+            support: components["schemas"]["SupportContextDto"] | null;
         };
         MyTenantDto: {
             /** Format: uuid */
@@ -1929,6 +2008,8 @@ export interface components {
             status: "ACTIVE" | "DISABLED";
             mustChangePassword: boolean;
             platformAdmin: boolean;
+            /** @description Super Admin (PD-045): may open read-only support sessions and grant Super Admin */
+            superAdmin: boolean;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -3498,6 +3579,31 @@ export interface components {
             /** @description Reason stored in the audit record */
             reason: string;
         };
+        StartSupportSessionDto: {
+            /** Format: uuid */
+            tenantId: string;
+            /** @example Ticket #123: Owner báo không thấy booking hôm nay */
+            reason: string;
+        };
+        SupportSessionDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenantId: string;
+            tenantName: string;
+            /** Format: uuid */
+            adminUserId: string;
+            adminDisplayName: string;
+            reason: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** @description Not ended and not expired */
+            active: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -4211,6 +4317,79 @@ export interface operations {
                 };
             };
             /** @description User is disabled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformUsersController_grantSuper: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformReasonDto"];
+            };
+        };
+        responses: {
+            /** @description Super Admin granted (PD-045). Caller must be Super Admin; target must be an active Platform Admin */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserDto"];
+                };
+            };
+            /** @description Target is not a Platform Admin */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformUsersController_revokeSuper: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformReasonDto"];
+            };
+        };
+        responses: {
+            /** @description Super Admin revoked; the user's open support sessions end */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserDto"];
+                };
+            };
+            /** @description Not a Platform Admin, or the action targets the caller's own account */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Would leave no active Super Admin */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7286,6 +7465,87 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SupportSessionController_list: {
+        parameters: {
+            query?: {
+                status?: "active" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest 200 sessions of every Super Admin */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportSessionDto"][];
+                };
+            };
+        };
+    };
+    SupportSessionController_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSupportSessionDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportSessionDto"];
+                };
+            };
+            /** @description Not a Super Admin, or the admin belongs to that merchant */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Merchant not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SupportSessionController_end: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Idempotent; any Super Admin may end a session */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportSessionDto"];
+                };
             };
         };
     };

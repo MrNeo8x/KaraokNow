@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
+import { useReadOnly } from './permissions-context';
 import { ROLES, membershipError, roleLabel, temporaryPasswordError, type Role } from '@/lib/admin';
 
 export type Membership = { id: string; userId: string; email: string; displayName: string; status: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[] };
@@ -17,6 +18,7 @@ export function GrantPicker({ value, onChange, branches }: { value: Grant; onCha
 
 // Owner-only. Other roles receive 403 and the section is hidden.
 export default function Memberships({ token, tenant, branches }: { token: string; tenant: string; branches: { id: string; name: string }[] }) {
+  const readOnly = useReadOnly();
   const [items, setItems] = useState<Membership[] | null>(null); const [hidden, setHidden] = useState(false); const [revision, setRevision] = useState(0);
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState('');
   const [email, setEmail] = useState(''); const [displayName, setDisplayName] = useState(''); const [password, setPassword] = useState(''); const [grant, setGrant] = useState<Grant>({ roles: ['RECEPTIONIST'], branchIds: [] });
@@ -64,16 +66,16 @@ export default function Memberships({ token, tenant, branches }: { token: string
       {editing?.id === item.id ? <td colSpan={2} data-label="Quyền"><GrantPicker value={editing.grant} onChange={next => setEditing({ id: item.id, grant: next })} branches={branches} /><div className="hold-actions"><button type="button" className="primary" disabled={busy === item.id} onClick={() => saveGrant(item)}>Lưu quyền</button><button type="button" className="secondary" onClick={() => setEditing(null)}>Huỷ</button></div></td>
         : <><td data-label="Vai trò">{item.roles.map(role => roleLabel[role] ?? role).join(', ') || '—'}</td><td data-label="Chi nhánh">{item.roles.includes('OWNER') ? 'Toàn merchant' : item.branchIds.map(branchName).join(', ') || '—'}</td></>}
       <td data-label="Trạng thái">{item.status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : <span className="pill gray">Đã vô hiệu hoá</span>}</td>
-      <td className="row-actions" data-label="">{editing?.id !== item.id && <button type="button" className="secondary" disabled={busy === item.id} onClick={() => setEditing({ id: item.id, grant: { roles: item.roles, branchIds: item.branchIds } })}>Sửa quyền</button>}{item.status === 'ACTIVE'
+      <td className="row-actions" data-label="">{!readOnly && <>{editing?.id !== item.id && <button type="button" className="secondary" disabled={busy === item.id} onClick={() => setEditing({ id: item.id, grant: { roles: item.roles, branchIds: item.branchIds } })}>Sửa quyền</button>}{item.status === 'ACTIVE'
         ? <button type="button" className="secondary danger" disabled={busy === item.id} onClick={() => { if (window.confirm(`Vô hiệu hoá ${item.email}? Người này không truy cập được merchant nữa.`)) void update(item, { status: 'INACTIVE' }, `Đã vô hiệu hoá ${item.email}.`); }}>Vô hiệu hoá</button>
-        : <button type="button" className="secondary" disabled={busy === item.id} onClick={() => void update(item, { status: 'ACTIVE' }, `Đã kích hoạt lại ${item.email}.`)}>Kích hoạt lại</button>}</td>
+        : <button type="button" className="secondary" disabled={busy === item.id} onClick={() => void update(item, { status: 'ACTIVE' }, `Đã kích hoạt lại ${item.email}.`)}>Kích hoạt lại</button>}</>}</td>
     </tr>)}</tbody></table></div>}
-    <details className="outcome-form"><summary>Thêm nhân viên</summary><form className="admin-form" onSubmit={create}>
+    {!readOnly && <details className="outcome-form"><summary>Thêm nhân viên</summary><form className="admin-form" onSubmit={create}>
       <label>Email<input type="email" value={email} onChange={event => setEmail(event.target.value)} autoComplete="off" required /></label>
       <label>Tên hiển thị<input value={displayName} onChange={event => setDisplayName(event.target.value)} maxLength={200} required /></label>
       <label>Mật khẩu tạm (≥ 12 ký tự)<input value={password} onChange={event => setPassword(event.target.value)} minLength={12} autoComplete="new-password" required /></label>
       <GrantPicker value={grant} onChange={setGrant} branches={branches} />
       <button className="primary" disabled={busy === 'create'}>{busy === 'create' ? 'Đang thêm…' : 'Thêm nhân viên'}</button>
-    </form></details>
+    </form></details>}
   </section>;
 }

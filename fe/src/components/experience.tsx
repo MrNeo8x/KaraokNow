@@ -28,15 +28,17 @@ import PlatformUsers from './platform-users';
 import PlatformReports from './platform-reports';
 import MerchantReports from './merchant-reports';
 import MySessions from './my-sessions';
-import { ApiError, request } from '@/lib/api';
+import SupportSessions from './support-sessions';
+import { ApiError, request, setReadOnlyGuard } from '@/lib/api';
+import { minutesLeft, supportTenantFromSearch } from '@/lib/support';
 import AdminShell, { useSection, type NavItem } from './admin-shell';
-import { RolesProvider } from './permissions-context';
+import { ReadOnlyProvider, RolesProvider } from './permissions-context';
 import { can } from '@/lib/permissions';
 import { roleLabel, type Role } from '@/lib/admin';
-import { BadgeCheck, BarChart3, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
+import { BadgeCheck, BarChart3, LifeBuoy, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorOpen, LayoutDashboard, LogOut, Mic2, Settings, ShieldCheck, Store, Tags, UserCog, Users, Wallet, Wrench } from 'lucide-react';
 import { autoTenant, cookieLogout, cookieRefresh, parseSession, readLastTenant, refreshDelay, rememberTenant, type MyTenant, type Session } from '@/lib/session';
 
-export type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
+export type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean; readOnly?: boolean; support?: { sessionId: string; expiresAt: string; reason: string } | null };
 export type Branch = { id: string; name: string; code: string; timezone: string; status: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; mapsUrl?: string | null; directionsUrl?: string | null; openingTime?: string | null; closingTime?: string | null };
 export type Room = { id: string; name: string; code: string; capacity: number; status: string };
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
@@ -55,9 +57,17 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const refreshFlight = useRef<Promise<Session | null> | null>(null);
   const [restoring, setRestoring] = useState(page !== 'customer');
   const [tenants, setTenants] = useState<MyTenant[] | null>(null); const autoChosen = useRef(false);
+  // FE-021 / PD-045: `/merchant?support=<tenantId>` opens a merchant in a Super Admin read-only support session.
+  const [supportTenant, setSupportTenant] = useState<string | null>(null); const [now, setNow] = useState(0);
+  const [superAdmin, setSuperAdmin] = useState<boolean | null>(null); const [ownTenantCount, setOwnTenantCount] = useState(0);
   const storage = () => { try { return window.localStorage; } catch { return null; } };
   function clearMerchant() { setActiveTenant(''); setBranches([]); setBranch(''); setRooms([]); setTenants(null); autoChosen.current = false; }
 
+  useEffect(() => {
+    if (page !== 'merchant') return;
+    const tenantId = supportTenantFromSearch(window.location.search);
+    if (tenantId) { autoChosen.current = true; setSupportTenant(tenantId); setActiveTenant(tenantId); }
+  }, [page]);
   // F5: the HttpOnly cookie restores the session. Transient failures (409/503/network) are retried, 401 shows sign-in.
   useEffect(() => {
     if (page === 'customer') return;
@@ -114,16 +124,34 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
     }).catch(err => { if (!controller.signal.aborted) { setTenants([]); setError((err as Error).message); } });
     return () => controller.abort();
   }, [session?.accessToken ? 'signed-in' : 'signed-out', session?.mustChangePassword, page]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (activeTenant) rememberTenant(storage(), activeTenant); }, [activeTenant]);
+  useEffect(() => { if (activeTenant && activeTenant !== supportTenant) rememberTenant(storage(), activeTenant); }, [activeTenant, supportTenant]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Roles drive what the UI offers; the backend still enforces every permission. Unknown roles (null) hide nothing.
   useEffect(() => {
     if (!session || !activeTenant || session.mustChangePassword || page !== 'merchant') { setMe(null); return; }
     const controller = new AbortController();
     request<Me>('/merchant/me', { signal: controller.signal }, session.accessToken, activeTenant)
-      .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError('Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
+      .then(setMe).catch(err => { if (!controller.signal.aborted) { setMe(null); if (err instanceof ApiError && err.status === 403) setError(activeTenant === supportTenant ? 'Phiên hỗ trợ của merchant này đã kết thúc hoặc hết hạn. Mở lại từ khu Platform (mục Merchant → Hỗ trợ).' : 'Tài khoản không có quyền trong merchant này. Kiểm tra lại Tenant ID.'); } });
     return () => controller.abort();
   }, [session, activeTenant, page]);
+
+  // Read-only support session: block merchant writes in the browser and tick the expiry clock.
+  const readOnly = Boolean(me?.readOnly);
+  useEffect(() => { setReadOnlyGuard(readOnly); return () => setReadOnlyGuard(false); }, [readOnly]);
+  useEffect(() => { if (!me?.support) return; setNow(Date.now()); const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer); }, [me?.support]);
+  // Platform area: Super Admin probe (support sessions answer 403 otherwise) and own memberships (PD-046 switch link).
+  useEffect(() => {
+    if (!session || session.mustChangePassword || page !== 'platform') { setSuperAdmin(null); return; }
+    const controller = new AbortController();
+    request('/platform/support-sessions?status=active', { signal: controller.signal }, session.accessToken).then(() => setSuperAdmin(true)).catch(() => { if (!controller.signal.aborted) setSuperAdmin(false); });
+    request<MyTenant[]>('/me/tenants', { signal: controller.signal }, session.accessToken).then(list => setOwnTenantCount(list.length)).catch(() => {});
+    return () => controller.abort();
+  }, [session?.accessToken ? 'signed-in' : 'signed-out', session?.mustChangePassword, page]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function endSupport() {
+    if (!session || !me?.support) return;
+    try { await request(`/platform/support-sessions/${encodeURIComponent(me.support.sessionId)}/end`, { method: 'POST' }, session.accessToken); window.location.assign('/platform#support'); }
+    catch (err) { setError((err as Error).message); }
+  }
 
   // Merchant logo for the sidebar (every merchant role may read it).
   useEffect(() => {
@@ -154,16 +182,18 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   const sessionsCard = <MySessions token={session.accessToken} onCurrentRevoked={() => void logout()} />;
 
   if (page === 'platform') {
-    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'users', label: 'Người dùng', icon: Users }, { id: 'reports', label: 'Báo cáo', icon: BarChart3 }, { id: 'account', label: 'Tài khoản', icon: UserCog }];
-    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', users: 'Người dùng', reports: 'Báo cáo nền tảng', account: 'Tài khoản' };
-    return <AdminShell product="Platform" nav={nav} active={platformSection} onSelect={selectPlatform} title={titles[platformSection]} subtitle="Quản trị toàn hệ thống · không gắn với merchant nào"
-      footer={<><strong>Platform Admin</strong><a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
+    const nav: NavItem[] = [{ id: 'listings', label: 'Duyệt listing', icon: BadgeCheck }, { id: 'merchants', label: 'Merchant', icon: Store }, { id: 'users', label: 'Người dùng', icon: Users }, { id: 'reports', label: 'Báo cáo', icon: BarChart3 }, ...(superAdmin ? [{ id: 'support', label: 'Hỗ trợ', icon: LifeBuoy }] : []), { id: 'account', label: 'Tài khoản', icon: UserCog }];
+    const titles: Record<string, string> = { listings: 'Duyệt listing', merchants: 'Merchant', users: 'Người dùng', reports: 'Báo cáo nền tảng', support: 'Phiên hỗ trợ', account: 'Tài khoản' };
+    const platformActive = nav.some(item => item.id === platformSection) ? platformSection : 'listings';
+    return <AdminShell product="Platform" nav={nav} active={platformActive} onSelect={selectPlatform} title={titles[platformActive]} subtitle="Quản trị toàn hệ thống · không gắn với merchant nào"
+      footer={<><strong>Platform Admin{superAdmin ? ' · Super Admin' : ''}</strong>{ownTenantCount > 0 && <a href="/merchant"><Store size={14} aria-hidden />Khu merchant</a>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
       {error && <div role="alert" className="error">{error}</div>}
-      {platformSection === 'listings' && <PlatformListings token={session.accessToken} />}
-      {platformSection === 'merchants' && <PlatformMerchants token={session.accessToken} />}
-      {platformSection === 'users' && <PlatformUsers token={session.accessToken} />}
-      {platformSection === 'reports' && <PlatformReports token={session.accessToken} />}
-      {platformSection === 'account' && sessionsCard}
+      {platformActive === 'listings' && <PlatformListings token={session.accessToken} />}
+      {platformActive === 'merchants' && <PlatformMerchants token={session.accessToken} superAdmin={superAdmin === true} />}
+      {platformActive === 'users' && <PlatformUsers token={session.accessToken} superAdmin={superAdmin === true} />}
+      {platformActive === 'reports' && <PlatformReports token={session.accessToken} />}
+      {platformActive === 'support' && superAdmin && <SupportSessions token={session.accessToken} />}
+      {platformActive === 'account' && sessionsCard}
     </AdminShell>;
   }
 
@@ -192,9 +222,15 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
   return <AdminShell product="Business" logoUrl={activeTenant ? logoUrl : null} nav={activeTenant ? nav : []} active={section} onSelect={selectMerchant}
     title={activeTenant ? titles[section] : 'Chọn merchant'} subtitle={activeTenant ? (currentBranch ? `${currentBranch.name} · ${currentBranch.timezone}` : 'Chưa chọn chi nhánh') : 'Nhập Tenant ID được cấp để mở dữ liệu'}
     actions={activeTenant && branches.length > 0 ? <label className="sr-label"><span className="visually-hidden">Chi nhánh</span><select aria-label="Chi nhánh" value={branch} onChange={e => { setRooms([]); setBranch(e.target.value); }}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label> : undefined}
-    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && (tenants?.length ?? 0) !== 1 && <button type="button" onClick={switchMerchant}><Store size={14} aria-hidden />Đổi merchant</button>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
+    footer={<><Building2 size={18} aria-hidden color="#c4b5fd" /><strong>{me?.tenantName ?? currentBranch?.name ?? 'Chưa chọn chi nhánh'}</strong>{me && <small>{me.displayName} · {me.support ? 'Hỗ trợ (chỉ xem)' : me.roles.map(role => roleLabel[role] ?? role).join(', ')}</small>}{activeTenant && <small>Tenant {activeTenant}</small>}{activeTenant && !me?.support && (tenants?.length ?? 0) !== 1 && <button type="button" onClick={switchMerchant}><Store size={14} aria-hidden />Đổi merchant</button>}{(me?.platformAdmin || supportTenant) && <a href="/platform"><ShieldCheck size={14} aria-hidden />Khu Platform</a>}<a href="/booking"><Mic2 size={14} aria-hidden />Trải nghiệm khách</a><button type="button" onClick={() => void logout()}><LogOut size={14} aria-hidden />Đăng xuất</button></>}>
     {error && <div role="alert" className="error">{error}</div>}
     {me?.tenantStatus === 'INACTIVE' && <div role="alert" className="error suspended-banner"><strong>Merchant đang bị Platform khoá.</strong> Khách không thấy chi nhánh và không giữ chỗ mới được; giữ chỗ và booking hiện có vẫn xử lý bình thường.</div>}
+    {me?.support && <div className={`support-banner${now && minutesLeft(me.support.expiresAt, now) === 0 ? ' expired' : ''}`} role="status">
+      <div><strong><LifeBuoy size={16} aria-hidden /> Đang xem hỗ trợ {me.tenantName} — chỉ xem</strong>
+        <p>{now && minutesLeft(me.support.expiresAt, now) === 0 ? 'Phiên đã hết hạn: mở lại từ khu Platform.' : `Hết hạn lúc ${new Date(me.support.expiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}${now ? ` (còn ${minutesLeft(me.support.expiresAt, now)} phút)` : ''}`} · Lý do: {me.support.reason} · SĐT/email khách và nhân viên được che một phần; mọi thao tác thay đổi bị chặn.</p></div>
+      <div className="hold-actions"><a className="secondary button-link" href="/platform#support">Về khu Platform</a><button type="button" className="secondary danger" onClick={() => void endSupport()}>Kết thúc phiên</button></div>
+    </div>}
+    <ReadOnlyProvider value={readOnly}>
     <RolesProvider value={roles}>
     {!activeTenant ? <section className="card tenant-card tenant-picker" aria-labelledby="picker-title"><div className="kpi-head"><span className="kpi-icon"><Store size={18} aria-hidden /></span><span id="picker-title">Chọn merchant</span></div>
       {tenants === null ? <p role="status">Đang tải danh sách merchant…</p> : tenants.length === 0 ? <div className="notice">Tài khoản này chưa thuộc merchant nào đang hoạt động. Platform Admin vào <a href="/platform">khu Platform</a>.</div>
@@ -229,7 +265,7 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
           {loading ? <p role="status">Đang tải dữ liệu…</p> : branches.length === 0 ? <div className="empty">Chưa có chi nhánh được cấp quyền.</div> : rooms.length === 0 ? <div className="empty">Chi nhánh này chưa có phòng.</div>
             : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Tên phòng</th><th>Mã</th><th>Sức chứa</th><th>Trạng thái</th></tr></thead><tbody>{rooms.map(r => <tr key={r.id}><td data-label="Tên phòng"><strong>{r.name}</strong></td><td data-label="Mã">{r.code}</td><td data-label="Sức chứa">Tối đa {r.capacity} khách</td><td data-label="Trạng thái">{roomStatus(r.status)}</td></tr>)}</tbody></table></div>}
         </section>
-        <VenueActions key={`venue-actions:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} branch={currentBranch} rooms={rooms} onChanged={() => setRevision(value => value + 1)} />
+        {!readOnly && <VenueActions key={`venue-actions:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} branch={currentBranch} rooms={rooms} onChanged={() => setRevision(value => value + 1)} />}
         <RoomAmenities key={`room-amenities:${branchKey}`} token={session.accessToken} tenant={activeTenant} rooms={rooms} />
         <RoomMedia key={`room-media:${branchKey}`} token={session.accessToken} tenant={activeTenant} rooms={rooms} />
         {currentBranch && <RoomBlocks key={`room-blocks:${branchKey}`} token={session.accessToken} tenant={activeTenant} branchId={branch} timezone={currentBranch.timezone} rooms={rooms} />}
@@ -256,8 +292,9 @@ export default function App({ initialPage = 'merchant' }: { initialPage?: 'merch
       </>}
     </>}
     </RolesProvider>
+    </ReadOnlyProvider>
   </AdminShell>;
 }
 
 const MERCHANT_IDS = ['overview', 'bookings', 'cash', 'reports', 'rooms', 'pricing', 'users', 'marketplace', 'settings'];
-const PLATFORM_IDS = ['listings', 'merchants', 'users', 'reports', 'account'];
+const PLATFORM_IDS = ['listings', 'merchants', 'users', 'reports', 'support', 'account'];

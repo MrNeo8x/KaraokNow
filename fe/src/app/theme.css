@@ -441,3 +441,10 @@ main.admin-content { margin: 0; }
 .heat-legend i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
 .heat-legend strong { margin-left: 10px; color: var(--text); }
 .date-note { font-size: 12px; color: var(--muted); }
+/* FE-021: Super Admin support session (PD-045) */
+.button-link { padding: 9px 14px; font-weight: 700; font-size: 14px; text-decoration: none; white-space: nowrap; }
+.support-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 18px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid #f59e0b; background: var(--warning-bg); color: #78350f; }
+.support-banner strong { color: #78350f; }
+.support-banner p { margin: 2px 0 0; color: #92400e; font-size: 13px; }
+.support-banner .hold-actions { margin: 0; }
+.support-banner.expired { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }

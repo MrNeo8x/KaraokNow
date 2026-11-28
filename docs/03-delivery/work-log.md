@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28 ~15:50, Luồng BE — sau OPS-002)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-021; phần production theo Luồng BE ~15:50)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -16,16 +16,25 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** BE/FE đang (hoặc sắp) chuyển từ `d76ad76` sang `148cbde`; Prisma **30 migration** theo nhật ký gần nhất. Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`. Việc ngay: (1) áp `20261124090000`; (2) kiểm deploy `148cbde` READY trên Vercel; (3) smoke `POST /v1/platform/support-sessions` không auth → 401, `/v1/platform/users` (admin) 200; (4) theo chỉ định của người dùng chạy đúng một lệnh `UPDATE platform_admins SET super_admin=true WHERE user_id=<id> AND revoked_at IS NULL`. Workflow backup `.github/workflows/db-backup.yml` đã lên `main` nhưng bỏ qua cho tới khi có secret (OPS-010). Còn chờ: nhập địa chỉ/SĐT/link/giờ mở cửa MAJESTIC qua giao diện. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng BE không có. Luồng FE: FE-021 phiên hỗ trợ (`support-sessions.tsx`, `support.ts`, `permissions-context.tsx`, `api-types.gen.ts` đã sinh lại…, chưa commit) — commit sớm để Frontend CI xanh lại. `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE.
+**Đang dở (working tree):** Luồng BE không có. Luồng FE: không có (FE-021 đã commit, `VERIFY`, e2e 248/248; commit này làm Frontend CI `types:check` xanh lại). `docs/KaraokeNow_Merchant_Feature_Plan.md/.html` không phải của Luồng BE.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* xác nhận/áp migration `20261124090000` (hoặc giao session triển khai) và kiểm deploy; chỉ định Super Admin đầu tiên; thêm secret `PROD_DATABASE_URL` + `BACKUP_PASSPHRASE` và chạy tay workflow backup (OPS-010, `docs/03-delivery/ops-002-backup-restore.md`); đăng ký uptime monitor (OPS-009); UAT nhóm I–Q; xem lại PD-044; trả lời BKG-008; quyết định làm sạch email/lý do trong audit cũ.
 - *Session triển khai:* các bước "Việc ngay" ở trên; ghi nhật ký.
-- *Luồng FE:* hoàn tất và commit FE-021 (handoff "FE READY — phiên hỗ trợ Super Admin"), chuyển khu cho người kiêm Platform Admin + Owner (PD-046).
+- *Luồng FE:* không còn task FE `READY`. Có thể ẩn nốt nút ghi ở các form cài đặt trong phiên hỗ trợ (hiện bị chặn trước khi gửi).
 - *Luồng BE:* BKG-008 khi có PO; IAM-004 khi có ZBS; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache. Không còn task BE không bị chặn khác.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường, phiên hỗ trợ có quyền ghi, ghi log từng lượt xem trong phiên hỗ trợ.
+
+---
+
+## 2026-11-28 — Luồng FE: phiên hỗ trợ Super Admin và chuyển khu (FE-021)
+
+- Người dùng: "Tiếp tục công việc BE đã [xong]" → FE-021 (IAM-009/010, PD-045/046). Sinh lại `api-types.gen.ts` tới `c4de3f1`.
+- Platform: mục "Hỗ trợ" cho Super Admin, nút "Hỗ trợ" trên merchant (lý do bắt buộc), cấp/thu hồi Super Admin ở màn Người dùng. Merchant `?support=`: banner chỉ xem, kết thúc phiên, chặn ghi ở `useCan` và ở `request()`, ẩn các nút ghi dễ thấy; link chuyển khu Platform ↔ merchant (PD-046).
+- Sửa test: `platform-users.mjs` chọn `dialog.reason-dialog[open]` (màn Merchant giờ có hai hộp thoại lý do).
+- Kiểm chứng: unit 71/71, `tsc`, `types:check`, `next build`; `npm run e2e` **248/248** (lượt đầy đủ: `platform-users` 10/12 do selector trên, sửa xong chạy lại 12/12).
 
 ---
 

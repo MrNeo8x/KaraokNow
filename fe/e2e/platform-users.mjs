@@ -14,7 +14,7 @@ const loginStatus = async (email, password) => (await api('POST', '/auth/login',
 const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage(); page.setDefaultTimeout(15000);
 const step = async (name, fn) => { try { log(true, name, (await fn()) ?? ''); } catch (error) { log(false, name, error.message.split('\n')[0]); await page.screenshot({ path: `${SHOTS}/platform-users-error-${name.replace(/[^\p{L}\d]+/gu, '-').slice(0, 40)}.png`, fullPage: true }).catch(() => {}); } };
-const users = page.locator('section[aria-labelledby="users-title"]'); const detail = users.locator('.user-detail'); const dialog = page.locator('dialog.reason-dialog');
+const users = page.locator('section[aria-labelledby="users-title"]'); const detail = users.locator('.user-detail'); const dialog = page.locator('dialog.reason-dialog[open]');
 async function search(text) { await users.getByLabel('Tìm theo email hoặc tên').fill(text); await users.locator('tbody tr', { hasText: text }).first().waitFor(); }
 async function open(email) { await search(email); await users.getByRole('button', { name: `Xem chi tiết ${email}` }).click(); await detail.waitFor(); }
 async function confirmWith(reason, label) { await dialog.getByLabel(/Lý do/).fill(reason); await dialog.getByRole('button', { name: label }).click(); await dialog.waitFor({ state: 'hidden' }); }

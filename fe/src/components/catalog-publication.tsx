@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { ApiError, request } from '@/lib/api';
+import { useReadOnly } from './permissions-context';
 
 export type Publication = { published: boolean; platformApproved: boolean; version?: string; tenantStatus?: 'ACTIVE' | 'INACTIVE' };
 
 // Owner-only. Other roles receive 403 and the section is hidden.
 export default function CatalogPublication({ token, tenant }: { token: string; tenant: string }) {
+  const readOnly = useReadOnly();
   const [value, setValue] = useState<Publication | null>(null); const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
 
@@ -31,7 +33,7 @@ export default function CatalogPublication({ token, tenant }: { token: string; t
     <h2 id="publication-title">Hiển thị catalog công khai</h2>
     {error && <div className="error" role="alert">{error}</div>}{notice && <div className="notice" role="status">{notice}</div>}
     {!value ? !error && <p role="status">Đang tải…</p> : state && <><p><span className={state.tone}>{state.label}</span></p><p>{state.text}</p>
-      <div className="hold-actions">{value.published ? <button type="button" className="secondary" disabled={busy} onClick={() => void toggle(false)}>Ngừng publish</button> : <button type="button" className="primary" disabled={busy} onClick={() => void toggle(true)}>Publish catalog</button>}</div>
+      {!readOnly && <div className="hold-actions">{value.published ? <button type="button" className="secondary" disabled={busy} onClick={() => void toggle(false)}>Ngừng publish</button> : <button type="button" className="primary" disabled={busy} onClick={() => void toggle(true)}>Publish catalog</button>}</div>}
       <small>Duyệt Platform là bước riêng, merchant không tự thay đổi được. Nên cấu hình điều khoản công khai trước khi publish.</small></>}
   </section>;
 }

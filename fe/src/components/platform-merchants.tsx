@@ -3,7 +3,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError, request } from '@/lib/api';
 import { merchantCodeError, temporaryPasswordError } from '@/lib/admin';
+import { LifeBuoy } from 'lucide-react';
+import { supportHref } from '@/lib/support';
 import PlatformMembers from './platform-members';
+import ReasonDialog, { type ReasonRequest } from './reason-dialog';
 import { Fragment } from 'react';
 
 export type Merchant = { tenantId: string; code: string; name: string; status: 'ACTIVE' | 'INACTIVE'; createdAt: string; ownerCount: number; activeBranchCount: number; published: boolean; platformApproved: boolean };
@@ -17,11 +20,11 @@ function randomPassword(): string {
 }
 
 // Platform Admin is a global grant: requests deliberately omit X-Tenant-ID.
-export default function PlatformMerchants({ token }: { token: string }) {
+export default function PlatformMerchants({ token, superAdmin = false }: { token: string; superAdmin?: boolean }) {
   const [status, setStatus] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL'); const [offset, setOffset] = useState(0); const [revision, setRevision] = useState(0);
   const [page, setPage] = useState<Page | null>(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(''); const [forbidden, setForbidden] = useState(false);
   const [code, setCode] = useState(''); const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [displayName, setDisplayName] = useState(''); const [password, setPassword] = useState('');
-  const [membersOf, setMembersOf] = useState<string | null>(null);
+  const [membersOf, setMembersOf] = useState<string | null>(null); const [dialog, setDialog] = useState<ReasonRequest | null>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({}); const [acting, setActing] = useState(''); const [notice, setNotice] = useState('');
   const [creating, setCreating] = useState(false); const [createError, setCreateError] = useState(''); const [created, setCreated] = useState<{ value: Created; password: string } | null>(null);
 
@@ -65,6 +68,14 @@ export default function PlatformMerchants({ token }: { token: string }) {
     } finally { setActing(''); }
   }
 
+  // FE-021 / PD-045: Super Admin opens a 60-minute read-only session, then lands in the merchant area.
+  function askSupport(item: Merchant) {
+    setDialog({ title: `Mở phiên hỗ trợ ${item.name}`, description: 'Bạn xem mọi màn hình như Owner trong 60 phút nhưng chỉ xem (mọi thay đổi bị chặn); SĐT/email bị che một phần. Owner thấy bạn đã xem và lý do trong nhật ký audit. Ghi lý do, ví dụ mã ticket.', confirmLabel: 'Mở phiên hỗ trợ', run: async reason => {
+      await request('/platform/support-sessions', { method: 'POST', body: JSON.stringify({ tenantId: item.tenantId, reason }) }, token);
+      window.location.assign(supportHref(item.tenantId));
+    } });
+  }
+
   if (forbidden) return null; // PlatformListings already explains the missing Platform Admin grant.
   return <section className="card amenities" aria-labelledby="platform-merchants-title">
     <div className="heading"><div><div className="eyebrow">PLATFORM ADMIN</div><h2 id="platform-merchants-title">Merchant</h2><p>Tạo merchant thủ công cùng Owner đầu tiên. Merchant mới chưa publish và chưa được duyệt.</p></div></div>
@@ -82,7 +93,8 @@ export default function PlatformMerchants({ token }: { token: string }) {
       <button type="button" className="secondary" onClick={() => setCreated(null)}>Đóng</button></div>}
     <div className="section-title"><div><h3>Danh sách merchant</h3></div><label className="select-label">Trạng thái<select value={status} onChange={event => { setStatus(event.target.value as typeof status); setOffset(0); }}><option value="ALL">Tất cả</option><option value="ACTIVE">Hoạt động</option><option value="INACTIVE">Đang bị khoá</option></select></label></div>
     {error && <div className="error" role="alert">{error}</div>}{notice && <div className="notice" role="status">{notice}</div>}
-    {loading ? <p role="status">Đang tải merchant…</p> : page && (page.items.length === 0 ? <div className="empty">Chưa có merchant.</div> : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Merchant</th><th>Trạng thái</th><th>Owner</th><th>Chi nhánh</th><th>Catalog</th><th>Tạo lúc</th><th>Khoá / mở khoá</th></tr></thead><tbody>{page.items.map(item => <Fragment key={item.tenantId}><tr><td data-label="Merchant"><strong>{item.name}</strong><br /><small>{item.code} · {item.tenantId}</small></td><td data-label="Trạng thái">{item.status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : <span className="pill rose">Đang bị khoá</span>}</td><td data-label="Owner">{item.ownerCount}</td><td data-label="Chi nhánh">{item.activeBranchCount}</td><td data-label="Catalog">{item.platformApproved ? 'Đã duyệt' : item.published ? 'Chờ duyệt' : 'Chưa publish'}</td><td data-label="Tạo lúc">{new Date(item.createdAt).toLocaleString('vi-VN')}</td><td data-label="" className="status-action"><input aria-label={`Lý do ${item.status === 'ACTIVE' ? 'khoá' : 'mở khoá'} ${item.name}`} placeholder="Lý do (bắt buộc)" maxLength={500} value={reasons[item.tenantId] ?? ''} onChange={event => setReasons(current => ({ ...current, [item.tenantId]: event.target.value }))} />{item.status === 'ACTIVE' ? <button type="button" className="secondary danger" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'suspend')}>Khoá</button> : <button type="button" className="secondary" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'reactivate')}>Mở khoá</button>}<button type="button" className="link-button" aria-expanded={membersOf === item.tenantId} onClick={() => setMembersOf(current => current === item.tenantId ? null : item.tenantId)}>{membersOf === item.tenantId ? 'Ẩn thành viên' : 'Thành viên'}</button></td></tr>{membersOf === item.tenantId && <tr><td colSpan={8} data-label=""><PlatformMembers token={token} tenantId={item.tenantId} tenantName={item.name} /></td></tr>}</Fragment>)}</tbody></table></div>)}
+    {loading ? <p role="status">Đang tải merchant…</p> : page && (page.items.length === 0 ? <div className="empty">Chưa có merchant.</div> : <div className="table-wrap"><table className="admin-table"><thead><tr><th>Merchant</th><th>Trạng thái</th><th>Owner</th><th>Chi nhánh</th><th>Catalog</th><th>Tạo lúc</th><th>Khoá / mở khoá</th></tr></thead><tbody>{page.items.map(item => <Fragment key={item.tenantId}><tr><td data-label="Merchant"><strong>{item.name}</strong><br /><small>{item.code} · {item.tenantId}</small></td><td data-label="Trạng thái">{item.status === 'ACTIVE' ? <span className="pill green">Hoạt động</span> : <span className="pill rose">Đang bị khoá</span>}</td><td data-label="Owner">{item.ownerCount}</td><td data-label="Chi nhánh">{item.activeBranchCount}</td><td data-label="Catalog">{item.platformApproved ? 'Đã duyệt' : item.published ? 'Chờ duyệt' : 'Chưa publish'}</td><td data-label="Tạo lúc">{new Date(item.createdAt).toLocaleString('vi-VN')}</td><td data-label="" className="status-action"><input aria-label={`Lý do ${item.status === 'ACTIVE' ? 'khoá' : 'mở khoá'} ${item.name}`} placeholder="Lý do (bắt buộc)" maxLength={500} value={reasons[item.tenantId] ?? ''} onChange={event => setReasons(current => ({ ...current, [item.tenantId]: event.target.value }))} />{item.status === 'ACTIVE' ? <button type="button" className="secondary danger" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'suspend')}>Khoá</button> : <button type="button" className="secondary" disabled={acting === item.tenantId} onClick={() => void changeStatus(item, 'reactivate')}>Mở khoá</button>}<button type="button" className="link-button" aria-expanded={membersOf === item.tenantId} onClick={() => setMembersOf(current => current === item.tenantId ? null : item.tenantId)}>{membersOf === item.tenantId ? 'Ẩn thành viên' : 'Thành viên'}</button>{superAdmin && <button type="button" className="link-button" onClick={() => askSupport(item)} aria-label={`Hỗ trợ ${item.name}`}><LifeBuoy size={14} aria-hidden /> Hỗ trợ</button>}</td></tr>{membersOf === item.tenantId && <tr><td colSpan={8} data-label=""><PlatformMembers token={token} tenantId={item.tenantId} tenantName={item.name} /></td></tr>}</Fragment>)}</tbody></table></div>)}
     {page && <div className="amenity-buttons"><button type="button" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - LIMIT))}>← Trang trước</button><span>Trang {Math.floor(offset / LIMIT) + 1}</span><button type="button" disabled={loading || !page.hasMore} onClick={() => setOffset(value => value + LIMIT)}>Trang sau →</button></div>}
+    <ReasonDialog request={dialog} onClose={() => setDialog(null)} />
   </section>;
 }

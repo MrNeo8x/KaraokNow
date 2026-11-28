@@ -230,6 +230,15 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Kiêm nhiệm (PD-046): Platform Admin được mời làm thành viên sẽ thấy merchant trong `/v1/me/tenants` như mọi người; FE cần cho người dùng vừa có khu Platform vừa có khu merchant chuyển qua lại.
 - Production cần migration `20261124090000_support_sessions` và chỉ định Super Admin đầu tiên.
 
+
+### FE INTEGRATED — phiên hỗ trợ Super Admin và kiêm nhiệm (FE-021, IAM-009/010, 2026-11-28)
+
+- Platform: biết mình là Super Admin bằng `GET /v1/platform/support-sessions?status=active` (403 → không phải). Super Admin có mục "Hỗ trợ" (đang mở/tất cả, "Mở merchant", "Kết thúc"), nút "Hỗ trợ" trên từng merchant (hộp thoại lý do → `POST /platform/support-sessions` → `/merchant?support=<tenantId>`), nhãn và nút cấp/thu hồi Super Admin ở màn Người dùng (không hiện trên chính mình). Footer "Platform Admin · Super Admin".
+- Merchant `?support=`: mở thẳng tenant đó, không ghi nhớ làm merchant mặc định; `readOnly`/`support` từ `/merchant/me` → banner (hết hạn lúc…, còn N phút, lý do, "Về khu Platform", "Kết thúc phiên" → `POST …/end` rồi về `/platform#support`); 403 khi phiên đã đóng → "Phiên hỗ trợ của merchant này đã kết thúc hoặc hết hạn…".
+- Chỉ xem: `useCan` trả false cho mọi quyền ghi (giữ `cash.report`, `reports.view`); `request()` chặn mọi lệnh không phải GET tới `/merchant/*` khi phiên chỉ xem (không gửi lên BE); ẩn form sửa chi nhánh/phòng, nút publish, lưu điều khoản, thêm/sửa nhân viên. Các form cài đặt còn lại vẫn hiện nút nhưng bị chặn với thông báo "Phiên hỗ trợ chỉ được xem…". Thông báo BE mới (Super Admin, phiên hỗ trợ) đã dịch.
+- PD-046: footer khu merchant có "Khu Platform" khi `platformAdmin`; footer khu Platform có "Khu merchant" khi `/v1/me/tenants` không rỗng.
+- Kiểm thử: unit `support.test.mjs`; e2e `fe/e2e/support.mjs` 16/16 (403 Owner, mở phiên qua giao diện, banner, email che, ẩn nút, chặn ghi không gửi request, báo cáo xem được, F5, audit `SUPPORT_SESSION_STARTED`, kết thúc, link cũ báo hết phiên, lịch sử). Đã `npm run types:generate` (Frontend CI `types:check` xanh lại khi commit).
+
 ## FE READY — điều khoản công khai chưa cấu hình (2026-11-28)
 
 Trả lời mục "Cần BE xem" (2026-11-26): `GET /v1/public/branches/{id}/booking-terms` nay trả **200 `{ configured: false, terms: null, version: null, updatedAt: null }`** khi chi nhánh đã công khai nhưng merchant chưa đặt điều khoản (giống endpoint Owner); **404 chỉ khi chi nhánh không công khai**. FE đang xử lý cả hai nên không vỡ; có thể bỏ nhánh coi 404 là "chưa cấu hình". OpenAPI thêm mô tả 404 → `npm run types:generate`.
