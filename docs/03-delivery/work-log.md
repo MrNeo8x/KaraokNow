@@ -26,6 +26,16 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 ---
 
+## 2026-11-28 — Triển khai Vercel + Prisma Postgres (OPS-006)
+
+- Vercel (tài khoản Hobby): `vn-karaoke-now` → https://vn-karaoke-now.vercel.app (root `fe`, Next.js, `BACKEND_API_ORIGIN=https://vn-karaoke-now-api.vercel.app`); `vn-karaoke-now-api` → https://vn-karaoke-now-api.vercel.app (root `be`, NestJS). Cả hai nối GitHub `MrNeo8x/KaraokNow`, nhánh `main` → push là deploy production.
+- Database: Prisma Postgres `prisma-postgres-cerulean-drawer` (PostgreSQL 17.2, có `btree_gist`) gắn vào cả hai project; BE dùng `DATABASE_URL` (trực tiếp `db.prisma.io:5432`, SSL). Đã chạy `db:migrate` từ máy (25 migration). **Không seed** (production). Env BE: `JWT_SECRET`, `CRON_SECRET` (ngẫu nhiên, sensitive), `SWAGGER_ENABLED=false`, `PG_POOL_MAX=5`.
+- Code: `be/src/jobs/` (cron thay worker liên tục; file đã lọt vào commit `617198a` của Luồng BE), `be/vercel.json` (cron 1 lần/ngày — Hobby không cho chạy dày hơn; hold vẫn hết hạn khi có request chạm vào), hạ `@nestjs/config` xuống 4.0.4 vì bản 12 thuần ESM làm function crash `ERR_REQUIRE_ESM` trên Vercel.
+- Kiểm chứng: `npm run verify` 52/52, `npm run test:e2e` 43/43; production: `/v1/health/live|ready` 200 (trực tiếp và qua rewrite FE), `/docs` 404, cron thiếu/sai secret 404, login sai 401, `/`, `/booking`, `/merchant`, `/platform` 200.
+- Còn lại: tạo Platform Admin đầu tiên trên production (DB trống); OPS-007 xác minh IP khách để đặt `TRUST_PROXY_HOPS`; project FE cũng đang nhận biến DB do Prisma gắn (FE không dùng, có thể gỡ); cập nhật mục "Trạng thái hiện tại" khi luồng FE commit xong.
+
+---
+
 ## 2026-11-28 — Luồng BE: PO chốt các giả định (PD-032…PD-035)
 
 - PD-032 Thu ngân giữ quyền đọc SĐT/email khách ở hold/booking chi nhánh được cấp; PD-033 quy tắc cọc (FIXED tối đa bằng tổng, PERCENT làm tròn lên đến đồng, không ghi vượt); PD-034 overtime quá ân hạn tính toàn bộ phút trễ; PD-035 publish lại giữ trạng thái đã duyệt. Cả bốn xác nhận cách đang cài — **không đổi code**.

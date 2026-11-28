@@ -155,6 +155,20 @@ Image `tools` mặc định chạy `npm run db:migrate` (cần `DATABASE_URL`); 
 
 Rollback: triển khai lại image cũ. `npm run db:rollback` lùi một migration; chỉ dùng khi migration đó có `down` an toàn và đã sao lưu.
 
+### Vercel + Prisma Postgres (production hiện tại, OPS-006)
+
+| Project Vercel | Root | URL |
+|---|---|---|
+| `vn-karaoke-now` | `fe` (Next.js) | https://vn-karaoke-now.vercel.app |
+| `vn-karaoke-now-api` | `be` (NestJS, một Vercel Function) | https://vn-karaoke-now-api.vercel.app |
+
+- Cả hai nối repo GitHub, nhánh `main`: push lên `main` là deploy production, nhánh khác/PR tạo preview.
+- FE: `BACKEND_API_ORIGIN=https://vn-karaoke-now-api.vercel.app` (đọc lúc build, đổi xong phải redeploy).
+- BE: `DATABASE_URL` do Prisma Postgres gắn (kết nối trực tiếp, SSL), `JWT_SECRET`, `CRON_SECRET`, `SWAGGER_ENABLED=false`, `PG_POOL_MAX=5`.
+- **Migration không tự chạy khi deploy.** Trước khi push code có migration mới: `vercel env pull` (project `vn-karaoke-now-api`) rồi `DATABASE_URL=… npm run db:migrate` trong `be/`.
+- Worker thay bằng Vercel Cron (`be/vercel.json` → `GET /v1/internal/cron/hold-expiry`, `/outbox`, xác thực `Authorization: Bearer $CRON_SECRET`). Gói Hobby chỉ cho chạy 1 lần/ngày; lên Pro thì đổi lịch thành `*/5 * * * *`.
+- Runtime Vercel không cho `require()` gói thuần ESM: giữ dependency runtime của `be/` ở bản có CommonJS (ví dụ `@nestjs/config` 4.x).
+
 ### Giới hạn hiện tại cần lưu ý
 
 - **Không chạy `npm run db:seed:uat` trên production**: seed tạo tài khoản với mật khẩu công khai trong mã nguồn.
