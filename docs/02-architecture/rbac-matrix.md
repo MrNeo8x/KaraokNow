@@ -49,3 +49,12 @@ Any signed-in user may list their own active merchant memberships (`GET /v1/me/t
 Platform Admins may list and download any merchant's PDF documents (`/v1/platform/merchants/{tenantId}/documents`) for listing review (PD-037).
 
 Platform reports (`GET /v1/platform/reports/overview|merchants`, JSON or CSV) require the Platform Admin grant; they return counts and money totals per merchant, no customer data (PD-044).
+
+### Data-level scope of reports and aggregates (reviewed 2026-11-28, RPT-002)
+
+- Every merchant query filters on the caller's `X-Tenant-ID` (membership checked by `TenantGuard`) and, for branch-scoped roles, on `actor.branchIds`; Owner sees all branches of the tenant.
+- Merchant reports (`/v1/merchant/reports/*`): Owner and Branch Manager only. Branch Manager without `branchId` gets assigned branches only; an unassigned branch → 403; a branch of another tenant → 404 (also for Owner). Receptionist/Cashier → 403.
+- Daily cash report, unresolved deposits, branch hold/booking lists (reception calendar), booking account and manual payments: branch checked against `actor.branchIds` for non-Owners.
+- Owner-only tenant-wide aggregates: audit log, hold-expiry backlog, outbox backlog.
+- Platform reports and user management: Platform Admin grant only; counts and money totals per merchant, no customer contact data.
+- Public: `/v1/health/jobs` (platform-wide counts only, PD-041) and `/v1/metrics` (request counts by method/status, no data).

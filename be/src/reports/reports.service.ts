@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import type { Actor } from '../platform/auth/auth.types';
 import { PG_POOL } from '../platform/database/database.module';
@@ -56,7 +56,7 @@ export class ReportsService {
 
   async bookings(actor: Actor, query: MerchantReportQueryDto) {
     const { from, to, groupBy } = this.range(query);
-    const branchIds = this.scope(actor, query.branchId);
+    const branchIds = await this.scope(actor, query.branchId);
     const params = [actor.tenantId, branchIds, from, to];
     const scope = `b.tenant_id=$1 AND ($2::uuid[] IS NULL OR b.id=ANY($2::uuid[])) AND x.ld BETWEEN $3::date AND $4::date`;
     const [periods, bookingRows, money] = await Promise.all([
@@ -78,7 +78,7 @@ export class ReportsService {
 
   async occupancy(actor: Actor, query: MerchantReportQueryDto) {
     const { from, to } = this.range(query);
-    const branchIds = this.scope(actor, query.branchId);
+    const branchIds = await this.scope(actor, query.branchId);
     const params = [actor.tenantId, branchIds, from, to];
     const rooms = (await this.db.query(`SELECT b.id AS "branchId",b.name AS "branchName",r.id AS "roomId",r.name AS "roomName",
         COALESCE((SELECT sum(k.duration_minutes) FROM bookings k WHERE k.room_id=r.id AND k.tenant_id=r.tenant_id
@@ -100,7 +100,7 @@ export class ReportsService {
 
   async channels(actor: Actor, query: MerchantReportQueryDto) {
     const { from, to } = this.range(query);
-    const branchIds = this.scope(actor, query.branchId);
+    const branchIds = await this.scope(actor, query.branchId);
     const rows = (await this.db.query(`SELECT h.channel,count(*)::int AS holds,
         count(k.id)::int AS confirmed,
         count(*) FILTER (WHERE k.id IS NULL AND (h.status='EXPIRED' OR (h.status='HELD' AND h.expires_at<=clock_timestamp())))::int AS expired
@@ -182,10 +182,16 @@ export class ReportsService {
     return { from: query.from, to: query.to, groupBy: (query.groupBy ?? 'day') as GroupBy };
   }
 
-  /** null = every branch of the tenant (Owner); otherwise the explicit list the caller may see. */
-  private scope(actor: Actor, branchId?: string): string[] | null {
+  /**
+   * Data scope: null = every branch of the tenant (Owner); otherwise the explicit list the caller may see
+   * (Branch Manager: assigned branches only). A branch of another tenant is 404, an unassigned one 403.
+   * Every query also filters on the caller's tenant, so a stale list can never reach another merchant.
+   */
+  private async scope(actor: Actor, branchId?: string): Promise<string[] | null> {
     const owner = actor.roles.includes('OWNER');
     if (branchId) {
+      const exists = await this.db.query('SELECT 1 FROM branches WHERE tenant_id=$1 AND id=$2', [actor.tenantId, branchId]);
+      if (!exists.rowCount) throw new NotFoundException('Branch not found');
       if (!owner && !actor.branchIds.includes(branchId)) throw new ForbiddenException('Branch access denied');
       return [branchId];
     }

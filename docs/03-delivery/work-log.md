@@ -6,9 +6,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `45a14e2` (đã deploy production: IAM-008/FE-017, BKG-011/AUD-002, OPS-003, FE-012, IAM-007, BKG-010/FE-016, FILE-001/FE-015). **Chưa push** (theo thứ tự): `b558901` BE VEN-004 vị trí chi nhánh (**migration `20261124070000`**), `e23d5ca` FE-011 type từ OpenAPI, `faf337e` FE sinh lại type, `98920cf` BE VEN-005 giờ mở cửa + giờ lẻ 15 phút (**migration `20261124080000`**), `3a677bf` FE-018 địa chỉ/chỉ đường, `5620f76` BE RPT-001 báo cáo (không migration), và commit tài liệu này. Luồng FE đang làm FE-019 (chưa commit).
+**Code trên `main`:** `origin/main` = `45a14e2` (đã deploy production: IAM-008/FE-017, BKG-011/AUD-002, OPS-003, FE-012, IAM-007, BKG-010/FE-016, FILE-001/FE-015). **Chưa push** (theo thứ tự, mới nhất: commit RPT-002 rà soát phân quyền báo cáo): `b558901` BE VEN-004 vị trí chi nhánh (**migration `20261124070000`**), `e23d5ca` FE-011 type từ OpenAPI, `faf337e` FE sinh lại type, `98920cf` BE VEN-005 giờ mở cửa + giờ lẻ 15 phút (**migration `20261124080000`**), `3a677bf` FE-018 địa chỉ/chỉ đường, `5620f76` BE RPT-001 báo cáo (không migration), và commit tài liệu này. Luồng FE đang làm FE-019 (chưa commit).
 
-**Kiểm chứng gần nhất:** BE (sau RPT-001) `npm run verify` 71/71 unit + drift OpenAPI/Markdown, `npm run test:e2e` **53/53**; migration `20261124070000`, `20261124080000` up → down → up trên Postgres 17 tạm; benchmark sau BKG-011 đạt (tìm phòng p95 24,5 ms, tranh chấp 175 ms). FE (sau FE-018) unit 58/58, `next build`, `npm run e2e` 206/206 (trên backend có VEN-004, chưa có VEN-005/RPT-001).
+**Kiểm chứng gần nhất:** BE (sau RPT-001) `npm run verify` 71/71 unit + drift OpenAPI/Markdown, `npm run test:e2e` **54/54** (sau RPT-002); migration `20261124070000`, `20261124080000` up → down → up trên Postgres 17 tạm; benchmark sau BKG-011 đạt (tìm phòng p95 24,5 ms, tranh chấp 175 ms). FE (sau FE-018) unit 58/58, `next build`, `npm run e2e` 206/206 (trên backend có VEN-004, chưa có VEN-005/RPT-001).
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **30 migration** (đến `20261124080000_branch_opening_hours`); backend `:3000` chạy `5620f76` (có báo cáo), `AUTH_COOKIE_SECURE=false`; file upload ở `/app/.storage` trong container, mất khi rebuild; `/v1/health/jobs` local trả 503 vì worker tắt (bình thường). Đã seed UAT; `uat.owner` thuộc >30 merchant thử do e2e tạo.
 
@@ -24,6 +24,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 - *Luồng BE:* BKG-008 khi có PO; OPS-002 (cần quyền Prisma production); IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache (ứng viên đầu tiên: báo cáo nếu chậm).
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF, bản đồ nhúng hoặc chọn ghim (cần API key), danh mục tỉnh/phường.
+
+---
+
+## 2026-11-28 — Luồng BE: rà soát phân quyền mức dữ liệu của báo cáo/dashboard (RPT-002)
+
+- Người dùng: "rà soát các báo cáo, dashboard đã phân quyền ở mức dữ liệu chưa". Rà mọi route GET tổng hợp: báo cáo merchant/Platform, báo cáo tiền mặt, cọc chưa xử lý, danh sách giữ chỗ/booking theo chi nhánh (lịch lễ tân), thanh toán, audit, backlog, health/metrics.
+- Kết luận: đã lọc theo tenant (TenantGuard + `tenant_id` trong mọi truy vấn) và theo chi nhánh được giao cho vai trò không phải Owner. Hai điểm sửa: (1) báo cáo merchant với `branchId` của merchant khác trả 404 thay vì 200 rỗng; (2) audit `HOLD_CREATED` chỉ ghi trường cấu trúc (trước ghi nguyên bản ghi gồm trường SĐT/email — lúc tạo đang rỗng nên chưa lộ). Thêm E2E chứng minh phạm vi Branch Manager/Lễ tân/Thu ngân/sai tenant cho cả 3 báo cáo và CSV.
+- Ghi chú không sửa: `/v1/health/jobs` công khai trả số đếm toàn nền tảng (đã chấp nhận ở PD-041); `/v1/metrics` công khai chỉ có số request theo method/status.
+- Kiểm chứng: unit 71/71, E2E 54/54. Không đổi OpenAPI, không migration.
 
 ---
 

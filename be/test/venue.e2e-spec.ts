@@ -2251,6 +2251,46 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect(platformCsv.text).toContain('Tenant A');
   });
 
+  it('scopes reports to the caller: Branch Manager only assigned branches, no Receptionist/Cashier, no other merchant (RPT-001 data-level)', async () => {
+    const server = app.getHttpServer();
+    const mine = (await authorized('post', '/v1/merchant/branches').send({ code: 'RPT-SC-1', name: 'Scope assigned', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const other = (await authorized('post', '/v1/merchant/branches').send({ code: 'RPT-SC-2', name: 'Scope other', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    const foreign = (await pool.query(`INSERT INTO branches(id,tenant_id,code,name,timezone,status) VALUES (gen_random_uuid(),$1,'RPT-SC-B','Tenant B branch','Asia/Ho_Chi_Minh','ACTIVE') RETURNING id`, [TENANT_B])).rows[0].id;
+    const login = async (email: string, role: string, branchIds: string[]) => {
+      const userId = randomUUID(), membershipId = randomUUID();
+      await pool.query(`INSERT INTO users(id,email,password_hash,display_name,status) VALUES ($1,$2,$3,$4,'ACTIVE')`, [userId, email, await hash('Scope-pass-123', 4), role]);
+      await pool.query(`INSERT INTO tenant_memberships(id,tenant_id,user_id,status) VALUES ($1,$2,$3,'ACTIVE')`, [membershipId, TENANT_A, userId]);
+      await pool.query(`INSERT INTO membership_roles(membership_id,role) VALUES ($1,$2)`, [membershipId, role]);
+      for (const branchId of branchIds) await pool.query(`INSERT INTO membership_branches(membership_id,tenant_id,branch_id) VALUES ($1,$2,$3)`, [membershipId, TENANT_A, branchId]);
+      return (await request(server).post('/v1/auth/login').send({ email, password: 'Scope-pass-123' }).expect(200)).body.accessToken;
+    };
+    const manager = await login('rpt-scope-manager@example.com', 'BRANCH_MANAGER', [mine.id]);
+    const cashier = await login('rpt-scope-cashier@example.com', 'CASHIER', [mine.id]);
+    const reception = await login('rpt-scope-reception@example.com', 'RECEPTIONIST', [mine.id]);
+    const get = (token: string, path: string, query: Record<string, string>) => request(server).get(path).query(query)
+      .set('Authorization', `Bearer ${token}`).set('X-Tenant-ID', TENANT_A);
+    const range = { from: '2026-11-01', to: '2026-11-30' };
+    for (const path of ['/v1/merchant/reports/bookings', '/v1/merchant/reports/occupancy', '/v1/merchant/reports/channels']) {
+      expect((await get(manager, path, range).expect(200)).body.branchIds).toEqual([mine.id]);
+      expect((await get(manager, path, { ...range, branchId: mine.id }).expect(200)).body.branchIds).toEqual([mine.id]);
+      await get(manager, path, { ...range, branchId: other.id }).expect(403);
+      await get(manager, path, { ...range, branchId: foreign }).expect(404);
+      await get(manager, path, { ...range, format: 'csv', branchId: other.id }).expect(403);
+      await get(cashier, path, range).expect(403);
+      await get(reception, path, range).expect(403);
+      await get(ownerToken, path, { ...range, branchId: foreign }).expect(404);
+      await request(server).get(path).query(range).set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_B).expect(403);
+    }
+    // Branch Manager occupancy lists only rooms of the assigned branch.
+    await authorized('post', '/v1/merchant/rooms').send({ branchId: other.id, code: 'RPT-SC-R2', name: 'Other room', capacity: 4 }).expect(201);
+    const mineRoom = (await authorized('post', '/v1/merchant/rooms').send({ branchId: mine.id, code: 'RPT-SC-R1', name: 'Mine room', capacity: 4 }).expect(201)).body;
+    expect((await get(manager, '/v1/merchant/reports/occupancy', range).expect(200)).body.rooms.map((r: { roomId: string }) => r.roomId)).toEqual([mineRoom.id]);
+    await get(manager, '/v1/platform/reports/overview', range).expect(403);
+    // Hold audit keeps structured fields only.
+    const created = (await pool.query(`SELECT after_data FROM audit_logs WHERE action='HOLD_CREATED' ORDER BY occurred_at DESC LIMIT 1`)).rows[0].after_data;
+    expect(Object.keys(created).sort()).toEqual(['branchId', 'bufferMinutes', 'channel', 'durationMinutes', 'expiresAt', 'reservedEndAt', 'roomId', 'startAt', 'status']);
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

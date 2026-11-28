@@ -145,7 +145,10 @@ export class HoldService {
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,clock_timestamp()+($13::integer*interval '1 minute'))`,
       [id, actor.tenantId, room.branchId, dto.roomId, occupancyId, actor.userId, key, hash, dto.channel, start.toISOString(), dto.durationMinutes, bufferMinutes, ttl]);
       const result = await this.find(client, actor.tenantId!, id);
-      await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,after_data) VALUES($1,$2,$3,'HOLD_CREATED','BOOKING_HOLD',$4,$5)`, [randomUUID(), actor.tenantId, actor.userId, id, JSON.stringify(result)]);
+      await client.query(`INSERT INTO audit_logs(id,tenant_id,actor_user_id,action,entity_type,entity_id,after_data) VALUES($1,$2,$3,'HOLD_CREATED','BOOKING_HOLD',$4,$5)`, [randomUUID(), actor.tenantId, actor.userId, id,
+        // Structured fields only: never the customer's phone/email or free text (audit has no PII).
+        JSON.stringify({ branchId: result.branchId, roomId: result.roomId, channel: result.channel, startAt: result.startAt, durationMinutes: result.durationMinutes,
+          bufferMinutes: result.bufferMinutes, reservedEndAt: result.reservedEndAt, expiresAt: result.expiresAt, status: result.status })]);
       await client.query('COMMIT'); return result;
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
