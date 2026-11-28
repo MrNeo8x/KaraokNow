@@ -35,7 +35,7 @@ import { BadgeCheck, Building2, CalendarDays, CheckCircle2, ClipboardList, DoorO
 import { autoTenant, cookieLogout, cookieRefresh, parseSession, readLastTenant, refreshDelay, rememberTenant, type MyTenant, type Session } from '@/lib/session';
 
 export type Me = { displayName: string; email: string; tenantName: string; tenantStatus: 'ACTIVE' | 'INACTIVE'; roles: Role[]; branchIds: string[]; platformAdmin: boolean };
-export type Branch = { id: string; name: string; code: string; timezone: string; status: string };
+export type Branch = { id: string; name: string; code: string; timezone: string; status: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; mapsUrl?: string | null; directionsUrl?: string | null };
 export type Room = { id: string; name: string; code: string; capacity: number; status: string };
 export default function App({ initialPage = 'merchant' }: { initialPage?: 'merchant' | 'customer' | 'platform' }) {
   const page = initialPage;

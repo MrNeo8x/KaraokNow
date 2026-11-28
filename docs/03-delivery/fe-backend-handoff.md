@@ -239,6 +239,11 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Khách: `GET /v1/public/branches` có thêm `address`, `phone`, `latitude`, `longitude`, `directionsUrl`. Hiển thị địa chỉ; `phone` → `<a href="tel:+84…">` (hiển thị dạng `0989 015 619`); `directionsUrl` → nút "Chỉ đường" (`target="_blank"`, trên điện thoại mở app Google Maps). Ẩn phần nào đang `null`. Dùng ở danh sách chi nhánh, bước đặt phòng và biên nhận/tra cứu (biên nhận có `branchId` → lấy từ danh sách chi nhánh).
 - Production cần migration `20261124070000_branch_location` trước khi push.
 
+### FE INTEGRATED — địa chỉ và vị trí chi nhánh (FE-018, VEN-004, 2026-11-28)
+
+- Form chi nhánh có địa chỉ, SĐT, link Google Maps và nút xem trước qua `branch-location/resolve`; PATCH theo quy ước bỏ trường = giữ, `null` = xoá. Trang khách hiển thị địa chỉ, nút gọi và "Chỉ đường" (`directionsUrl`, tab mới) ở chọn quán, xác nhận, biên nhận và tra cứu.
+- Kiểm thử: `branch-location.mjs` 7/7, `customer.mjs` 26/26; `npm run e2e` 206/206.
+
 ## FE READY — quản lý user của Platform (IAM-008, PD-040, 2026-11-28)
 
 Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 48/48 (contract cho các route dưới). Mọi route: Bearer của Platform Admin, **không** `X-Tenant-ID`; user thường → 403. Mọi thao tác ghi cần `reason` (1–500 ký tự, không chỉ khoảng trắng → 400).

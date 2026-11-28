@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Navigation, Phone } from 'lucide-react';
 import { CalendarDays, Check, CheckCircle2, ClipboardList, Copy, Home, MapPin, Mic2, Minus, Plus, Search } from 'lucide-react';
 import { ApiError, request } from '@/lib/api';
 import { bookingStatusLabel, type BookingStatus } from '@/lib/booking-lifecycle';
+import { formatPhone, telHref } from '@/lib/branch-location';
 import { SLOTS, firstSlot, initialChoice, slotOpen, upcomingDates } from '@/lib/booking-time';
 import { PUBLIC_HOLD_ATTEMPT_KEY, PUBLIC_HOLD_RECEIPT_KEY, cleanBookingCode, cleanPhone, formatBookingCode, clear, isRetryable, prepareAttempt, readAttempt, readReceipt, save, type PublicHoldAttempt, type PublicHoldReceipt } from '@/lib/public-booking';
 
-export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string };
+export type Branch = { id: string; merchantId: string; merchantName: string; merchantLogoUrl?: string | null; name: string; timezone: string; address?: string | null; phone?: string | null; latitude?: number | null; longitude?: number | null; directionsUrl?: string | null };
 export type Room = { id: string; branchId?: string; name: string; capacity: number };
 type Page<T> = { items: T[]; hasMore: boolean };
 export type Availability = { branchId: string; startAt: string; requestedEndAt: string; durationMinutes: number; bufferEnabled: boolean; bufferMinutes: number; appliedBufferMinutes: number; reservedEndAt: string; rooms: Room[] };
@@ -25,6 +27,17 @@ function fetchTerms(branchId: string, signal?: AbortSignal): Promise<Terms> {
     .catch(err => { if (err instanceof ApiError && err.status === 404) return { configured: false, terms: null, version: null }; throw err; });
 }
 function durationLabel(minutes: number) { return minutes % 60 === 0 ? `${minutes / 60} giờ` : `${(minutes / 60).toLocaleString('vi-VN')} giờ`; }
+/** Address, call button and Google Maps directions for a branch; each part is hidden when missing (PD-042). */
+function BranchContact({ branch, compact = false }: { branch?: Branch; compact?: boolean }) {
+  if (!branch || (!branch.address && !branch.phone && !branch.directionsUrl)) return null;
+  return <div className="branch-contact-block">
+    {branch.address && <p className="branch-address"><MapPin size={14} aria-hidden /> {branch.address}</p>}
+    {!compact && (branch.phone || branch.directionsUrl) && <div className="branch-contact">
+      {branch.phone && <a href={telHref(branch.phone)} aria-label={`Gọi ${branch.name} ${formatPhone(branch.phone)}`}><Phone size={14} aria-hidden /> {formatPhone(branch.phone)}</a>}
+      {branch.directionsUrl && <a className="directions" href={branch.directionsUrl} target="_blank" rel="noopener noreferrer"><Navigation size={14} aria-hidden /> Chỉ đường</a>}
+    </div>}
+  </div>;
+}
 function money(value: string) { return `${BigInt(value).toLocaleString('vi-VN')} ₫`; }
 function when(value: string, timezone?: string) { return new Date(value).toLocaleString('vi-VN', { timeZone: timezone ?? 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'short' }); }
 
@@ -175,6 +188,7 @@ export default function CustomerBooking() {
         <p>{statusLabel[receipt.status] ?? receipt.status}</p>
         <label className="app-label">Mã đặt phòng — hãy lưu lại để tra cứu<code className="booking-code" aria-label={`Mã đặt phòng ${receipt.bookingCode.split('').join(' ')}`}>{formatBookingCode(receipt.bookingCode)}</code></label>
         <div className="summary"><div><span>Thời gian</span><strong>{when(receipt.startAt, branch?.timezone)}</strong></div><div><span>Thời lượng</span><strong>{durationLabel(receipt.durationMinutes)}</strong></div><div><span>Giữ chỗ đến</span><strong>{when(receipt.expiresAt, branch?.timezone)}</strong></div><div><span>Điều khoản</span><strong>Phiên bản {receipt.termsVersion}</strong></div><div className="total"><span>Tổng tiền</span><strong>{money(receipt.totalAmountVnd)}</strong></div></div>
+        <BranchContact branch={branches.find(item => item.id === receipt.branchId)} />
         {receipt.depositRequiredVnd && receipt.depositRequiredVnd !== '0' ? <p className="deposit-callout">Cần đặt cọc <strong>{money(receipt.depositRequiredVnd)}</strong> bằng tiền mặt tại quầy trước khi nhân viên xác nhận. Không có thanh toán online.</p> : receipt.depositRequiredVnd === '0' ? <p>Không yêu cầu đặt cọc.</p> : null}
         <p>Nhân viên sẽ gọi số {receipt.phone} để xác minh; giữ chỗ chưa phải đặt phòng đã xác nhận.</p>
         <div className="success-actions"><button type="button" className="primary" onClick={() => void copyCode(receipt.bookingCode)}><Copy size={15} aria-hidden /> {copied ? 'Đã sao chép' : 'Sao chép mã'}</button><a className="secondary" href="#lookup" style={{ textAlign: 'center', textDecoration: 'none' }}>Xem đơn của tôi</a><button type="button" className="secondary" onClick={newBooking}>Đặt phòng khác</button></div>
@@ -183,7 +197,8 @@ export default function CustomerBooking() {
       <section className="app-card" id="booking" aria-labelledby="customer-booking-title">
         <h2 id="customer-booking-title"><span className="step-no">1</span>Chọn quán</h2>
         {loading && branches.length === 0 ? <p role="status">Đang tải danh mục…</p> : branches.length === 0 ? <div className="empty">Chưa có địa điểm được công khai.</div>
-          : <div className="branch-list" role="group" aria-label="Địa điểm">{branches.map((item, index) => <button type="button" key={item.id} className="branch-option" aria-pressed={item.id === branchId} onClick={() => setBranchId(item.id)}><img src={item.merchantLogoUrl ?? fixedRoomImages[index % fixedRoomImages.length]} alt={item.merchantLogoUrl ? `Logo ${item.merchantName}` : ''} className={item.merchantLogoUrl ? 'merchant-logo' : undefined} onError={event => { const image = event.currentTarget; const fallback = fixedRoomImages[index % fixedRoomImages.length]; if (!image.src.endsWith(fallback)) { image.src = fallback; image.className = ''; image.alt = ''; } }} /><span><strong>{item.merchantName}</strong><small><MapPin size={12} aria-hidden /> {item.name}</small></span></button>)}</div>}
+          : <div className="branch-list" role="group" aria-label="Địa điểm">{branches.map((item, index) => <button type="button" key={item.id} className="branch-option" aria-pressed={item.id === branchId} onClick={() => setBranchId(item.id)}><img src={item.merchantLogoUrl ?? fixedRoomImages[index % fixedRoomImages.length]} alt={item.merchantLogoUrl ? `Logo ${item.merchantName}` : ''} className={item.merchantLogoUrl ? 'merchant-logo' : undefined} onError={event => { const image = event.currentTarget; const fallback = fixedRoomImages[index % fixedRoomImages.length]; if (!image.src.endsWith(fallback)) { image.src = fallback; image.className = ''; image.alt = ''; } }} /><span><strong>{item.merchantName}</strong><small><MapPin size={12} aria-hidden /> {item.name}</small>{item.address && <small className="branch-option-address">{item.address}</small>}</span></button>)}</div>}
+        {branch && <BranchContact branch={branch} />}
       </section>
       <form className="app-card" onSubmit={findAvailability} aria-labelledby="customer-time-title">
         <h2 id="customer-time-title"><span className="step-no">2</span>Chọn ngày &amp; giờ</h2>
@@ -207,7 +222,7 @@ export default function CustomerBooking() {
       </section>}
       {availability && selectedRoom && quote && <section className="app-card" aria-labelledby="customer-confirm-title">
         <h2 id="customer-confirm-title"><span className="step-no">4</span>Xác nhận đặt phòng</h2>
-        <div className="summary customer-quote" role="status"><div><span>Quán</span><strong>{branch?.merchantName} · {branch?.name}</strong></div><div><span>Phòng</span><strong>{selectedRoom.name}</strong></div><div><span>Thời gian</span><strong>{when(availability.startAt, branch?.timezone)}</strong></div><div><span>Thời lượng</span><strong>{durationLabel(quote.durationMinutes)}</strong></div><div className="total"><span>Tạm tính</span><strong>{money(quote.totalAmountVnd)}</strong></div></div>
+        <div className="summary customer-quote" role="status"><div><span>Quán</span><strong>{branch?.merchantName} · {branch?.name}</strong></div>{branch?.address && <div><span>Địa chỉ</span><strong>{branch.address}</strong></div>}<div><span>Phòng</span><strong>{selectedRoom.name}</strong></div><div><span>Thời gian</span><strong>{when(availability.startAt, branch?.timezone)}</strong></div><div><span>Thời lượng</span><strong>{durationLabel(quote.durationMinutes)}</strong></div><div className="total"><span>Tạm tính</span><strong>{money(quote.totalAmountVnd)}</strong></div></div>
         {terms?.configured && terms.terms && terms.version ? <div className="customer-terms"><details><summary>Đọc điều khoản đặt phòng</summary><p>{terms.terms}</p><small>Phiên bản {terms.version}{terms.updatedAt ? ` · cập nhật ${new Date(terms.updatedAt).toLocaleString('vi-VN')}` : ''}</small></details><label className="check-row"><input type="checkbox" checked={acceptedTerms?.version === terms.version} onChange={event => setAcceptedTerms(event.target.checked ? { ...terms } : null)} /> Tôi đã đọc và đồng ý điều khoản phiên bản {terms.version}.</label></div> : <div className="notice">Merchant chưa cấu hình điều khoản đặt phòng công khai nên chưa thể giữ chỗ online.</div>}
         {holdError && <div className="error" role="alert">{holdError}</div>}
         {pending && <div className="notice" role="status">Có một yêu cầu giữ phòng chưa xác định kết quả ({when(pending.body.startAt, branch?.timezone)} · {pending.body.durationMinutes} phút · {money(pending.body.expectedTotalAmountVnd)}). <div className="hold-actions"><button type="button" className="primary" disabled={holding || retryAt > Date.now()} onClick={() => void send(pending)}>{holding ? 'Đang gửi…' : 'Gửi lại yêu cầu'}</button><button type="button" className="secondary" disabled={holding} onClick={discardPending}>Bỏ yêu cầu này</button></div></div>}
@@ -219,7 +234,7 @@ export default function CustomerBooking() {
       <section className="app-card customer-lookup" id="lookup" aria-labelledby="customer-lookup-title"><h2 id="customer-lookup-title"><ClipboardList size={18} aria-hidden /> Đơn của tôi</h2><p>Tra cứu bằng số điện thoại đã dùng và mã đặt phòng 6 ký tự (ví dụ K7M 4XQ).</p>
         <form className="fields contact-fields" onSubmit={lookupBooking}><label>Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={lookupPhone} onChange={event => setLookupPhone(event.target.value)} required maxLength={24} /></label><label>Mã đặt phòng<input value={lookupCode} onChange={event => setLookupCode(event.target.value)} required maxLength={40} autoCapitalize="characters" placeholder="K7M 4XQ" autoComplete="off" spellCheck={false} /></label><button className="primary" disabled={lookingUp || lookupRetryAt > Date.now()}>{lookingUp ? 'Đang tra cứu…' : 'Tra cứu'}</button></form>
         {lookupError && <div className="error" role="alert">{lookupError}</div>}
-        {lookup && <div className="order-card customer-receipt" role="status"><div className="order-head"><strong>{branches.find(item => item.id === lookup.branchId)?.merchantName ?? 'Đặt phòng'}</strong><span className={`pill ${pillTone(lookupStatus)}`}>{lookup.bookingStatus ? 'Booking' : 'Giữ chỗ'}</span></div><h3>{lookup.bookingStatus ? bookingStatusLabel[lookup.bookingStatus] ?? lookup.bookingStatus : statusLabel[lookup.status] ?? lookup.status}</h3><p>{branches.find(item => item.id === lookup.branchId)?.name ?? 'Địa điểm'} · {catalogRooms.find(item => item.id === lookup.roomId)?.name ?? 'Phòng đã chọn'}</p><p><CalendarDays size={13} aria-hidden /> {when(lookup.startAt, branches.find(item => item.id === lookup.branchId)?.timezone)} · {durationLabel(lookup.durationMinutes)} · <strong>{money(lookup.totalAmountVnd)}</strong></p>{lookup.depositRequiredVnd && lookup.depositRequiredVnd !== '0' && <p>Cọc yêu cầu: {money(lookup.depositRequiredVnd)} · đã ghi nhận: {money(lookup.depositRecordedVnd ?? '0')}{lookup.status === 'HELD' && BigInt(lookup.depositRecordedVnd ?? '0') < BigInt(lookup.depositRequiredVnd) ? ' · vui lòng đặt cọc tiền mặt tại quầy' : ''}</p>}<small>Điều khoản phiên bản {lookup.termsVersion}{lookup.bookingId ? ` · Mã booking: ${lookup.bookingId}` : ''}</small></div>}
+        {lookup && <div className="order-card customer-receipt" role="status"><div className="order-head"><strong>{branches.find(item => item.id === lookup.branchId)?.merchantName ?? 'Đặt phòng'}</strong><span className={`pill ${pillTone(lookupStatus)}`}>{lookup.bookingStatus ? 'Booking' : 'Giữ chỗ'}</span></div><h3>{lookup.bookingStatus ? bookingStatusLabel[lookup.bookingStatus] ?? lookup.bookingStatus : statusLabel[lookup.status] ?? lookup.status}</h3><p>{branches.find(item => item.id === lookup.branchId)?.name ?? 'Địa điểm'} · {catalogRooms.find(item => item.id === lookup.roomId)?.name ?? 'Phòng đã chọn'}</p><p><CalendarDays size={13} aria-hidden /> {when(lookup.startAt, branches.find(item => item.id === lookup.branchId)?.timezone)} · {durationLabel(lookup.durationMinutes)} · <strong>{money(lookup.totalAmountVnd)}</strong></p>{lookup.depositRequiredVnd && lookup.depositRequiredVnd !== '0' && <p>Cọc yêu cầu: {money(lookup.depositRequiredVnd)} · đã ghi nhận: {money(lookup.depositRecordedVnd ?? '0')}{lookup.status === 'HELD' && BigInt(lookup.depositRecordedVnd ?? '0') < BigInt(lookup.depositRequiredVnd) ? ' · vui lòng đặt cọc tiền mặt tại quầy' : ''}</p>}<small>Điều khoản phiên bản {lookup.termsVersion}{lookup.bookingId ? ` · Mã booking: ${lookup.bookingId}` : ''}</small><BranchContact branch={branches.find(item => item.id === lookup.branchId)} /></div>}
       </section>
     </main>
     <nav className="app-tabbar" aria-label="Điều hướng"><a href="#booking" className="active"><Home size={20} aria-hidden />Đặt phòng</a><a href="#lookup"><ClipboardList size={20} aria-hidden />Đơn của tôi</a><a href="/merchant"><CheckCircle2 size={20} aria-hidden />Chủ quán</a></nav>

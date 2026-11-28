@@ -2,7 +2,7 @@
 
 Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE) tiếp tục mà không phải đọc lại lịch sử chat. Mục **"Trạng thái hiện tại"** luôn đứng đầu và được **viết lại** ở cuối mỗi phiên (commit, kiểm chứng, môi trường, việc dở, việc tiếp theo). Nhật ký từng phiên ghi ngay bên dưới, mới nhất trước: phạm vi, commit, kiểm chứng thực tế, quyết định mới, việc dở dang, cảnh báo. Trạng thái task chi tiết vẫn nằm ở `task-board.md`.
 
-## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-011)
+## Trạng thái hiện tại (cập nhật 2026-11-28, Luồng FE — sau FE-018)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
@@ -14,19 +14,27 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 **Production (Vercel):** chạy `84aa397`; 27 migration (đến `20261124050000_file_storage`); Blob `vn-karaoke-now-blob-pub/-pri` đã gắn vào BE (OPS-008 `VERIFY` — chờ Owner thử upload trên giao diện). Env BE: `CLIENT_IP_HEADER=x-real-ip`, `BLOB_PUBLIC_READ_WRITE_TOKEN`, `BLOB_PRIVATE_READ_WRITE_TOKEN`; không đặt `AUTH_COOKIE_SECURE` (cookie Secure). **Trước khi push `693fd7b`: áp migration `20261124060000_platform_user_management` lên Prisma** (chỉ thêm bảng/cột nullable/index). Sau deploy: smoke `GET /v1/platform/users?limit=1` (admin 200, user thường 403); đăng nhập trên domain FE → cookie `kn_refresh` HttpOnly/Secure path `/v1/auth`, F5 vẫn đăng nhập. Quy trình: `docs/03-delivery/deploy-vercel.md`.
 
-**Đang dở (working tree):** Luồng FE không có sau commit FE-011. Luồng BE đã commit VEN-004 (`b558901`, địa chỉ/SĐT/vị trí chi nhánh; FE-018 `READY`); FE đã sinh lại type theo `openapi.json` mới. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
+**Đang dở (working tree):** Luồng FE không có sau commit FE-018. Luồng BE đã commit VEN-005 (`98920cf`, giờ mở cửa và giờ lẻ 15 phút; FE-019 `READY`); FE đã sinh lại type theo `openapi.json` mới. Session triển khai có `deploy-vercel.md` và mục OPS-008 chưa commit — Luồng FE không commit hộ.
 
 **Việc tiếp theo**
 
 - *Người dùng / PO:* UAT theo `docs/04-quality/uat-checklist.md` (nhóm I ảnh/giấy tờ, J mã đặt phòng, K phiên đăng nhập, L quản lý user); trả lời BKG-008; quyết định có sửa audit `MEMBERSHIP_CREATED` đang chứa email (có từ trước, lệch quy tắc audit không PII).
 - *Session triển khai:* migrate `20261124060000` → push → smoke như trên; đóng OPS-008 sau khi Owner thử upload.
-- *Luồng FE:* **FE-018** (địa chỉ, SĐT, chỉ đường Google Maps cho chi nhánh — handoff "FE READY — địa chỉ và vị trí chi nhánh"); sau deploy kiểm tra cookie `kn_refresh` (FE-012) và màn Người dùng trên production; khi BE đổi `openapi.json` chạy `npm run types:generate`; QA-003 phần còn lại.
+- *Luồng FE:* **FE-019** (giờ lẻ 15 phút, giờ mở cửa, thời lượng theo chính sách — handoff "FE READY — giờ lẻ và giờ mở cửa"); rebuild backend local có VEN-005 rồi chạy lại `npm run e2e` (e2e FE-018 chạy trên backend trước VEN-005); sau deploy kiểm tra cookie `kn_refresh`, màn Người dùng và vị trí chi nhánh trên production.
 - *Luồng BE:* BKG-008 khi có PO; OPS-002/OPS-003; IAM-004 khi có ZBS; quyết định giữ/gỡ endpoint chẩn đoán IP; Redis `redis-byzantium-mirror` chỉ khi có số đo cần cache.
 
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
 
 
 
+
+
+---
+
+## 2026-11-28 — Luồng FE: địa chỉ, SĐT và chỉ đường cho chi nhánh (FE-018)
+
+- Form chi nhánh có địa chỉ/SĐT/link Google Maps + xem trước vị trí; trang khách có địa chỉ, nút gọi, nút Chỉ đường ở chọn quán, xác nhận, biên nhận, tra cứu. Chi nhánh UAT local được đặt địa chỉ "Số 1 Hàng Bài", SĐT 0989 015 619, toạ độ 21.0285, 105.8542.
+- Kiểm chứng: unit 58/58, `next build`; `npm run e2e` **206/206** (backend local rebuild có VEN-004).
 
 ---
 

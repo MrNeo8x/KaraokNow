@@ -1905,6 +1905,16 @@ export interface components {
             phone?: string | null;
             /** @description Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location */
             mapsLink?: string | null;
+            /**
+             * @description Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h
+             * @example 09:00
+             */
+            openingTime?: string | null;
+            /**
+             * @description Closing time HH:mm; earlier than or equal to openingTime = closes after midnight
+             * @example 02:00
+             */
+            closingTime?: string | null;
         };
         BranchResponseDto: {
             /** Format: uuid */
@@ -1927,6 +1937,16 @@ export interface components {
             mapsUrl: string | null;
             /** @description Google Maps directions to the coordinates */
             directionsUrl: string | null;
+            /**
+             * @description Opening time HH:mm; null = open 24 h (PD-043)
+             * @example 09:00
+             */
+            openingTime: string | null;
+            /**
+             * @description Closing time HH:mm; ≤ openingTime means after midnight
+             * @example 02:00
+             */
+            closingTime: string | null;
         };
         ResolveLocationDto: {
             mapsLink: string;
@@ -1949,6 +1969,16 @@ export interface components {
             phone?: string | null;
             /** @description Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location */
             mapsLink?: string | null;
+            /**
+             * @description Opening time HH:mm (PD-043); send together with closingTime; null with closingTime null = open 24 h
+             * @example 09:00
+             */
+            openingTime?: string | null;
+            /**
+             * @description Closing time HH:mm; earlier than or equal to openingTime = closes after midnight
+             * @example 02:00
+             */
+            closingTime?: string | null;
         };
         BranchStatusDto: {
             /** @enum {string} */
@@ -3024,6 +3054,14 @@ export interface components {
             /** @description Single public cancellation/booking terms text shown before guest submission */
             terms: string;
         };
+        PublicBookingPolicyDto: {
+            minDurationMinutes: number;
+            maxDurationMinutes: number;
+            /** @description Allowed durations: min + k × step, up to max */
+            durationStepMinutes: number;
+            /** @description Start times must be on this minute boundary (15) */
+            startStepMinutes: number;
+        };
         PublicBranchDto: {
             /** Format: uuid */
             id: string;
@@ -3042,6 +3080,17 @@ export interface components {
             longitude: number | null;
             /** @description Google Maps directions link; null when the branch has no location */
             directionsUrl: string | null;
+            /**
+             * @description Opening time HH:mm in the branch timezone; null = open 24 h (PD-043)
+             * @example 09:00
+             */
+            openingTime: string | null;
+            /**
+             * @description Closing time HH:mm; ≤ openingTime means after midnight
+             * @example 02:00
+             */
+            closingTime: string | null;
+            bookingPolicy: components["schemas"]["PublicBookingPolicyDto"];
         };
         PublicBranchListDto: {
             limit: number;

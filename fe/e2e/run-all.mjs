@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const steps = ['setup-uat.mjs', 'api-smoke.mjs', 'customer.mjs', 'staff.mjs', 'platform-role.mjs', 'roles.mjs', 'files.mjs', 'session.mjs', 'platform-users.mjs'];
+const steps = ['setup-uat.mjs', 'api-smoke.mjs', 'branch-location.mjs', 'customer.mjs', 'staff.mjs', 'platform-role.mjs', 'roles.mjs', 'files.mjs', 'session.mjs', 'platform-users.mjs'];
 const failed = [];
 for (const step of steps) {
   console.log(`\n===== ${step} =====`);

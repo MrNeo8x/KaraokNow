@@ -383,3 +383,14 @@ main.admin-content { margin: 0; }
 .secret-box code { font-size: 16px; font-weight: 700; letter-spacing: .04em; }
 .members-panel { margin-top: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #fff; display: grid; gap: 10px; }
 @media (max-width: 700px) { .user-filters { grid-template-columns: 1fr; } }
+/* Branch location (FE-018, PD-042) */
+.location-fields { display: grid; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 0; }
+.location-fields legend { font-size: 12px; font-weight: 750; color: var(--text-2); padding: 0 4px; }
+.location-fields small { color: var(--muted); }
+.branch-contact { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.branch-contact a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--brand-200); background: #fff; color: var(--brand-700); font-weight: 700; font-size: 12.5px; text-decoration: none; }
+.branch-contact a.directions { background: var(--brand-700); border-color: var(--brand-700); color: #fff; }
+.branch-address { display: flex; gap: 6px; align-items: flex-start; color: var(--text-2); font-size: 13px; }
+.branch-contact-block { display: grid; gap: 4px; margin-top: 10px; text-align: left; }
+.branch-option-address { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.success-card .branch-contact { justify-content: center; }

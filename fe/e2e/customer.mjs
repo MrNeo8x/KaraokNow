@@ -28,11 +28,13 @@ for (const vp of [{ name: 'mobile', width: 390, height: 844 }, { name: 'desktop'
     const shown = (await page.locator('.booking-code').innerText()).trim(); const code = shown.replace(/\s/g, '');
     log(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/.test(code) && /^\S{3} \S{3}$/.test(shown), `${vp.name}: giữ chỗ, hiện mã 6 ký tự tách đôi`, shown);
     log(await page.locator('.deposit-callout').isVisible(), `${vp.name}: hiện số cọc cần đóng`, await page.locator('.deposit-callout').innerText().catch(() => ''));
+    log(await page.locator('.success-card .branch-contact a[href^="tel:"]').count() === 1 && await page.locator('.success-card .branch-contact a', { hasText: 'Chỉ đường' }).count() === 1, `${vp.name}: biên nhận có nút gọi và Chỉ đường của chi nhánh`);
     await page.screenshot({ path: `${SHOTS}/customer-${vp.name}-receipt.png`, fullPage: true });
     // lookup (prefilled after hold)
     const lookup = page.locator('section.customer-lookup');
     await lookup.getByRole('button', { name: 'Tra cứu' }).click();
     await lookup.locator('.customer-receipt').waitFor(); log(/chờ nhân viên/.test(await lookup.locator('h3').innerText()), `${vp.name}: tra cứu ra trạng thái giữ chỗ`, await lookup.locator('h3').innerText());
+    log(await lookup.locator('.customer-receipt .branch-contact a', { hasText: 'Chỉ đường' }).count() === 1, `${vp.name}: kết quả tra cứu có Chỉ đường`);
     // wrong code → generic 404 message
     await lookup.getByLabel('Mã đặt phòng').fill(`${code.slice(0, 3).toLowerCase()}-${code.slice(3).toLowerCase()}`); await lookup.getByRole('button', { name: 'Tra cứu' }).click();
     await lookup.locator('.customer-receipt h3').waitFor(); log(true, `${vp.name}: tra cứu bằng chữ thường có dấu gạch`);
