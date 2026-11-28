@@ -2,14 +2,14 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPi
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiHeader, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UPLOAD_LIMITS, type UploadedFileLike } from '../platform/storage/uploaded-file';
-import { BranchResponseDto, RoomAmenityResponseDto, RoomMediaResponseDto, RoomResponseDto, UploadRoomMediaDto } from './venue-response.dto';
+import { BranchResponseDto, ResolvedLocationDto, RoomAmenityResponseDto, RoomMediaResponseDto, RoomResponseDto, UploadRoomMediaDto } from './venue-response.dto';
 import type { AuthenticatedRequest } from '../platform/auth/auth.types';
 import { AuthGuard } from '../platform/auth/auth.guard';
 import { RequireRoles } from '../platform/auth/roles.decorator';
 import { RolesGuard } from '../platform/auth/roles.guard';
 import { TenantGuard } from '../platform/tenant/tenant.guard';
 import {
-  BranchStatusDto, CreateBranchDto, CreateRoomAmenityDto, CreateRoomDto, CreateRoomMediaDto,
+  BranchStatusDto, CreateBranchDto, CreateRoomAmenityDto, CreateRoomDto, CreateRoomMediaDto, ResolveLocationDto,
   RoomStatusDto, UpdateBranchDto, UpdateRoomAmenityDto, UpdateRoomDto, UpdateRoomMediaDto
 } from './dto';
 import { VenueService } from './venue.service';
@@ -21,6 +21,10 @@ export class VenueController {
   @Post('branches') @RequireRoles('OWNER')
   @ApiResponse({ status: 201, type: BranchResponseDto })
   createBranch(@Req() req: AuthenticatedRequest, @Body() dto: CreateBranchDto) { return this.venues.createBranch(req.actor, dto); }
+  @Post('branch-location/resolve') @HttpCode(200) @RequireRoles('OWNER','BRANCH_MANAGER')
+  @ApiResponse({ status: 200, type: ResolvedLocationDto, description: 'Preview the coordinates of a Google Maps link before saving (PD-042)' })
+  @ApiResponse({ status: 422, description: 'Not a Google Maps link, or the link has no coordinates' })
+  resolveLocation(@Body() dto: ResolveLocationDto) { return this.venues.resolveLocation(dto.mapsLink); }
   @Get('branches') @RequireRoles('OWNER','BRANCH_MANAGER','RECEPTIONIST','CASHIER')
   @ApiResponse({ status: 200, type: [BranchResponseDto] })
   listBranches(@Req() req: AuthenticatedRequest) { return this.venues.listBranches(req.actor); }

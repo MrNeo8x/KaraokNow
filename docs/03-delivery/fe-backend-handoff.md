@@ -218,6 +218,16 @@ Chưa phải FE READY: chỉ cần FE làm nếu đo trên production cho thấy
 - Mục **Tiền mặt**: `GET .../cash-report?date=` (ngày lấy theo múi giờ chi nhánh trên trình duyệt) và `GET .../unresolved-deposits` + `POST .../holds/{id}/deposit-resolution` (chặn hoàn vượt cọc ròng ở client).
 - Ẩn thao tác theo PD-036 qua `/me`. Kiểm thử: `npm run e2e` 157/157.
 
+## FE READY — địa chỉ và vị trí chi nhánh (VEN-004, PD-042, 2026-11-28)
+
+Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 51/51 (contract cho các route dưới). Không cần Google Maps API key.
+
+- `POST /v1/merchant/branches` và `PATCH /v1/merchant/branches/{id}` nhận thêm (tuỳ chọn): `address` (≤ 300, một dòng), `phone` (vd `0989 015 619`; BE bỏ dấu cách/chấm/gạch và lưu `+84…`; sai định dạng → 400), `mapsLink` (link Google Maps đầy đủ, link rút gọn `https://maps.app.goo.gl/…`, hoặc `"21.0285, 105.8542"`). Ở PATCH: bỏ trường = giữ nguyên, gửi `null` = xoá. Link không phải Google hoặc không có toạ độ (ví dụ link chỉ có tên quán) → **422**, hiện thông báo: "Mở đúng quán trên Google Maps rồi bấm Chia sẻ → Sao chép liên kết, hoặc dán toạ độ".
+- `BranchResponseDto` (mọi API chi nhánh) có thêm `address`, `phone`, `latitude`, `longitude`, `mapsUrl` (link đã dán), `directionsUrl` — tất cả nullable.
+- Xem trước khi lưu: `POST /v1/merchant/branch-location/resolve` `{ mapsLink }` (Owner, Branch Manager) → `{ latitude, longitude, mapsUrl, directionsUrl }` hoặc 422. Gợi ý: hiện toạ độ + nút "Mở trên Google Maps" (`directionsUrl`) để Owner tự kiểm tra đúng chỗ.
+- Khách: `GET /v1/public/branches` có thêm `address`, `phone`, `latitude`, `longitude`, `directionsUrl`. Hiển thị địa chỉ; `phone` → `<a href="tel:+84…">` (hiển thị dạng `0989 015 619`); `directionsUrl` → nút "Chỉ đường" (`target="_blank"`, trên điện thoại mở app Google Maps). Ẩn phần nào đang `null`. Dùng ở danh sách chi nhánh, bước đặt phòng và biên nhận/tra cứu (biên nhận có `branchId` → lấy từ danh sách chi nhánh).
+- Production cần migration `20261124070000_branch_location` trước khi push.
+
 ## FE READY — quản lý user của Platform (IAM-008, PD-040, 2026-11-28)
 
 Đã qua build, OpenAPI drift check, PostgreSQL Docker E2E 48/48 (contract cho các route dưới). Mọi route: Bearer của Platform Admin, **không** `X-Tenant-ID`; user thường → 403. Mọi thao tác ghi cần `reason` (1–500 ký tự, không chỉ khoảng trắng → 400).

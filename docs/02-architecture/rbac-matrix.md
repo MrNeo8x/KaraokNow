@@ -25,6 +25,7 @@ This is the conservative authorization baseline implemented for the current venu
 | Reverse a deposit, CASH payment or surcharge | Yes, all tenant branches | Assigned only | No | No |
 | List unresolved expired-hold deposits; read daily cash report | Yes, all tenant branches | Assigned only | No | Assigned only |
 | Resolve an expired-hold deposit (refund/keep) | Yes, all tenant branches | Assigned only | No | No |
+| Set branch address, phone and Google Maps location; preview a Maps link (`POST /v1/merchant/branch-location/resolve`) | Yes, all tenant branches | Assigned only | No | No |
 | Upload/delete room photos (public store) | Yes, all tenant branches | Assigned only | No | No |
 | Read the merchant logo | Yes | Yes | Yes | Yes |
 | Upload/remove the merchant logo | Yes | No | No | No |

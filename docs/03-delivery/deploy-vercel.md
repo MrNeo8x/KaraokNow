@@ -121,6 +121,8 @@ Chỉ làm khi người dùng yêu cầu, với email do người dùng cung c�
 
 ## 10. Việc còn mở
 
+- **VEN-004** (PD-042, địa chỉ/SĐT/vị trí chi nhánh): **migration `20261124070000_branch_location` phải áp lên Prisma trước khi push** (cột nullable + CHECK — tương thích ngược). Function BE gọi ra `maps.app.goo.gl`/`google.com` để mở link rút gọn (không cần env). Sau deploy: Owner MAJESTIC nhập địa chỉ/SĐT/link cho `LA_KHE`, `THANH_HA` qua giao diện (không seed).
+
 - **OPS-003** (`/v1/health/jobs`): không migration. Sau deploy làm OPS-009 (đăng ký uptime monitor, §6a).
 
 - **BKG-011** (lỗi production: giữ chỗ quá hạn chặn phòng tới lần cron hằng ngày) + **AUD-002**: không migration, không env. Nên push sớm. Smoke: tìm phòng trống `/v1/public/branches/{id}/availability` 200.

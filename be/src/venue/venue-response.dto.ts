@@ -6,6 +6,19 @@ export class BranchResponseDto {
   @ApiProperty() name!: string;
   @ApiProperty({ example: 'Asia/Ho_Chi_Minh', description: 'IANA timezone' }) timezone!: string;
   @ApiProperty({ enum: ['ACTIVE', 'INACTIVE'] }) status!: string;
+  @ApiProperty({ nullable: true, type: String }) address!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Normalised +84… contact phone' }) phone!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) latitude!: number | null;
+  @ApiProperty({ nullable: true, type: Number }) longitude!: number | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Link the Owner pasted' }) mapsUrl!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Google Maps directions to the coordinates' }) directionsUrl!: string | null;
+}
+
+export class ResolvedLocationDto {
+  @ApiProperty() latitude!: number;
+  @ApiProperty() longitude!: number;
+  @ApiProperty({ nullable: true, type: String }) mapsUrl!: string | null;
+  @ApiProperty() directionsUrl!: string;
 }
 
 export class RoomResponseDto {

@@ -37,6 +37,11 @@ export class PublicBranchDto {
   @ApiProperty({ nullable: true, type: String, description: 'Public logo URL (PD-037); null when the merchant has none' }) merchantLogoUrl!: string | null;
   @ApiProperty() name!: string;
   @ApiProperty() timezone!: string;
+  @ApiProperty({ nullable: true, type: String, description: 'Branch address (PD-042)' }) address!: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Branch contact phone, +84… (PD-042)' }) phone!: string | null;
+  @ApiProperty({ nullable: true, type: Number }) latitude!: number | null;
+  @ApiProperty({ nullable: true, type: Number }) longitude!: number | null;
+  @ApiProperty({ nullable: true, type: String, description: 'Google Maps directions link; null when the branch has no location' }) directionsUrl!: string | null;
 }
 export class PublicRoomDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

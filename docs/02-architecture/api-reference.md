@@ -770,6 +770,33 @@ Response được khai báo:
 |---|---|---|
 | 200 | Chưa mô tả | {"type":"array","items":{"$ref":"#/components/schemas/BranchResponseDto"}} |
 
+### POST /v1/merchant/branch-location/resolve
+
+Nhóm: merchant venues
+
+| Vị trí | Tên | Bắt buộc | Kiểu / mô tả |
+|---|---|---|---|
+| header | `X-Tenant-ID` | Có | string |
+
+Xác thực OpenAPI: bearer.
+
+Body bắt buộc:
+
+`application/json`
+
+```json
+{
+  "$ref": "#/components/schemas/ResolveLocationDto"
+}
+```
+
+Response được khai báo:
+
+| HTTP | Mô tả | Schema |
+|---|---|---|
+| 200 | Preview the coordinates of a Google Maps link before saving (PD-042) | {"$ref":"#/components/schemas/ResolvedLocationDto"} |
+| 422 | Not a Google Maps link, or the link has no coordinates | Chưa khai báo schema |
+
 ### GET /v1/merchant/branches/{id}
 
 Nhóm: merchant venues
@@ -3855,6 +3882,24 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "timezone": {
       "type": "string",
       "example": "Asia/Ho_Chi_Minh"
+    },
+    "address": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 300,
+      "description": "One-line address shown to customers (PD-042); null clears it"
+    },
+    "phone": {
+      "type": "string",
+      "nullable": true,
+      "example": "0989 015 619",
+      "description": "Public contact phone (PD-042), stored as +84…; null clears it"
+    },
+    "mapsLink": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 500,
+      "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
     }
   },
   "required": [
@@ -3892,6 +3937,33 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
         "ACTIVE",
         "INACTIVE"
       ]
+    },
+    "address": {
+      "type": "string",
+      "nullable": true
+    },
+    "phone": {
+      "type": "string",
+      "nullable": true,
+      "description": "Normalised +84… contact phone"
+    },
+    "latitude": {
+      "type": "number",
+      "nullable": true
+    },
+    "longitude": {
+      "type": "number",
+      "nullable": true
+    },
+    "mapsUrl": {
+      "type": "string",
+      "nullable": true,
+      "description": "Link the Owner pasted"
+    },
+    "directionsUrl": {
+      "type": "string",
+      "nullable": true,
+      "description": "Google Maps directions to the coordinates"
     }
   },
   "required": [
@@ -3899,7 +3971,59 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "code",
     "name",
     "timezone",
-    "status"
+    "status",
+    "address",
+    "phone",
+    "latitude",
+    "longitude",
+    "mapsUrl",
+    "directionsUrl"
+  ]
+}
+```
+
+### ResolveLocationDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "mapsLink": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "mapsLink"
+  ]
+}
+```
+
+### ResolvedLocationDto
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "latitude": {
+      "type": "number"
+    },
+    "longitude": {
+      "type": "number"
+    },
+    "mapsUrl": {
+      "type": "string",
+      "nullable": true
+    },
+    "directionsUrl": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "latitude",
+    "longitude",
+    "mapsUrl",
+    "directionsUrl"
   ]
 }
 ```
@@ -3915,6 +4039,24 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "timezone": {
       "type": "string"
+    },
+    "address": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 300,
+      "description": "One-line address shown to customers (PD-042); null clears it"
+    },
+    "phone": {
+      "type": "string",
+      "nullable": true,
+      "example": "0989 015 619",
+      "description": "Public contact phone (PD-042), stored as +84…; null clears it"
+    },
+    "mapsLink": {
+      "type": "string",
+      "nullable": true,
+      "maxLength": 500,
+      "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
     }
   }
 }
@@ -7567,6 +7709,29 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     },
     "timezone": {
       "type": "string"
+    },
+    "address": {
+      "type": "string",
+      "nullable": true,
+      "description": "Branch address (PD-042)"
+    },
+    "phone": {
+      "type": "string",
+      "nullable": true,
+      "description": "Branch contact phone, +84… (PD-042)"
+    },
+    "latitude": {
+      "type": "number",
+      "nullable": true
+    },
+    "longitude": {
+      "type": "number",
+      "nullable": true
+    },
+    "directionsUrl": {
+      "type": "string",
+      "nullable": true,
+      "description": "Google Maps directions link; null when the branch has no location"
     }
   },
   "required": [
@@ -7575,7 +7740,12 @@ Tham chiếu `$ref` trỏ tới tên schema trong danh sách sau. `required` là
     "merchantName",
     "merchantLogoUrl",
     "name",
-    "timezone"
+    "timezone",
+    "address",
+    "phone",
+    "latitude",
+    "longitude",
+    "directionsUrl"
   ]
 }
 ```

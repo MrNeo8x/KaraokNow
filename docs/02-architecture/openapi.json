@@ -1400,6 +1400,54 @@
         ]
       }
     },
+    "/v1/merchant/branch-location/resolve": {
+      "post": {
+        "operationId": "VenueController_resolveLocation",
+        "parameters": [
+          {
+            "name": "X-Tenant-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveLocationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview the coordinates of a Google Maps link before saving (PD-042)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolvedLocationDto"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a Google Maps link, or the link has no coordinates"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "merchant venues"
+        ]
+      }
+    },
     "/v1/merchant/branches/{id}": {
       "get": {
         "operationId": "VenueController_getBranch",
@@ -6997,6 +7045,24 @@
           "timezone": {
             "type": "string",
             "example": "Asia/Ho_Chi_Minh"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "One-line address shown to customers (PD-042); null clears it"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "0989 015 619",
+            "description": "Public contact phone (PD-042), stored as +84…; null clears it"
+          },
+          "mapsLink": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
           }
         },
         "required": [
@@ -7029,6 +7095,33 @@
               "ACTIVE",
               "INACTIVE"
             ]
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Normalised +84… contact phone"
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "mapsUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Link the Owner pasted"
+          },
+          "directionsUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Google Maps directions to the coordinates"
           }
         },
         "required": [
@@ -7036,7 +7129,49 @@
           "code",
           "name",
           "timezone",
-          "status"
+          "status",
+          "address",
+          "phone",
+          "latitude",
+          "longitude",
+          "mapsUrl",
+          "directionsUrl"
+        ]
+      },
+      "ResolveLocationDto": {
+        "type": "object",
+        "properties": {
+          "mapsLink": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "mapsLink"
+        ]
+      },
+      "ResolvedLocationDto": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "mapsUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "directionsUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "mapsUrl",
+          "directionsUrl"
         ]
       },
       "UpdateBranchDto": {
@@ -7047,6 +7182,24 @@
           },
           "timezone": {
             "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300,
+            "description": "One-line address shown to customers (PD-042); null clears it"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "example": "0989 015 619",
+            "description": "Public contact phone (PD-042), stored as +84…; null clears it"
+          },
+          "mapsLink": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "description": "Google Maps link (full or maps.app.goo.gl) or \"latitude, longitude\"; null clears the location"
           }
         }
       },
@@ -10249,6 +10402,29 @@
           },
           "timezone": {
             "type": "string"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Branch address (PD-042)"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Branch contact phone, +84… (PD-042)"
+          },
+          "latitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "longitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "directionsUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Google Maps directions link; null when the branch has no location"
           }
         },
         "required": [
@@ -10257,7 +10433,12 @@
           "merchantName",
           "merchantLogoUrl",
           "name",
-          "timezone"
+          "timezone",
+          "address",
+          "phone",
+          "latitude",
+          "longitude",
+          "directionsUrl"
         ]
       },
       "PublicBranchListDto": {

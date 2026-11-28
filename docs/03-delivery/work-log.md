@@ -6,9 +6,9 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 
 Đọc mục này trước; các mục nhật ký bên dưới là lịch sử.
 
-**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
+**Code trên `main`:** `origin/main` = `84aa397` (đã deploy production). **Chưa push:** commit VEN-004 (vị trí chi nhánh, **có migration `20261124070000`**), commit OPS-003 (`/v1/health/jobs`), commit BKG-011/AUD-002 (sửa lỗi production giữ chỗ quá hạn chặn phòng — nên push sớm, không migration), `693fd7b` BE IAM-008 quản lý user Platform (PD-040, **có migration**), `31c7905` FE-012 giữ phiên qua F5 + chọn merchant, `8949911` work log FE, và commit tài liệu này. Gần nhất trước đó: `84aa397` FE-015/FE-016, `8d85d55` BE IAM-007 cookie phiên + `/me/tenants` + sửa lỗi phục vụ file local, `8029594` BE BKG-010 mã đặt phòng 6 ký tự, `1205321` BE FILE-001 Vercel Blob.
 
-**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **50/50** (sau OPS-003), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
+**Kiểm chứng gần nhất:** BE (sau IAM-008) `npm run verify` 67/67 unit + drift OpenAPI/Markdown, `npm run test:e2e` **51/51** (sau VEN-004), migration `20261124060000` up → down → up trên Postgres 17 tạm. FE (sau FE-012) unit 54/54, `tsc`; e2e `session` 9/9, `platform-role` 16/16, `files` 13/13, `roles` 28/28, `api-smoke` 66/66, `customer` 22/22, `staff` 29/29.
 
 **Môi trường local** (`be/compose.yaml`): Postgres `:5433` đã áp **28 migration** (đến `20261124060000_platform_user_management`); backend `:3000` chạy `693fd7b`, `AUTH_COOKIE_SECURE=false` (HTTP); file upload nằm ở `/app/.storage` trong container, **mất khi rebuild**. Frontend `:3100`: rebuild nếu cần FE-012. Đã seed UAT; tài khoản `uat.owner` thuộc >30 merchant thử do e2e tạo. Worker tắt.
 
@@ -26,6 +26,15 @@ Nhật ký theo phiên để agent sau (Codex/Claude Code, luồng BE hoặc FE)
 **Không làm khi chưa có quyết định:** thanh toán online, tính tiền overtime hoặc gia hạn giờ, tự động hoàn tiền/no-show, Zalo/Messenger, video/tệp khác ngoài ảnh và PDF.
 
 
+
+---
+
+## 2026-11-28 — Luồng BE: địa chỉ, SĐT và vị trí Google Maps của chi nhánh (VEN-004, PD-042)
+
+- Người dùng: cần vị trí Google Maps ở phần khai báo cơ sở và phần đặt phòng. PO chọn: dán link Google Maps (không API key), khách thấy địa chỉ + nút Chỉ đường, SĐT công khai có nút gọi, địa chỉ một dòng → PD-042 (cũng trả lời câu hỏi treo của VEN-004).
+- Code: migration `20261124070000_branch_location`; `be/src/venue/branch-location.ts` (toạ độ từ `!3d…!4d…`, `@lat,lng`, `q/query/destination/ll`, `/search|place|dir/lat,lng`, `consent.google.com?continue=`; link rút gọn theo redirect thủ công tối đa 5 bước, mỗi bước https + host Google, timeout 4 s, không đọc body); DTO/service/controller chi nhánh; catalog công khai.
+- Kiểm chứng: unit 70/70 (parser + redirect giả, chặn redirect sang `169.254.169.254`), E2E 51/51, migration up → down → up. Chưa thử link `maps.app.goo.gl` thật (môi trường test không gọi mạng) — kiểm ở UAT N1.
+- FE-018 `READY`. Production cần migrate trước push; dữ liệu MAJESTIC nhập qua giao diện.
 
 ---
 

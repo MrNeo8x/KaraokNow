@@ -2079,6 +2079,48 @@ describe('Authentication, membership, RBAC and venue API', () => {
     expect((await check()).body.checks.holdExpiry.oldestOverdueMinutes ?? 0).toBeLessThan(2880);
   });
 
+  it('stores branch address, public phone and a Google Maps location from a pasted link (VEN-004, PD-042)', async () => {
+    const doc = JSON.parse(readFileSync(resolve('../docs/02-architecture/openapi.json'), 'utf8'));
+    const link = 'https://www.google.com/maps/place/Karaoke+Majestic/@20.97,105.75,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x1!8m2!3d20.9786123!4d105.7569456';
+    const created = (await authorized('post', '/v1/merchant/branches').send({ code: 'LOC-1', name: 'La Khê', timezone: 'Asia/Ho_Chi_Minh',
+      address: '  80 Khu Trống Đồng, P. Dương Nội, Hà Nội ', phone: '0989 015 619', mapsLink: link }).expect(201)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/branches', 201, created);
+    expect(created).toMatchObject({ address: '80 Khu Trống Đồng, P. Dương Nội, Hà Nội', phone: '+84989015619', latitude: 20.978612, longitude: 105.756946,
+      mapsUrl: link, directionsUrl: 'https://www.google.com/maps/dir/?api=1&destination=20.978612,105.756946' });
+    const plain = (await authorized('post', '/v1/merchant/branches').send({ code: 'LOC-2', name: 'No location', timezone: 'Asia/Ho_Chi_Minh' }).expect(201)).body;
+    expect(plain).toMatchObject({ address: null, phone: null, latitude: null, longitude: null, mapsUrl: null, directionsUrl: null });
+
+    await authorized('post', '/v1/merchant/branches').send({ code: 'LOC-3', name: 'Bad', timezone: 'Asia/Ho_Chi_Minh', mapsLink: 'https://evil.example/@21,105,15z' }).expect(422);
+    await authorized('post', '/v1/merchant/branches').send({ code: 'LOC-3', name: 'Bad', timezone: 'Asia/Ho_Chi_Minh', phone: 'abc' }).expect(400);
+    await authorized('patch', `/v1/merchant/branches/${created.id}`).send({ mapsLink: 'https://www.google.com/maps/place/Karaoke+Majestic' }).expect(422);
+
+    // Partial updates: undefined keeps, null clears, coordinates accepted directly.
+    const moved = (await authorized('patch', `/v1/merchant/branches/${created.id}`).send({ mapsLink: '21.0285, 105.8542', phone: null }).expect(200)).body;
+    expect(moved).toMatchObject({ address: '80 Khu Trống Đồng, P. Dương Nội, Hà Nội', phone: null, latitude: 21.0285, longitude: 105.8542, mapsUrl: null });
+    expect((await authorized('patch', `/v1/merchant/branches/${created.id}`).send({ name: 'La Khê 2' }).expect(200)).body).toMatchObject({ latitude: 21.0285, address: '80 Khu Trống Đồng, P. Dương Nội, Hà Nội' });
+    const preview = (await authorized('post', '/v1/merchant/branch-location/resolve').send({ mapsLink: 'https://maps.google.com/?q=10.7769,106.7009' }).expect(200)).body;
+    assertMatchesContract(doc, 'post', '/v1/merchant/branch-location/resolve', 200, preview);
+    expect(preview).toEqual({ latitude: 10.7769, longitude: 106.7009, mapsUrl: 'https://maps.google.com/?q=10.7769,106.7009', directionsUrl: 'https://www.google.com/maps/dir/?api=1&destination=10.7769,106.7009' });
+
+    // Customers see address, phone and directions in the public catalog.
+    await authorized('patch', `/v1/merchant/branches/${created.id}`).send({ phone: '+84 989 015 619' }).expect(200);
+    const catalog = (await pool.query('SELECT published,platform_approved FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A])).rows[0];
+    if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=true,platform_approved=true WHERE tenant_id=$1', [TENANT_A]);
+    else await pool.query('INSERT INTO tenant_public_catalog(tenant_id,published,platform_approved,updated_by) VALUES($1,true,true,$2)', [TENANT_A, OWNER_ID]);
+    try {
+      const listed = (await request(app.getHttpServer()).get('/v1/public/branches').query({ limit: 100 }).expect(200)).body;
+      assertMatchesContract(doc, 'get', '/v1/public/branches', 200, listed);
+      expect(listed.items.find((b: { id: string }) => b.id === created.id)).toMatchObject({ address: '80 Khu Trống Đồng, P. Dương Nội, Hà Nội', phone: '+84989015619',
+        latitude: 21.0285, longitude: 105.8542, directionsUrl: 'https://www.google.com/maps/dir/?api=1&destination=21.0285,105.8542' });
+      expect(listed.items.find((b: { id: string }) => b.id === plain.id)).toMatchObject({ directionsUrl: null });
+    } finally {
+      if (catalog) await pool.query('UPDATE tenant_public_catalog SET published=$2,platform_approved=$3 WHERE tenant_id=$1', [TENANT_A, catalog.published, catalog.platform_approved]);
+      else await pool.query('DELETE FROM tenant_public_catalog WHERE tenant_id=$1', [TENANT_A]);
+    }
+    expect((await authorized('patch', `/v1/merchant/branches/${created.id}`).send({ mapsLink: null, address: null }).expect(200)).body)
+      .toMatchObject({ address: null, latitude: null, longitude: null, mapsUrl: null, directionsUrl: null });
+  });
+
   function authorized(method: 'get' | 'post' | 'patch' | 'delete', path: string) {
     return request(app.getHttpServer())[method](path)
       .set('Authorization', `Bearer ${ownerToken}`).set('X-Tenant-ID', TENANT_A);

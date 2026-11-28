@@ -6,6 +6,8 @@ import { PG_POOL } from '../platform/database/database.module';
 import { EXTENSIONS, IMAGE_TYPES } from '../platform/storage/file-type';
 import { ObjectStorageService, StorageBackend } from '../platform/storage/object-storage.service';
 import { UploadedFileLike, requireFile } from '../platform/storage/uploaded-file';
+import { normalizePhone } from '../booking/phone';
+import { directionsUrl, resolveMapsLink } from './branch-location';
 
 const MEDIA_FIELDS = `id,room_id AS "roomId",asset_ref AS "assetRef",alt_text AS "altText",display_order AS "displayOrder",
   storage_url AS url,content_type AS "contentType",size_bytes AS "sizeBytes"`;
@@ -16,7 +18,19 @@ import {
   CreateRoomMediaDto, RoomStatusDto, UpdateBranchDto, UpdateRoomAmenityDto, UpdateRoomDto, UpdateRoomMediaDto
 } from './dto';
 
-export interface Branch { id: string; code: string; name: string; timezone: string; status: string }
+export interface Branch {
+  id: string; code: string; name: string; timezone: string; status: string;
+  address: string | null; phone: string | null; latitude: number | null; longitude: number | null; mapsUrl: string | null; directionsUrl: string | null;
+}
+/** VEN-004 / PD-042: address, public phone and Google Maps location. */
+export const BRANCH_FIELDS = `id,code,name,timezone,status,address,contact_phone AS phone,latitude::float8 AS latitude,longitude::float8 AS longitude,
+  maps_url AS "mapsUrl",CASE WHEN latitude IS NULL THEN NULL ELSE 'https://www.google.com/maps/dir/?api=1&destination='||latitude::float8||','||longitude::float8 END AS "directionsUrl"`;
+
+/** Strips separators and normalises Vietnamese numbers to +84…; null/undefined pass through. */
+export function normalizeBranchPhone(phone: string | null | undefined): string | null | undefined {
+  if (phone === null || phone === undefined) return phone;
+  return normalizePhone(phone.replace(/[\s.()-]/g, ''));
+}
 export interface Room { id: string; branchId: string; code: string; name: string; capacity: number; status: string }
 export interface RoomAmenity { id: string; roomId: string; label: string; createdAt: Date }
 export interface RoomMedia { id: string; roomId: string; assetRef: string; altText: string | null; displayOrder: number; url: string | null; contentType: string | null; sizeBytes: number | null }
@@ -25,19 +39,27 @@ export interface RoomMedia { id: string; roomId: string; assetRef: string; altTe
 export class VenueService {
   constructor(@Inject(PG_POOL) private readonly db: Pool, private readonly storage: ObjectStorageService) {}
 
+  async resolveLocation(mapsLink: string) {
+    const location = await this.locate(mapsLink);
+    return { ...location, directionsUrl: directionsUrl(location.latitude, location.longitude)! };
+  }
+
   async createBranch(actor: Actor, dto: CreateBranchDto): Promise<Branch> {
     this.validateTimezone(dto.timezone);
+    const location = dto.mapsLink ? await this.locate(dto.mapsLink) : null; // network call outside the transaction
     return this.mutate(actor, 'BRANCH_CREATED', 'BRANCH', randomUUID(), async (client, id) => {
       const result = await this.safeWrite(() => client.query<Branch>(
-        `INSERT INTO branches(id,tenant_id,code,name,timezone,status) VALUES ($1,$2,$3,$4,$5,'ACTIVE')
-         RETURNING id,code,name,timezone,status`, [id, actor.tenantId, dto.code, dto.name, dto.timezone]));
+        `INSERT INTO branches(id,tenant_id,code,name,timezone,status,address,contact_phone,latitude,longitude,maps_url)
+         VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,$7,$8,$9,$10)
+         RETURNING ${BRANCH_FIELDS}`, [id, actor.tenantId, dto.code, dto.name, dto.timezone, dto.address?.trim() ?? null,
+          normalizeBranchPhone(dto.phone) ?? null, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null]));
       return result.rows[0];
     });
   }
 
   async listBranches(actor: Actor): Promise<Branch[]> {
     return (await this.db.query<Branch>(
-      `SELECT id,code,name,timezone,status FROM branches
+      `SELECT ${BRANCH_FIELDS} FROM branches
        WHERE tenant_id=$1 AND ($2::boolean OR id=ANY($3::uuid[])) ORDER BY name`,
       [actor.tenantId, actor.roles.includes('OWNER'), actor.branchIds])).rows;
   }
@@ -45,7 +67,7 @@ export class VenueService {
   async getBranch(actor: Actor, id: string): Promise<Branch> {
     this.assertBranchAccess(actor, id);
     const result = await this.db.query<Branch>(
-      'SELECT id,code,name,timezone,status FROM branches WHERE tenant_id=$1 AND id=$2', [actor.tenantId, id]);
+      `SELECT ${BRANCH_FIELDS} FROM branches WHERE tenant_id=$1 AND id=$2`, [actor.tenantId, id]);
     if (!result.rows[0]) throw new NotFoundException('Branch not found');
     return result.rows[0];
   }
@@ -53,18 +75,32 @@ export class VenueService {
   async updateBranch(actor: Actor, id: string, dto: UpdateBranchDto): Promise<Branch> {
     this.assertBranchAccess(actor, id);
     if (dto.timezone) this.validateTimezone(dto.timezone);
+    // undefined = unchanged, null = clear (address, phone, location).
+    const location = dto.mapsLink ? await this.locate(dto.mapsLink) : null;
     return this.updateEntity<Branch>(actor, 'BRANCH_UPDATED', 'BRANCH', id,
-      'SELECT id,code,name,timezone,status FROM branches WHERE tenant_id=$1 AND id=$2 FOR UPDATE',
-      `UPDATE branches SET name=COALESCE($3,name),timezone=COALESCE($4,timezone),updated_at=now(),version=version+1
-       WHERE tenant_id=$1 AND id=$2 RETURNING id,code,name,timezone,status`, [dto.name ?? null, dto.timezone ?? null]);
+      `SELECT ${BRANCH_FIELDS} FROM branches WHERE tenant_id=$1 AND id=$2 FOR UPDATE`,
+      `UPDATE branches SET name=COALESCE($3,name),timezone=COALESCE($4,timezone),
+         address=CASE WHEN $5::boolean THEN $6::varchar ELSE address END,
+         contact_phone=CASE WHEN $7::boolean THEN $8::varchar ELSE contact_phone END,
+         latitude=CASE WHEN $9::boolean THEN $10::numeric ELSE latitude END,
+         longitude=CASE WHEN $9::boolean THEN $11::numeric ELSE longitude END,
+         maps_url=CASE WHEN $9::boolean THEN $12::varchar ELSE maps_url END,
+         updated_at=now(),version=version+1
+       WHERE tenant_id=$1 AND id=$2 RETURNING ${BRANCH_FIELDS}`,
+      [dto.name ?? null, dto.timezone ?? null,
+        dto.address !== undefined, dto.address?.trim() ?? null,
+        dto.phone !== undefined, normalizeBranchPhone(dto.phone) ?? null,
+        dto.mapsLink !== undefined, location?.latitude ?? null, location?.longitude ?? null, location?.mapsUrl ?? null]);
   }
+
+  private locate(mapsLink: string) { return resolveMapsLink(mapsLink); }
 
   async setBranchStatus(actor: Actor, id: string, dto: BranchStatusDto): Promise<Branch> {
     this.assertBranchAccess(actor, id);
     return this.updateEntity<Branch>(actor, 'BRANCH_STATUS_CHANGED', 'BRANCH', id,
-      'SELECT id,code,name,timezone,status FROM branches WHERE tenant_id=$1 AND id=$2 FOR UPDATE',
+      `SELECT ${BRANCH_FIELDS} FROM branches WHERE tenant_id=$1 AND id=$2 FOR UPDATE`,
       `UPDATE branches SET status=$3,updated_at=now(),version=version+1 WHERE tenant_id=$1 AND id=$2
-       RETURNING id,code,name,timezone,status`, [dto.status]);
+       RETURNING ${BRANCH_FIELDS}`, [dto.status]);
   }
 
   async createRoom(actor: Actor, dto: CreateRoomDto): Promise<Room> {

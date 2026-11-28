@@ -1,10 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class CreateBranchDto {
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(50) code!: string;
   @ApiProperty() @IsString() @IsNotEmpty() @MaxLength(200) name!: string;
   @ApiProperty({ example: 'Asia/Ho_Chi_Minh' }) @IsString() @IsNotEmpty() @MaxLength(64) timezone!: string;
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 300, description: 'One-line address shown to customers (PD-042); null clears it' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/\S/) @MaxLength(300) address?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '0989 015 619', description: 'Public contact phone (PD-042), stored as +84…; null clears it' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/^\+?[0-9][0-9 .()-]{7,19}$/) phone?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 500, description: 'Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500) mapsLink?: string | null;
+}
+
+export class ResolveLocationDto {
+  @ApiProperty({ maxLength: 500 }) @IsString() @IsNotEmpty() @MaxLength(500) mapsLink!: string;
 }
 
 export class CreateRoomDto {
@@ -17,6 +27,12 @@ export class CreateRoomDto {
 export class UpdateBranchDto {
   @ApiProperty({ required: false }) @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200) name?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsString() @IsNotEmpty() @MaxLength(64) timezone?: string;
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 300, description: 'One-line address shown to customers (PD-042); null clears it' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/\S/) @MaxLength(300) address?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, example: '0989 015 619', description: 'Public contact phone (PD-042), stored as +84…; null clears it' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @Matches(/^\+?[0-9][0-9 .()-]{7,19}$/) phone?: string | null;
+  @ApiProperty({ required: false, nullable: true, type: String, maxLength: 500, description: 'Google Maps link (full or maps.app.goo.gl) or "latitude, longitude"; null clears the location' })
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsString() @MaxLength(500) mapsLink?: string | null;
 }
 export class BranchStatusDto {
   @ApiProperty({ enum: ['ACTIVE', 'INACTIVE'] }) @IsEnum(['ACTIVE', 'INACTIVE']) status!: 'ACTIVE' | 'INACTIVE';
